@@ -46,7 +46,8 @@ test("navigation matches the approved prototype role mapping", async () => {
   for (const module of prototype.modules) {
     const actual = navigation.find((item) => item.id === module.id);
     assert.ok(actual, module.id);
-    const expected = module.id === "admissions" ? [...module.roles, "teacher"] : module.roles;
+    const expected = module.id === "admissions" ? [...module.roles, "teacher"]
+      : module.id === "finance" ? [...module.roles, "receptionist"] : module.roles;
     assert.deepEqual([...actual.roles].sort(), [...expected].sort(), module.id);
   }
 });

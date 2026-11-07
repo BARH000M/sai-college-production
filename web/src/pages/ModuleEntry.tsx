@@ -3,6 +3,7 @@ import { navigation, visibleNavigation } from "../lib/navigation";
 import { ManagementPage } from "./ManagementPage";
 import { Admissions } from "./Admissions";
 import { Attendance } from "./Attendance";
+import { Finance } from "./Finance";
 
 export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userId: string | null }) {
   const { moduleId } = useParams();
@@ -16,6 +17,7 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   }
   if (item.id === "admissions") return <Admissions roles={roles} userId={userId} />;
   if (item.id === "attendance") return <Attendance roles={roles} userId={userId} />;
+  if (item.id === "finance") return <Finance key={`${userId}:${[...roles].sort().join(",")}`} roles={roles} userId={userId} />;
   return <main className="workspace"><section className="panel">
     <p className="eyebrow">كلية ساي</p><h1>{item.label}</h1>
     <p className="muted">هذا القسم غير متاح بعد. لم تُفعّل وظائفه في التطبيق.</p>

@@ -46,7 +46,7 @@ export const navigation: readonly NavigationItem[] = [
   { id: "authoring", label: "تأليف الدروس", icon: "✎", roles: ["super_admin", "admin", "content_editor", "teacher"] },
   { id: "media", label: "مكتبة الوسائط", icon: "▤", roles: ["super_admin", "admin", "content_editor", "teacher"] },
   { id: "approvals", label: "المراجعة والنشر", icon: "✓", roles: ["super_admin", "admin", "content_editor", "teacher"] },
-  { id: "finance", label: "الرسوم والمالية", icon: "◈", roles: ["super_admin", "admin", "accountant", "parent", "student"] },
+  { id: "finance", label: "الرسوم والمالية", icon: "◈", roles: ["super_admin", "admin", "accountant", "receptionist", "parent", "student"] },
   { id: "staff", label: "شؤون الموظفين", icon: "♙", roles: ["super_admin", "admin", "teacher", "accountant", "receptionist", "librarian", "content_editor"] },
   { id: "reception", label: "الاستقبال", icon: "♙", roles: ["super_admin", "admin", "receptionist"] },
   { id: "library", label: "المكتبة", icon: "▤", roles: ["super_admin", "admin", "librarian", "teacher", "parent", "student"] },
@@ -71,5 +71,5 @@ export function modulePath(item: NavigationItem): string {
 }
 
 export function isModuleAvailable(id: string): boolean {
-  return ["home", "branches", "sessions", "classes", "students", "admissions", "attendance"].includes(id);
+  return ["home", "branches", "sessions", "classes", "students", "admissions", "attendance", "finance"].includes(id);
 }

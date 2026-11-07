@@ -38,8 +38,22 @@ test("finance controls reflect role decisions without widening unrelated roles",
   assert.deepEqual(financePermissions(["super_admin"]), {
     view: true, manageGroups: true, assignFees: true, postPayment: true, waive: true, void: true, refund: true,
   });
+
   assert.deepEqual(financePermissions(["accountant"]), {
     view: true, manageGroups: true, assignFees: true, postPayment: true, waive: true, void: true, refund: false,
+  });
+
+  test("saved payment and refund recovery validates the entire payload", async () => {
+    const { parsePendingFinancePayment, parsePendingFinanceRefund } = await finance;
+    const payment = { assignment: "a", amount: "12.50", method: "card", reference: "ref", key: "key" };
+    assert.deepEqual(parsePendingFinancePayment(JSON.stringify(payment)), payment);
+    assert.throws(() => parsePendingFinancePayment(JSON.stringify({ ...payment, reference: "" })));
+    assert.throws(() => parsePendingFinancePayment(JSON.stringify({ ...payment, key: "" })));
+    assert.throws(() => parsePendingFinancePayment("not-json"));
+    const refund = { ...payment, payment: "p", reason: "reason" };
+    assert.deepEqual(parsePendingFinanceRefund(JSON.stringify(refund)), refund);
+    assert.throws(() => parsePendingFinanceRefund(JSON.stringify({ ...refund, payment: "" })));
+    assert.throws(() => parsePendingFinanceRefund(JSON.stringify({ ...refund, reason: " " })));
   });
   assert.deepEqual(financePermissions(["admin"]), {
     view: true, manageGroups: true, assignFees: true, postPayment: true, waive: false, void: false, refund: false,

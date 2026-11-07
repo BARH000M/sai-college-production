@@ -1,5 +1,30 @@
 # Wave 1 implementation status
 
+## Finance (local preparation; migration 007 not applied)
+
+Migration 007 prepares branch/session fee groups, immutable assignment
+snapshots, YER payments and receipts, waivers, voids, refunds, and a separate
+finance audit log. Its non-login finance owner is subject to forced RLS, and
+browser roles access finance through scoped server functions rather than
+direct table privileges. The web module displays database errors if the
+migration has not been installed; it does not substitute sample records.
+
+The client retains an unconfirmed payment or refund request and its idempotency key in
+the current browser tab's session storage across reloads. Before explicitly
+discarding an uncertain request, staff must reconcile its receipt. This does
+not coordinate separate tabs or devices. Verify receipt or refund history
+before discarding an uncertain request.
+
+The SQL and database behavior suite have not been executed against PostgreSQL.
+A dry run only lists migrations; it does not validate SQL execution, RLS,
+privileges, financial invariants, concurrency, receipt generation, or audit
+atomicity. The behavior test can advance sequences even when rolled back; run
+it only in a verified disposable database, never shared staging or production.
+Do not deploy 007 until those checks and a security review pass in an isolated
+environment. The existing management authorization gate remains
+open. The finance page currently requires real branch, session and student
+identifiers from administrative records when creating fees.
+
 ## Web startup configuration
 
 The web app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in its
