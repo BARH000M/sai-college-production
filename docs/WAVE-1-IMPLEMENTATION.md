@@ -1,5 +1,15 @@
 # Wave 1 implementation status
 
+## Web startup configuration
+
+The web app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in its
+Vite environment. Set them in an untracked `web/.env.local` using the
+authorized project URL and public client key; never put a service-role key or
+database password in browser configuration. Restart Vite after changing
+environment files, then reload the page. A missing or invalid configuration
+now displays a branded Arabic error instead of a blank screen. The error
+boundary does not establish that Supabase is reachable or authentication works.
+
 ## Attendance (prepared for staging; migration 006 not applied)
 
 The attendance route uses migration 006's session and record tables and

@@ -11,7 +11,6 @@ import {
   getInitialAuthState, restoreAuthState, signIn, signOut,
   subscribeToAuthChanges, type AuthState,
 } from "./lib/auth";
-import "./styles.css";
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState>(getInitialAuthState);
