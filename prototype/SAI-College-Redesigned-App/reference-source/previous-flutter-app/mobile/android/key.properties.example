@@ -1,6 +1,0 @@
-# Copy to key.properties only on the release owner's trusted build machine.
-# key.properties and every keystore are ignored by Git. Never use debug keys here.
-storePassword=OWNER_PROVIDED_STORE_PASSWORD
-keyPassword=OWNER_PROVIDED_KEY_PASSWORD
-keyAlias=OWNER_PROVIDED_ALIAS
-storeFile=/absolute/path/to/owner-upload-keystore.jks

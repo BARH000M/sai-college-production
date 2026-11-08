@@ -1,5 +1,0 @@
-Cairo font
-Copyright 2009 The Cairo Project Authors.
-Licensed under the SIL Open Font License, Version 1.1.
-License text: https://openfontlicense.org/open-font-license-official-text/
-Source: https://github.com/Gue3bara/Cairo
