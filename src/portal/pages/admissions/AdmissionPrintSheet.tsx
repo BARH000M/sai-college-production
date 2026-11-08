@@ -4,6 +4,7 @@ import {
   type AdmissionHistoryExportRow, type AdmissionRosterRow,
 } from "@/portal/lib/admissions";
 import { formatDate } from "@/portal/lib/learning";
+import { loadLastArchive } from "@/portal/lib/archiveHeader";
 import { ReportSheet, type SummaryItem } from "@/portal/pages/reports/ReportShell";
 
 export type AdmissionPrintKind = "roster" | "history";
@@ -105,6 +106,7 @@ export function AdmissionPrintSheet({ kind, scope, onClose }: {
       : [];
 
   const title = kind === "roster" ? "كشف طلبات القبول والتسجيل" : "سجل تغييرات حالات القبول";
+  const archive = loadLastArchive() ?? undefined;
 
   return <ReportSheet
     title={title}
@@ -115,6 +117,7 @@ export function AdmissionPrintSheet({ kind, scope, onClose }: {
     onRetry={() => setRetry((value) => value + 1)}
     onClose={onClose}
     canPrint={!loading && !error && Boolean(loaded)}
+    archive={archive}
   >
     {loaded?.kind === "roster" && <RosterTable rows={loaded.rows} />}
     {loaded?.kind === "history" && <HistoryTable rows={loaded.rows} />}

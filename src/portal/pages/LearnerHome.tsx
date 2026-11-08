@@ -173,6 +173,16 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
       <Link className="button secondary" to="/portal/modules/progress">التقدم والأداء</Link>
     </div>}
 
+    {learner && <nav className="learner-links lab-skill-links" aria-label="تدريب مهارات اللغة الصينية">
+      <span className="lab-meta">تدريب المهارات:</span>
+      <Link className="button secondary" to="/portal/modules/listening">الاستماع</Link>
+      <Link className="button secondary" to="/portal/modules/speaking">التحدث والنطق</Link>
+      <Link className="button secondary" to="/portal/modules/tones">النغمات</Link>
+      <Link className="button secondary" to="/portal/modules/handwriting">الكتابة اليدوية</Link>
+      <Link className="button secondary" to="/portal/modules/reading">القراءة</Link>
+      <Link className="button secondary" to="/portal/modules/review">المراجعة المتباعدة</Link>
+    </nav>}
+
     {learner && !courses.length && <section className="panel learn-empty">
       <h2>لم تُسجَّل مقررات لصفك بعد</h2>
       <p className="muted">سيظهر هنا المقرر فور إضافته من إدارة الأكاديمية إلى صفك الدراسي.</p>

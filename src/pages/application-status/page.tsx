@@ -344,8 +344,8 @@ export default function ApplicationStatusPage() {
                     ? 'تواصل مع مكتب القبول مع ذكر اسمك ورقم هاتفك، وسنعيد إرسال الرقم المرجعي إليك.'
                     : 'Contact the admissions office with your name and phone number and we will resend your reference.'}
                 </p>
-                <a href="mailto:info@saicollege.com" className="mt-3 inline-flex items-center gap-1 text-xs md:text-sm text-primary-700 underline whitespace-nowrap cursor-pointer">
-                  info@saicollege.com
+                <a href="mailto:admissions@saicollege.edu.ye" className="mt-3 inline-flex items-center gap-1 text-xs md:text-sm text-primary-700 underline whitespace-nowrap cursor-pointer">
+                  admissions@saicollege.edu.ye
                   <i className="ri-mail-line"></i>
                 </a>
               </div>

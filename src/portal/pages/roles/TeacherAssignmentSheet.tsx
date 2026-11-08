@@ -1,5 +1,6 @@
 import type { TeacherAccount, TeacherClass } from "@/portal/lib/learningAccounts";
 import { printDate } from "@/portal/lib/letterhead";
+import { printSheet } from "@/portal/lib/printDocument";
 import { PrintFooter, PrintLetterhead } from "@/portal/components/PrintLetterhead";
 
 export function TeacherAssignmentSheet({
@@ -82,7 +83,7 @@ export function TeacherAssignmentSheet({
     </div>
 
     <div className="print-actions">
-      <button className="button primary" type="button" onClick={() => window.print()} disabled={!teachers.length}>
+      <button className="button primary" type="button" onClick={() => printSheet("كشف إسناد المعلمين والصفوف")} disabled={!teachers.length}>
         طباعة الكشف
       </button>
       <button className="button secondary" type="button" onClick={onClose}>إغلاق</button>

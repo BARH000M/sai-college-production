@@ -3,7 +3,10 @@ import { loadStudentReport, type StudentReport } from "@/portal/lib/studentRepor
 import { formatDate } from "@/portal/lib/learning";
 import { exportStudentReportCsv } from "@/portal/lib/reportExport";
 import { printDate, buildSheetMeta, type ArchiveHeader } from "@/portal/lib/letterhead";
+import { printSheet } from "@/portal/lib/printDocument";
 import { PrintFooter, PrintLetterhead } from "@/portal/components/PrintLetterhead";
+
+const REPORT_TITLE = "تقرير تقدم الطالب للفصل الدراسي";
 
 export function StudentProgressReport({ studentId, onClose, autoPrint = false, archive }: {
   studentId: string;
@@ -34,7 +37,7 @@ export function StudentProgressReport({ studentId, onClose, autoPrint = false, a
   useEffect(() => {
     if (!autoPrint || !report || printed.current) return;
     printed.current = true;
-    const timer = window.setTimeout(() => window.print(), 400);
+    const timer = window.setTimeout(() => printSheet(`${REPORT_TITLE} — ${report.student.full_name}`), 400);
     return () => window.clearTimeout(timer);
   }, [autoPrint, report]);
 
@@ -51,7 +54,7 @@ export function StudentProgressReport({ studentId, onClose, autoPrint = false, a
   return <div className="print-overlay" role="dialog" aria-modal="true" aria-label="تقرير تقدم الطالب للفصل">
     <div className="assignment-sheet">
       <PrintLetterhead
-        title="تقرير تقدم الطالب للفصل الدراسي"
+        title={REPORT_TITLE}
         topic="المقررات والدرجات والحضور — نسخة ولي الأمر"
         meta={buildSheetMeta(archive)}
       />
@@ -124,7 +127,7 @@ export function StudentProgressReport({ studentId, onClose, autoPrint = false, a
     </div>
 
     <div className="print-actions">
-      <button className="button primary" type="button" onClick={() => window.print()} disabled={!report || loading || !!error}>
+      <button className="button primary" type="button" onClick={() => printSheet(report ? `${REPORT_TITLE} — ${report.student.full_name}` : REPORT_TITLE)} disabled={!report || loading || !!error}>
         <i className="ri-printer-line" aria-hidden="true"></i> طباعة التقرير لولي الأمر
       </button>
       <button className="button secondary" type="button" onClick={handleExport} disabled={!report || loading || !!error}>

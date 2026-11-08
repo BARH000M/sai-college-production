@@ -1,7 +1,10 @@
 import { QRCodeCanvas } from "qrcode.react";
 import { admissionStatuses, applicationStatusUrl, type Admission } from "../lib/admissions";
 import { printDate } from "../lib/letterhead";
+import { printSheet } from "../lib/printDocument";
 import { PrintFooter, PrintLetterhead } from "../components/PrintLetterhead";
+
+const RECEIPT_TITLE = "إيصال استلام طلب قبول";
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -27,7 +30,7 @@ export function AdmissionReceipt({ admission, branchLabel, sessionLabel, onClose
   return <div className="print-overlay" role="dialog" aria-modal="true" aria-label="إيصال استلام طلب قبول">
     <div className="print-receipt">
       <PrintLetterhead
-        title="إيصال استلام طلب قبول"
+        title={RECEIPT_TITLE}
         topic="Admission Enquiry Receipt — إثبات استلام الطلب ومتابعة حالته"
         meta={[
           { label: "تاريخ الإصدار", value: printDate() },
@@ -84,7 +87,7 @@ export function AdmissionReceipt({ admission, branchLabel, sessionLabel, onClose
     </div>
 
     <div className="print-actions">
-      <button className="button primary" onClick={() => window.print()}>طباعة الإيصال</button>
+      <button className="button primary" onClick={() => printSheet(`${RECEIPT_TITLE} ${admission.application_no}`)}>طباعة الإيصال</button>
       <button className="button secondary" onClick={onClose}>إغلاق</button>
     </div>
   </div>;

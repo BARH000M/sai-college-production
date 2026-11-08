@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { formatDate } from "@/portal/lib/learning";
 import { printDate, buildSheetMeta, type ArchiveHeader } from "@/portal/lib/letterhead";
+import { printSheet } from "@/portal/lib/printDocument";
 import { PrintFooter, PrintLetterhead } from "@/portal/components/PrintLetterhead";
 
 export type SummaryItem = { label: string; value: string };
@@ -49,7 +50,7 @@ export function ReportSheet({ title, subtitle, summary, loading, error, onRetry,
 
     <div className="print-actions">
       {onExportCsv && <button className="button secondary" type="button" onClick={onExportCsv} disabled={loading || Boolean(error)}>تصدير CSV</button>}
-      <button className="button primary" type="button" onClick={() => window.print()} disabled={!canPrint}>طباعة التقرير</button>
+      <button className="button primary" type="button" onClick={() => printSheet(title)} disabled={!canPrint}>طباعة التقرير</button>
       <button className="button secondary" type="button" onClick={onClose}>إغلاق</button>
     </div>
   </div>;

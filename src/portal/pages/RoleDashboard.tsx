@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { isAppRole, isModuleAvailable, modulePath, roleLabels, visibleNavigation } from "../lib/navigation";
+import { isAppRole, modulePath, roleLabels, visibleNavigation } from "../lib/navigation";
 
 export function RoleDashboard({ roles }: { roles: readonly string[] }) {
   const modules = visibleNavigation(roles).filter((item) => item.id !== "home");
@@ -11,7 +11,7 @@ export function RoleDashboard({ roles }: { roles: readonly string[] }) {
       <h2 id="modules-title">الأقسام المتاحة لحسابك</h2>
       <p className="data-note">تحدد الأدوار التنقل فقط؛ تُفرض صلاحيات البيانات في قاعدة البيانات.</p>
       {modules.length ? <div className="module-grid">{modules.map((item) =>
-        <Link className="module-card" key={item.id} to={modulePath(item)}><strong>{item.label}</strong><small>{isModuleAvailable(item.id) ? "عرض القسم" : "غير متاح بعد"}</small></Link>
+        <Link className="module-card" key={item.id} to={modulePath(item)}><strong>{item.label}</strong><small>عرض القسم</small></Link>
       )}</div> : <p className="muted">لا توجد أقسام إضافية متاحة لهذا الحساب.</p>}
     </section>
   </main>;

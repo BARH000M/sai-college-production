@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { loadManagementBranches, loadManagementOptions, type Option } from "../lib/management";
 import { AdmissionReceipt } from "../components/AdmissionReceipt";
 import { AdmissionPrintSheet, type AdmissionPrintKind } from "./admissions/AdmissionPrintSheet";
+import { AdmissionApplicationSheet } from "./admissions/AdmissionApplicationSheet";
 import { exportAdmissionHistoryCsv, exportAdmissionRosterCsv } from "../lib/admissionExport";
 import {
   admissionDraft, admissionStatuses, admissionsPageSize, applicationStatusUrl, canManageAdmissions, isAdmissionStatus,
@@ -78,6 +79,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
   const [success, setSuccess] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [applicationOpen, setApplicationOpen] = useState(false);
   const [printKind, setPrintKind] = useState<AdmissionPrintKind | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -293,6 +295,9 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
   return <main className="workspace">
     <div className="page-heading"><div><p className="eyebrow">إدارة الأكاديمية</p><h1>القبول والتسجيل</h1></div>
       <div className="actions">
+        <button className="button secondary" type="button" onClick={() => setPrintKind("roster")}>
+          <i className="ri-printer-line" aria-hidden="true"></i> طباعة كشوف القبول
+        </button>
         {manager && <Link className="button secondary" to="/portal/modules/scanner">مسح إيصال الاستقبال</Link>}
         {canCreate && <button className="button primary" disabled={saving || editing !== undefined || optionsLoading || !!optionsError} onClick={() => openForm(null)}>إضافة طلب</button>}
       </div>
@@ -351,6 +356,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
       </section>
       {canEditBranch(selected.branch_id) && <button className="button primary" onClick={() => openForm(selected)}>تعديل الطلب والحالة</button>}
       <div className="actions receipt-actions">
+        <button className="button secondary" onClick={() => setApplicationOpen(true)}>طباعة نموذج الطلب</button>
         <button className="button secondary" onClick={() => setReceiptOpen(true)}>طباعة إيصال الاستلام</button>
         <button className="button secondary" disabled={exporting !== false} onClick={() => void exportEnquiry()}>{exporting === "enquiry" ? "جارٍ التصدير..." : "تصدير سجل الطلب CSV"}</button>
       </div>
@@ -418,5 +424,6 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
       </form>
     </section>}
     {receiptOpen && selected && <AdmissionReceipt admission={selected} branchLabel={branchName(selected.branch_id)} sessionLabel={sessionName(selected.academic_session_id)} onClose={() => setReceiptOpen(false)} />}
+    {applicationOpen && selected && <AdmissionApplicationSheet admission={selected} branchLabel={branchName(selected.branch_id)} sessionLabel={sessionName(selected.academic_session_id)} onClose={() => setApplicationOpen(false)} />}
   </main>;
 }

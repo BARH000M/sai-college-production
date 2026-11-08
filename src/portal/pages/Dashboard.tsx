@@ -154,7 +154,7 @@ export function Dashboard() {
           >{reminderResult.message}</p>}
         </div>
       </section>
-      <section id="upcoming" className="panel"><h2>الحصص القادمة</h2><p className="muted">جدول الحصص غير متاح بعد في قاعدة البيانات الحالية.</p></section>
+      <section id="upcoming" className="panel"><h2>الحصص القادمة</h2><p className="muted">يتوفر الآن جدول الحصص الأسبوعي وتقويم الاختبارات والفعاليات لكل شعبة.</p><div className="actions"><Link className="button secondary" to="/portal/modules/timetable">عرض الجدول والتقويم</Link><Link className="button secondary" to="/portal/modules/qr">الحضور بالرمز QR</Link></div></section>
       <section id="audit" className="panel audit-panel"><h2>آخر أحداث التدقيق</h2><p className="data-note">سجل عام غير مصنف حسب الفرع أو الجلسة.</p>
         {dataLoading ? <p className="muted">جارٍ تحميل سجل التدقيق...</p> : audit?.error ? <p className="error-box" role="alert">تعذر تحميل سجل التدقيق: {audit.error}</p> : !branchId || !sessionId ? <p className="muted">اختر فرعاً وجلسة لعرض اللوحة.</p> : audit?.data?.length ? <ul className="audit-list">{audit.data.map((entry) => <li key={entry.id}><strong>{entry.action}</strong><span>{entry.entity_type} · <time>{new Date(entry.created_at).toLocaleString("ar")}</time></span></li>)}</ul> : <p className="muted">لا توجد أحداث متاحة لهذا الحساب.</p>}
       </section>
