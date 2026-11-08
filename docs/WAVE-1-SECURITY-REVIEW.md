@@ -1,5 +1,55 @@
 # Wave 1 security review status
 
+## Attendance migration 006 (prepared, not applied)
+
+Both attendance tables enable RLS and revoke browser privileges before granting
+select and limited-column writes. RLS and security-definer checks combine
+server-verified roles, active memberships, class assignment and verified parent
+links. The session trigger checks class/branch/session consistency and rejects
+future dates using `Asia/Aden`. The record trigger checks class membership for
+new marks and locks the session while checking its status; closed and cancelled
+sessions reject edits. Trigger-generated audit rows are transaction-bound.
+No browser role receives delete or truncate privileges. Receptionists may
+correct existing records but cannot create them.
+
+Parsing and mocked web tests are not evidence of effective database security.
+The isolated role, privacy, concurrent close/mark, audit failure and privilege
+tests must pass before deployment. `sai-college-staging` reports
+`MIGRATIONS_FAILED`; investigate that status before staging validation.
+Existing client-insertable audit rows can imitate trigger metadata, so the audit
+log is not tamper-proof.
+
+## Admissions session directory (migration 005, not applied)
+
+Migration 004 is applied on the linked project. The local 004 was modified
+afterward and does not represent that deployed state. Do not rerun it on the
+linked project. The pending 005 provides the forward migration; its replacement
+of `sai_admissions_prepare` preserves the deployed checks except for the
+session validation change. It also tolerates the directory already being
+present when testing a fresh local replay of the current files.
+
+`sai_admissions_sessions(wanted_branch)` is a read-only security-definer
+function with `search_path = public`; it returns only IDs and names of active
+academic sessions. It checks the current user's server-side roles and active
+membership in the requested existing branch, except that a super admin may use
+any existing branch. Only super admins and branch-member admins or
+receptionists qualify. A user holding multiple roles qualifies through any
+authorized role; teacher-only, student, parent, librarian, accountant and
+content-editor users do not qualify. Its execute grant is limited to
+authenticated, and callers cannot supply a user ID. No general session SELECT
+policy is broadened.
+
+The directory grants no session write access. Existing 003 policies still allow
+super admins to manage sessions; an admin or receptionist without that role
+cannot edit or delete them. The admissions trigger independently requires an
+active session on insertion or change and verifies branch authorization.
+Existing inactive session references can remain unchanged. Branch and session
+remain required by the table. The function relies on trusted ownership and
+schema privileges, and must be exercised with real JWT roles and memberships in
+an isolated database before deployment. Migration 005 is not applied. The
+existing actor-bound audit inserts remain forgeable and are not a tamper-proof
+ledger.
+
 ## Student and class management review
 
 **Post-deployment update:** The linked migration history lists 003 as applied. Read-only catalog checks confirmed the ten management write policies, existing SELECT policy definitions, two deactivation columns, five audit triggers, and student/class validation trigger. RLS is enabled on the five management tables, `user_roles`, and `audit_logs`; neither browser role has table `TRUNCATE` on those tables, authenticated has no table `DELETE`, and authenticated has no role-assignment insert or update. The descriptions of 003 as unapplied below are historical. Catalog inspection does not establish whether the policies and triggers behave correctly under real user claims; isolated positive and negative role tests remain outstanding.

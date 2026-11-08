@@ -1,12 +1,34 @@
 # Wave 1 implementation status
 
-## Admissions implementation (prepared, not deployed)
+## Attendance (prepared for staging; migration 006 not applied)
+
+The attendance route uses migration 006's session and record tables and
+role-scoped class and roster directories. Super admins, branch-member admins
+and assigned branch-member teachers can open, mark, close and cancel sessions;
+branch-member receptionists can view and correct existing records only.
+Students and verified parents see only their own or linked students' records.
+Attendance dates use `Asia/Aden`. A cancelled or closed session is read-only,
+and the unique class/date constraint also prevents recreating a cancelled
+session for that date. Corrections of existing records remain possible if a
+student later changes class; new records require current class membership.
+Records are saved individually, not as one bulk transaction.
+
+The linked branch was identified as `sai-college-staging`. Supabase reported
+`MIGRATIONS_FAILED` for that branch even though its history lists 001–005.
+Migration 006 is unapplied; the new route requires it and will surface database
+errors until it exists. Confirm branch health and execute the isolated
+authorization suite before any staging or production deployment approval.
+
+## Admissions implementation
 
 `supabase/migrations/004_admissions.sql` creates the enquiry table, restricted
 column grants, RLS, a branch-scoped active-staff directory function, validation
-and timestamp handling, and transaction-bound audit triggers. It has not been
-applied. `/modules/admissions` contains the real-data UI; it will show an error
-when queries reach a database where the migration has not been applied.
+and timestamp handling, and transaction-bound audit triggers. Migration 004 has
+been applied to the linked project. Its local file was subsequently modified and
+does not match the deployed version; do not rerun it against that project.
+The session-directory changes are now also in the pending
+`005_admissions_session_directory.sql`. Until 005 is deployed, the admissions
+session directory used by `/modules/admissions` is unavailable.
 
 Per the approved workflow, all seven valid statuses may transition to one
 another; `enrolled`, `rejected`, and `withdrawn` have a server-managed closure
@@ -18,14 +40,17 @@ accountant, librarian, or content editor access to an enquiry. Names in the
 staff directory are exposed only to authorized admissions managers for their
 branch (or super admins).
 
-Both branch and session are required. The existing session-read policy is
-unchanged: a receptionist without another qualifying role cannot normally see
-any sessions, so cannot create an enquiry; an admin also cannot select a
-session until an accessible class exposes it. This is a material limitation of
-the requested session policy and must be addressed by an explicitly approved
-future policy/design change, not by bypassing RLS.
+Both branch and session are required. The existing general session-read policy
+is unchanged. The admissions session directory returns only active session IDs
+and names to super admins and active branch-member admins or receptionists for
+the requested branch. The database validates active sessions on creation and
+session changes; a previously selected inactive session may remain unchanged.
+Teacher-only users do not call the directory. Existing super-admin session
+management remains available; the directory does not confer write privileges.
+Migration 005 is unapplied; these changes remain unverified against a running
+database.
 
-The migration has been parsed and dry-run only. Isolated role, trigger and
+Migration 005 has been parsed and dry-run only. Isolated role, trigger and
 audit-atomicity tests must pass before any deployment approval. The existing
 audit table also accepts untrusted authenticated inserts that can imitate trigger
 metadata, so it is not a tamper-proof ledger.

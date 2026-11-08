@@ -1,4 +1,5 @@
--- ISOLATED LOCAL SUPABASE ONLY. The runner sets the local marker.
+-- ISOLATED LOCAL SUPABASE ONLY, with migrations 001 through 005 applied.
+-- The runner sets the local marker; all fixtures are rolled back.
 begin;
 do $$
 begin
@@ -19,6 +20,8 @@ declare
   branch_a uuid := gen_random_uuid();
   branch_b uuid := gen_random_uuid();
   session_id uuid := gen_random_uuid();
+  second_session_id uuid := gen_random_uuid();
+  inactive_session_id uuid := gen_random_uuid();
   class_a uuid;
   enquiry_id uuid;
   other_enquiry_id uuid;
@@ -37,8 +40,10 @@ begin
   insert into public.branches (id, name, code) values
     (branch_a, 'WAVE1_TEST_a', 'WAVE1_TEST_' || run_id || '_a'),
     (branch_b, 'WAVE1_TEST_b', 'WAVE1_TEST_' || run_id || '_b');
-  insert into public.academic_sessions (id, name, starts_on, ends_on)
-    values (session_id, 'WAVE1_TEST_' || run_id, date '2031-01-01', date '2031-12-31');
+  insert into public.academic_sessions (id, name, starts_on, ends_on, is_active)
+    values (session_id, 'WAVE1_TEST_' || run_id, date '2031-01-01', date '2031-12-31', true),
+      (second_session_id, 'WAVE1_TEST_' || run_id || '_second', date '2032-01-01', date '2032-12-31', true),
+      (inactive_session_id, 'WAVE1_TEST_' || run_id || '_inactive', date '2031-01-01', date '2031-12-31', false);
   insert into public.branch_memberships (user_id, branch_id) values
     (admin_id, branch_a), (reception_id, branch_a), (teacher_id, branch_a);
   insert into public.classes (branch_id, session_id, name, program, teacher_id)
@@ -48,6 +53,34 @@ begin
 
   perform set_config('request.jwt.claim.sub', super_id::text, true);
   execute 'set local role authenticated';
+  if has_function_privilege('anon', 'public.sai_admissions_sessions(uuid)', 'execute') then
+    raise exception 'Anonymous role can execute session directory';
+  end if;
+  select count(*) into found_count from public.sai_admissions_sessions(branch_a) s where s.id = session_id;
+  if found_count <> 1 then raise exception 'Super admin cannot list active session'; end if;
+  select count(*) into found_count from public.sai_admissions_sessions(branch_a) s where s.id = inactive_session_id;
+  if found_count <> 0 then raise exception 'Inactive session listed'; end if;
+  denied := false;
+  begin
+    insert into public.admissions_enquiries (branch_id, academic_session_id, applicant_full_name)
+      values (branch_a, inactive_session_id, 'WAVE1_TEST_inactive');
+  exception when check_violation then denied := true;
+  end;
+  if not denied then raise exception 'Inactive session accepted'; end if;
+  denied := false;
+  begin
+    insert into public.admissions_enquiries (branch_id, academic_session_id, applicant_full_name)
+      values (branch_a, null, 'WAVE1_TEST_no_session');
+  exception when check_violation or not_null_violation then denied := true;
+  end;
+  if not denied then raise exception 'Missing session accepted'; end if;
+  denied := false;
+  begin
+    insert into public.admissions_enquiries (branch_id, academic_session_id, applicant_full_name)
+      values (null, session_id, 'WAVE1_TEST_no_branch');
+  exception when not_null_violation then denied := true;
+  end;
+  if not denied then raise exception 'Missing branch accepted'; end if;
   insert into public.admissions_enquiries (branch_id, academic_session_id, applicant_full_name, assigned_to)
     values (branch_a, session_id, 'WAVE1_TEST_applicant', teacher_id) returning id into enquiry_id;
   update public.admissions_enquiries set status = 'accepted' where id = enquiry_id;
@@ -102,6 +135,23 @@ begin
     values (branch_a, session_id, 'WAVE1_TEST_unassigned') returning id into other_enquiry_id;
 
   perform set_config('request.jwt.claim.sub', admin_id::text, true);
+  select count(*) into found_count from public.sai_admissions_sessions(branch_a) s where s.id = session_id;
+  if found_count <> 1 then raise exception 'Branch admin cannot list active session'; end if;
+  denied := false;
+  begin
+    perform public.sai_admissions_sessions(branch_b);
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Admin accessed another branch session directory'; end if;
+  update public.academic_sessions set name = 'WAVE1_TEST_unauthorized' where id = session_id;
+  get diagnostics affected = row_count;
+  if affected <> 0 then raise exception 'Admin updated academic session'; end if;
+  denied := false;
+  begin
+    execute 'delete from public.academic_sessions where id = $1' using session_id;
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Admin deleted academic session'; end if;
   update public.admissions_enquiries set status = 'contacted' where id = enquiry_id;
   get diagnostics affected = row_count;
   if affected <> 1 then raise exception 'Branch admin update denied'; end if;
@@ -113,13 +163,30 @@ begin
   end;
   if not denied then raise exception 'Cross-branch admin insert accepted'; end if;
 
-  -- The receptionist has no session access under the existing session SELECT
-  -- policy; add an independently authorized teacher role to test write scope.
-  execute 'reset role';
-  insert into public.user_roles (user_id, role) values (reception_id, 'teacher');
-  update public.classes set teacher_id = reception_id where id = class_a;
   perform set_config('request.jwt.claim.sub', reception_id::text, true);
-  execute 'set local role authenticated';
+  select count(*) into found_count from public.sai_admissions_sessions(branch_a) s where s.id = session_id;
+  if found_count <> 1 then raise exception 'Receptionist cannot list active session'; end if;
+  update public.admissions_enquiries set academic_session_id = second_session_id where id = enquiry_id;
+  get diagnostics affected = row_count;
+  if affected <> 1 then raise exception 'Receptionist could not change to active session'; end if;
+  update public.admissions_enquiries set academic_session_id = session_id where id = enquiry_id;
+  get diagnostics affected = row_count;
+  if affected <> 1 then raise exception 'Receptionist could not restore active session'; end if;
+  denied := false;
+  begin
+    perform public.sai_admissions_sessions(branch_b);
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Receptionist accessed another branch session directory'; end if;
+  update public.academic_sessions set name = 'WAVE1_TEST_unauthorized' where id = session_id;
+  get diagnostics affected = row_count;
+  if affected <> 0 then raise exception 'Receptionist updated academic session'; end if;
+  denied := false;
+  begin
+    execute 'delete from public.academic_sessions where id = $1' using session_id;
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Receptionist deleted academic session'; end if;
   insert into public.admissions_enquiries (branch_id, academic_session_id, applicant_full_name)
     values (branch_a, session_id, 'WAVE1_TEST_reception');
   update public.admissions_enquiries set notes = 'WAVE1_TEST_note' where id = enquiry_id;
@@ -138,6 +205,12 @@ begin
   if found_count <> 1 then raise exception 'Assigned teacher cannot read enquiry'; end if;
   select count(*) into found_count from public.admissions_enquiries where id = other_enquiry_id;
   if found_count <> 0 then raise exception 'Teacher read an unassigned enquiry'; end if;
+  denied := false;
+  begin
+    perform public.sai_admissions_sessions(branch_a);
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Teacher accessed admissions session directory'; end if;
   denied := false;
   begin
     perform public.sai_admissions_staff(branch_a);
@@ -164,6 +237,12 @@ begin
     insert into public.branch_memberships (user_id, branch_id) values (other_id, branch_a);
     perform set_config('request.jwt.claim.sub', other_id::text, true);
     execute 'set local role authenticated';
+    denied := false;
+    begin
+      perform public.sai_admissions_sessions(branch_a);
+    exception when insufficient_privilege then denied := true;
+    end;
+    if not denied then raise exception '% accessed admissions session directory', role_name; end if;
     select count(*) into found_count from public.admissions_enquiries where id = enquiry_id;
     if found_count <> 0 then raise exception '% read enquiry', role_name; end if;
     denied := false;
@@ -175,6 +254,37 @@ begin
     if not denied then raise exception '% inserted enquiry', role_name; end if;
     execute 'reset role';
   end loop;
+
+  perform set_config('request.jwt.claim.sub', super_id::text, true);
+  execute 'set local role authenticated';
+  update public.academic_sessions set is_active = false where id = session_id;
+  perform set_config('request.jwt.claim.sub', reception_id::text, true);
+  update public.admissions_enquiries set notes = 'WAVE1_TEST_historical' where id = enquiry_id;
+  get diagnostics affected = row_count;
+  if affected <> 1 then raise exception 'Unchanged inactive session prevented historical edit'; end if;
+  denied := false;
+  begin
+    update public.admissions_enquiries set academic_session_id = inactive_session_id where id = enquiry_id;
+  exception when check_violation then denied := true;
+  end;
+  if not denied then raise exception 'Changing to inactive session accepted'; end if;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', super_id::text, true);
+  update public.branch_memberships set is_active = false where user_id = reception_id and branch_id = branch_a;
+  perform set_config('request.jwt.claim.sub', reception_id::text, true);
+  execute 'set local role authenticated';
+  denied := false;
+  begin
+    perform public.sai_admissions_sessions(branch_a);
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Inactive membership accessed session directory'; end if;
+  execute 'reset role';
+  insert into public.user_roles (user_id, role) values (teacher_id, 'admin');
+  perform set_config('request.jwt.claim.sub', teacher_id::text, true);
+  execute 'set local role authenticated';
+  perform public.sai_admissions_sessions(branch_a);
+  execute 'reset role';
 end;
 $$;
 rollback;

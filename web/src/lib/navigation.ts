@@ -71,5 +71,5 @@ export function modulePath(item: NavigationItem): string {
 }
 
 export function isModuleAvailable(id: string): boolean {
-  return ["home", "branches", "sessions", "classes", "students", "admissions"].includes(id);
+  return ["home", "branches", "sessions", "classes", "students", "admissions", "attendance"].includes(id);
 }

@@ -1,23 +1,49 @@
 # Wave 1 test report
 
+## Attendance preparation
+
+- `npm test`: 27 passed, including five attendance unit tests. These use mocks
+  and do not establish RLS, privacy, trigger or concurrency behavior.
+- `npm run build`: passed; Vite reported existing chunk-size and React Router
+  directive warnings.
+- Migration SQL and PL/pgSQL parsing passed, with no destructive top-level
+  statements. The linked staging dry run listed only 006; it was not applied.
+- The rollback-only `supabase/tests/attendance_behavior.sql` contains
+  authorization, validation and audit assertions, but has not been run. No
+  database behavior or authenticated browser test has passed for 006.
+  Staging reports `MIGRATIONS_FAILED`, and migration 006 is not installed.
+  Concurrency behavior also needs a separate multi-connection test.
+
 ## Admissions preparation
 
-- `npm test`: exit 0; 20 unit tests passed. Coverage includes navigation,
+- Migration 005 follow-up: `npm test` passed 22 tests and `npm run build`
+  passed with the existing Vite warnings. SQL parsing passed for all five
+  migration statements and three PL/pgSQL blocks; no destructive top-level
+  statement was found. The linked dry run listed only 005; it was not applied.
+  `npm run test:admissions:db` failed before assertions with
+  `ECONNREFUSED 127.0.0.1:54322`. Real RLS and trigger behavior remain
+  unverified. Local 004 differs from the already deployed 004; the isolated
+  test suite requires 001 through 005, with 005 applied.
+
+- `npm test`: exit 0; 22 unit tests passed. Coverage includes navigation,
   permissions, status/payload validation, branch query filters, mocked
-  permission failures, and no-deletion source checks. Mocked errors do not
-  validate RLS.
+  permission failures, directory response/error handling, required branch and
+  session, and no-deletion source checks. Mocked errors do not validate RLS.
 - `npm run build`: exit 0; 83 modules. Vite reported existing bundle-size and
   React Router directive warnings.
-- Migration 004 parsed as 21 SQL statements with four PL/pgSQL blocks; no
-  destructive top-level statements. The linked dry run listed 004 only; it was
-  not applied.
+- Historical local migration 004 parsed as 24 SQL statements with five PL/pgSQL blocks; no
+  destructive top-level statements. An earlier linked dry run listed 004 only;
+  deployment was performed during that check. The user subsequently reported
+  that 004 had already been applied.
 - `npm run test:admissions:db`: exit 1; the isolated database on port 54322
   refused the connection because the Docker engine was unavailable. No
   database behavior assertions executed. The local-only test script and its
-  synthetic fixtures are not yet execution-verified.
+  synthetic fixtures are not yet execution-verified. Its new assertions cover
+  directory role and active-membership checks, branch isolation, active
+  sessions, unchanged inactive session references, and denied session writes.
 - Authenticated UI, RLS, assignment validation, audit triggers, and atomicity
   remain unverified. Run the existing management test and the admissions test
-  against an isolated Supabase with migrations 001–004 before deployment.
+  against an isolated Supabase with migrations 001–005 before deployment.
 
 ## Management UI follow-up
 
