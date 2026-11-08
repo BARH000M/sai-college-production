@@ -29,7 +29,7 @@ export function NewsPanel({ canEdit }: { canEdit: boolean }) {
     return () => { active = false; };
   }, [retry]);
 
-  const { publish } = usePreviewDraft();
+  const { publish, setDirty } = usePreviewDraft();
 
   useEffect(() => {
     if (loading) return;
@@ -126,6 +126,10 @@ export function NewsPanel({ canEdit }: { canEdit: boolean }) {
   function fieldDirty(key: keyof NewsDraft): boolean {
     return unsavedFields.includes(String(key));
   }
+
+  useEffect(() => {
+    setDirty("news", unsavedFields.length);
+  }, [unsavedFields.length, setDirty]);
 
   return <div className="cms-panels">
     <section className="panel">

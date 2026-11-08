@@ -29,7 +29,7 @@ export function ProgramsPanel({ canEdit }: { canEdit: boolean }) {
     return () => { active = false; };
   }, [retry]);
 
-  const { publish } = usePreviewDraft();
+  const { publish, setDirty } = usePreviewDraft();
 
   useEffect(() => {
     if (loading) return;
@@ -127,6 +127,10 @@ export function ProgramsPanel({ canEdit }: { canEdit: boolean }) {
   function fieldDirty(key: keyof ProgramDraft): boolean {
     return unsavedFields.includes(String(key));
   }
+
+  useEffect(() => {
+    setDirty("programs", unsavedFields.length);
+  }, [unsavedFields.length, setDirty]);
 
   return <div className="cms-panels">
     <section className="panel">

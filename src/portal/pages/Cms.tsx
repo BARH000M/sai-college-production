@@ -4,9 +4,9 @@ import { SiteContentPanel } from "./cms/SiteContentPanel";
 import { ProgramsPanel } from "./cms/ProgramsPanel";
 import { NewsPanel } from "./cms/NewsPanel";
 import { CmsPreview } from "./cms/CmsPreview";
-import { PreviewDraftContext, type PreviewDraftState } from "./cms/previewDraft";
+import { PreviewDraftContext, type CmsDraftKind, type CmsDirtyCounts, type PreviewDraftState } from "./cms/previewDraft";
 
-type Tab = "content" | "programs" | "news";
+type Tab = CmsDraftKind;
 
 const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: "content", label: "نصوص الموقع", icon: "ri-text" },
@@ -19,12 +19,19 @@ export function Cms({ roles }: { roles: readonly string[] }) {
   const [tab, setTab] = useState<Tab>("content");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [draftState, setDraftState] = useState<PreviewDraftState>({ content: null, programs: null, news: null });
+  const [dirty, setDirtyState] = useState<CmsDirtyCounts>({ content: 0, programs: 0, news: 0 });
 
   const publishDraft = useCallback((patch: Partial<PreviewDraftState>) => {
     setDraftState((current) => ({ ...current, ...patch }));
   }, []);
 
-  return <PreviewDraftContext.Provider value={{ draft: draftState, publish: publishDraft }}>
+  const setDirty = useCallback((kind: CmsDraftKind, count: number) => {
+    setDirtyState((current) => (current[kind] === count ? current : { ...current, [kind]: count }));
+  }, []);
+
+  const totalDirty = dirty.content + dirty.programs + dirty.news;
+
+  return <PreviewDraftContext.Provider value={{ draft: draftState, publish: publishDraft, dirty, setDirty }}>
     <main className="workspace">
       <div className="page-heading">
         <div>
@@ -33,6 +40,10 @@ export function Cms({ roles }: { roles: readonly string[] }) {
           <p className="muted">حرّر نصوص الصفحة العامة وبرامجها وأخبارها، وشاهد النتيجة على الموقع مباشرة بعد الحفظ.</p>
         </div>
         <div className="actions">
+          {totalDirty > 0 && <span className="cms-tab-count cms-tab-count-standalone">
+            <i className="ri-error-warning-line" aria-hidden="true"></i>
+            {totalDirty} تعديل غير محفوظ
+          </span>}
           <button className="button primary" type="button" onClick={() => setPreviewOpen(true)}>
             <i className="ri-eye-line" aria-hidden="true"></i> معاينة مباشرة
           </button>
@@ -46,17 +57,21 @@ export function Cms({ roles }: { roles: readonly string[] }) {
           type="button"
           role="tab"
           aria-selected={tab === item.id}
+          aria-label={dirty[item.id] > 0 ? `${item.label} — ${dirty[item.id]} تغيير غير محفوظ` : item.label}
           className={`cms-tab ${tab === item.id ? "active" : ""}`}
           onClick={() => setTab(item.id)}
         >
           <i className={item.icon} aria-hidden="true"></i>
           <span>{item.label}</span>
+          {dirty[item.id] > 0 && <span className="cms-tab-count" title="تعديلات كتبتها ولم تُحفظ بعد">
+            <i className="ri-error-warning-line" aria-hidden="true"></i>{dirty[item.id]}
+          </span>}
         </button>)}
       </div>
 
-      {tab === "content" && <SiteContentPanel canEdit={canEdit} />}
-      {tab === "programs" && <ProgramsPanel canEdit={canEdit} />}
-      {tab === "news" && <NewsPanel canEdit={canEdit} />}
+      <div hidden={tab !== "content"}><SiteContentPanel canEdit={canEdit} /></div>
+      <div hidden={tab !== "programs"}><ProgramsPanel canEdit={canEdit} /></div>
+      <div hidden={tab !== "news"}><NewsPanel canEdit={canEdit} /></div>
 
       <section className="panel cms-help">
         <h2>كيف يعمل النشر؟</h2>
@@ -64,6 +79,7 @@ export function Cms({ roles }: { roles: readonly string[] }) {
           <li><i className="ri-eye-line" aria-hidden="true"></i> زر «معاينة مباشرة» يعرض الصفحة كما ستبدو للزائر، بما فيها التعديلات غير المحفوظة بعد.</li>
           <li><i className="ri-checkbox-circle-line" aria-hidden="true"></i> أي عنصر «منشور» يظهر فوراً للزوّار في الصفحة العامة.</li>
           <li><i className="ri-eye-off-line" aria-hidden="true"></i> العنصر «المخفي» يبقى محفوظاً للإدارة ولا يظهر للزوّار.</li>
+          <li><i className="ri-error-warning-line" aria-hidden="true"></i> الرقم البنّي على التبويب يعني أن لديك تعديلات لم تُحفظ في ذلك القسم.</li>
           <li><i className="ri-shield-check-line" aria-hidden="true"></i> النشر والتعديل متاحان للإدارة العامة ومدير الأكاديمية ومحرر المحتوى فقط.</li>
         </ul>
         <p className="muted">يبقى المحتوى الاحتياطي ظاهراً في حال تعذّر الوصول إلى قاعدة البيانات، حتى لا تظهر الصفحة فارغة.</p>

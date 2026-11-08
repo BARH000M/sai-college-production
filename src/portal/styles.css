@@ -748,6 +748,18 @@
 }
 .portal-root .cms-tab:hover { background: oklch(var(--background-100)); }
 .portal-root .cms-tab.active { background: oklch(var(--primary-600)); color: oklch(var(--background-50)); }
+.portal-root .cms-tab-count {
+  display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+  padding: 1px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 700; line-height: 1.7;
+  background: oklch(var(--accent-500)); color: oklch(var(--accent-950));
+  border: 1px solid oklch(var(--accent-600) / .5);
+}
+.portal-root .cms-tab.active .cms-tab-count {
+  background: oklch(var(--accent-100)); color: oklch(var(--accent-950));
+  border-color: oklch(var(--accent-300));
+}
+.portal-root .cms-tab-count i { font-size: 11px; width: 11px; height: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.portal-root .cms-tab-count-standalone { font-size: 11px; }
 .portal-root .cms-panels > .panel + .panel { margin-top: 16px; }
 .portal-root .cms-group { margin-top: 18px; padding-top: 14px; border-top: 1px solid oklch(var(--background-200)); }
 .portal-root .cms-group-title { margin: 0 0 10px; font-size: 13px; color: oklch(var(--primary-800)); }

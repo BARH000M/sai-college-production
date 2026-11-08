@@ -64,7 +64,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
   const [from, setFrom] = useState(range.from);
   const [to, setTo] = useState(range.to);
   const [studentId, setStudentId] = useState("");
-  const [studentReport, setStudentReport] = useState<string | null>(null);
+  const [studentReport, setStudentReport] = useState<{ id: string; autoPrint: boolean } | null>(null);
 
   const [optionsError, setOptionsError] = useState<string | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -291,7 +291,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
 
     <section className="panel report-student-panel">
       <h2>تقرير فصل لطالب مفرد</h2>
-      <p className="muted">نفس التقرير الذي يُسلَّم لولي الأمر: المقررات، الواجبات، الدرجات، وملخص الحضور.</p>
+      <p className="muted">نفس التقرير الذي يُسلَّم لولي الأمر: المقررات، الواجبات، الدرجات، وملخص الحضور — يفتح جاهزاً بخانات التوقيع.</p>
       <div className="management-form">
         <label>الطالب
           <select value={studentId} onChange={(event) => setStudentId(event.target.value)} disabled={!classId || studentsLoading}>
@@ -300,7 +300,10 @@ export function Reports({ roles }: { roles: readonly string[] }) {
           </select>
         </label>
         <div className="actions" style={{ alignSelf: "end" }}>
-          <button className="button secondary" type="button" disabled={!studentId} onClick={() => setStudentReport(studentId)}>فتح التقرير</button>
+          <button className="button secondary" type="button" disabled={!studentId} onClick={() => setStudentReport({ id: studentId, autoPrint: false })}>فتح التقرير</button>
+          <button className="button primary" type="button" disabled={!studentId} onClick={() => setStudentReport({ id: studentId, autoPrint: true })}>
+            <i className="ri-printer-line" aria-hidden="true"></i> طباعة التقرير لولي الأمر
+          </button>
         </div>
       </div>
     </section>
@@ -335,6 +338,10 @@ export function Reports({ roles }: { roles: readonly string[] }) {
       {sheet?.kind === "distribution" && <DistributionSheet report={sheet.data} />}
     </ReportSheet>}
 
-    {studentReport && <StudentProgressReport studentId={studentReport} onClose={() => setStudentReport(null)} />}
+    {studentReport && <StudentProgressReport
+      studentId={studentReport.id}
+      autoPrint={studentReport.autoPrint}
+      onClose={() => setStudentReport(null)}
+    />}
   </main>;
 }

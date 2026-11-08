@@ -140,3 +140,93 @@ export async function saveManagementRow(
     if (result.error) throw new Error(result.error.message);
   }
 }
+
+export type StudentRosterExportRow = {
+  full_name: string;
+  admission_no: string;
+  date_of_birth: string | null;
+  status: string;
+  class_name: string | null;
+  branch_name: string | null;
+  session_name: string | null;
+};
+
+type ExportStudentRecord = {
+  full_name: string;
+  admission_no: string;
+  date_of_birth: string | null;
+  status: string;
+  class_id: string | null;
+  branch_id: string;
+};
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
+/**
+ * One CSV row per student for the current records filter, across every page.
+ * Names for class/branch/session are resolved separately so the export never
+ * depends on nested PostgREST relations.
+ */
+export async function loadStudentRecordsForExport(filters: ManagementFilters): Promise<StudentRosterExportRow[]> {
+  if (!filters.branch || !filters.session) return [];
+  const sessionFiltered = filters.session !== "unassigned";
+  const selected = sessionFiltered
+    ? "full_name,admission_no,date_of_birth,status,class_id,branch_id,classes!inner(session_id,branch_id)"
+    : "full_name,admission_no,date_of_birth,status,class_id,branch_id";
+
+  const rows: ExportStudentRecord[] = [];
+  let total = 0;
+  do {
+    let query = supabase.from("students").select(selected, { count: "exact" });
+    query = query.eq("branch_id", filters.branch);
+    if (sessionFiltered) {
+      query = query.eq("classes.session_id", filters.session).eq("classes.branch_id", filters.branch);
+    } else {
+      query = query.is("class_id", null);
+    }
+    if (filters.classId) query = query.eq("class_id", filters.classId);
+    if (filters.status) query = query.eq("status", filters.status);
+    if (filters.search.trim()) query = query.ilike("full_name", `%${escapeLike(filters.search.trim())}%`);
+
+    const result = await query
+      .order("full_name").order("admission_no")
+      .range(rows.length, rows.length + 499)
+      .returns<ExportStudentRecord[]>();
+    if (result.error) throw new Error(result.error.message);
+    if (!result.data || result.count === null) throw new Error("لم تُرجع قاعدة البيانات سجلات الطلاب أو عددها.");
+    total = result.count;
+    if (!result.data.length && rows.length < total) throw new Error("تعذر تحميل جميع سجلات الطلاب.");
+    rows.push(...result.data);
+  } while (rows.length < total);
+
+  if (!rows.length) return [];
+
+  const [branchRes, classRes, sessionRes] = await Promise.all([
+    supabase.from("branches").select("id,name"),
+    supabase.from("classes").select("id,name,session_id,branch_id"),
+    supabase.from("academic_sessions").select("id,name"),
+  ]);
+  if (branchRes.error) throw new Error(branchRes.error.message);
+  if (classRes.error) throw new Error(classRes.error.message);
+  if (sessionRes.error) throw new Error(sessionRes.error.message);
+
+  const branchNames = new Map(((branchRes.data ?? []) as Option[]).map((row) => [row.id, row.name]));
+  const classes = (classRes.data ?? []) as { id: string; name: string; session_id: string; branch_id: string }[];
+  const classMap = new Map(classes.map((row) => [row.id, row]));
+  const sessionNames = new Map(((sessionRes.data ?? []) as Option[]).map((row) => [row.id, row.name]));
+
+  return rows.map((row) => {
+    const cls = row.class_id ? classMap.get(row.class_id) ?? null : null;
+    return {
+      full_name: row.full_name,
+      admission_no: row.admission_no,
+      date_of_birth: row.date_of_birth,
+      status: row.status,
+      class_name: cls?.name ?? null,
+      branch_name: branchNames.get(cls ? cls.branch_id : row.branch_id) ?? null,
+      session_name: cls ? sessionNames.get(cls.session_id) ?? null : null,
+    };
+  });
+}

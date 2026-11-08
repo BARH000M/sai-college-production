@@ -43,7 +43,7 @@ export function SiteContentPanel({ canEdit }: { canEdit: boolean }) {
     return Array.from(map.entries());
   }, [rows]);
 
-  const { publish } = usePreviewDraft();
+  const { publish, setDirty } = usePreviewDraft();
 
   useEffect(() => {
     if (!rows.length) return;
@@ -62,6 +62,10 @@ export function SiteContentPanel({ canEdit }: { canEdit: boolean }) {
     const values = draft[row.key];
     return values && (values.value_ar !== row.value_ar || values.value_en !== row.value_en);
   }).length;
+
+  useEffect(() => {
+    setDirty("content", dirtyCount);
+  }, [dirtyCount, setDirty]);
 
   function isFieldDirty(key: string, field: "value_ar" | "value_en"): boolean {
     const row = rows.find((item) => item.key === key);

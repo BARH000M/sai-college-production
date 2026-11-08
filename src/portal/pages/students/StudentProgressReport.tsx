@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import logo from "@/portal/assets/saiLogo";
 import { loadStudentReport, type StudentReport } from "@/portal/lib/studentReport";
 import { formatDate } from "@/portal/lib/learning";
@@ -7,11 +7,16 @@ function today(): string {
   return new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
 }
 
-export function StudentProgressReport({ studentId, onClose }: { studentId: string; onClose: () => void }) {
+export function StudentProgressReport({ studentId, onClose, autoPrint = false }: {
+  studentId: string;
+  onClose: () => void;
+  autoPrint?: boolean;
+}) {
   const [report, setReport] = useState<StudentReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const printed = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -23,6 +28,14 @@ export function StudentProgressReport({ studentId, onClose }: { studentId: strin
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [studentId, retry]);
+
+  // When opened from a "print" action, hand the sheet straight to the printer once loaded.
+  useEffect(() => {
+    if (!autoPrint || !report || printed.current) return;
+    printed.current = true;
+    const timer = window.setTimeout(() => window.print(), 400);
+    return () => window.clearTimeout(timer);
+  }, [autoPrint, report]);
 
   return <div className="print-overlay" role="dialog" aria-modal="true" aria-label="تقرير تقدم الطالب للفصل">
     <div className="assignment-sheet">
@@ -102,7 +115,9 @@ export function StudentProgressReport({ studentId, onClose }: { studentId: strin
     </div>
 
     <div className="print-actions">
-      <button className="button primary" type="button" onClick={() => window.print()} disabled={!report || loading || !!error}>طباعة التقرير</button>
+      <button className="button primary" type="button" onClick={() => window.print()} disabled={!report || loading || !!error}>
+        <i className="ri-printer-line" aria-hidden="true"></i> طباعة التقرير لولي الأمر
+      </button>
       <button className="button secondary" type="button" onClick={onClose}>إغلاق</button>
     </div>
   </div>;

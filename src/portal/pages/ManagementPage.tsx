@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
-  loadManagementBranches, loadManagementOptions, loadManagementRows, managementAccess, pageSize, saveManagementRow,
-  type ManagementFilters, type ManagementKind, type ManagementRow, type Option,
+  loadManagementBranches, loadManagementOptions, loadManagementRows, loadStudentRecordsForExport, managementAccess,
+  pageSize, saveManagementRow, type ManagementFilters, type ManagementKind, type ManagementRow, type Option,
 } from "../lib/management";
+import { exportStudentRecordsCsv } from "../lib/reportExport";
 import { isAvailableStudentClass, makeDraft, managementPayload, validateManagementDraft, type Draft } from "../lib/managementForms";
 import { StudentAccountLink } from "./students/StudentAccountLink";
 import { StudentProgressReport } from "./students/StudentProgressReport";
@@ -54,6 +55,8 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
   const [scopeLoading, setScopeLoading] = useState(needsScope);
   const [scopeError, setScopeError] = useState<string | null>(null);
   const [reportStudent, setReportStudent] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!needsScope) { setScopeLoading(false); setScopeError(null); setManagedBranches([]); return; }
@@ -171,6 +174,29 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
     } catch (failure) { setError(`تعذر إيقاف السجل: ${message(failure)}`); }
     finally { setSaving(false); }
   }
+  async function exportRoster() {
+    if (exporting) return;
+    setExportError(null);
+    if (!filters.branch || !filters.session) {
+      setExportError("اختر الفرع والجلسة أولاً، ثم أعد التصدير. يُصدَّر الكشف التام وليس الصفحة المعروضة فقط.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const rows = await loadStudentRecordsForExport(filters);
+      if (!rows.length) {
+        setExportError("لا توجد سجلات طلاب مطابقة للتصفية الحالية لتصديرها.");
+        return;
+      }
+      const scope = `${optionName(options.branches, filters.branch)} ${optionName(options.sessions, filters.session)}`;
+      const fileName = exportStudentRecordsCsv(rows, scope);
+      setSuccess(`تم تصدير كشف الطلاب (${rows.length} سجلاً) في الملف ${fileName}.`);
+    } catch (failure) {
+      setExportError(`تعذر تصدير كشف الطلاب: ${message(failure)}`);
+    } finally {
+      setExporting(false);
+    }
+  }
   const scoped = kind === "classes" || kind === "students";
   const optionName = (list: Option[], id: string) => list.find((item) => item.id === id)?.name ?? id;
   const display = (key: string, value: unknown) => {
@@ -185,7 +211,12 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
 
   return <main className="workspace">
     <div className="page-heading"><div><p className="eyebrow">إدارة الأكاديمية</p><h1>{titles[kind]}</h1></div>
-      {canCreate && <button className="button primary" disabled={saving || editing !== undefined} onClick={() => openForm(null)}>إضافة سجل</button>}
+      <div className="actions">
+        {kind === "students" && <button className="button secondary" type="button" disabled={exporting || loading} onClick={() => void exportRoster()}>
+          <i className="ri-file-excel-2-line" aria-hidden="true"></i> {exporting ? "جارٍ التصدير..." : "تصدير CSV"}
+        </button>}
+        {canCreate && <button className="button primary" disabled={saving || editing !== undefined} onClick={() => openForm(null)}>إضافة سجل</button>}
+      </div>
     </div>
     <p className="data-note">تظهر السجلات المسموح بها فقط، وتفرض قاعدة البيانات صلاحيات القراءة والكتابة.</p>
     {kind === "sessions" && !isSuperAdmin && <p className="notice">الجلسات مشتركة بين الفروع؛ إدارتها متاحة للإدارة العامة فقط.</p>}
@@ -199,7 +230,9 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
       <label>الحالة<select value={filters.status} onChange={(event) => filter("status", event.target.value)}><option value="">كل الحالات</option>{(kind === "students" ? Object.entries(statuses) : Object.entries(statuses).slice(0, 2)).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label>
     </fieldset>
     {optionsLoading && <p className="muted" role="status">جارٍ تحميل خيارات التصفية...</p>}
+    {kind === "students" && <p className="muted">تصدير CSV يُنزّل كشف الطلاب كاملاً حسب التصفية الحالية (كل الصفحات) مع حالة كل طالب وصفه وفرعه وجلسته.</p>}
     {success && <p className="success-box" role="status">{success}</p>}
+    {exportError && <p className="error-box" role="alert">{exportError}</p>}
     {error && <div className="error-box" role="alert">{error} <button className="text-button" onClick={() => setRetry((value) => value + 1)}>إعادة المحاولة</button></div>}
     {optionsError && <div className="error-box" role="alert">{optionsError} <button className="text-button" onClick={() => setRetry((value) => value + 1)}>إعادة المحاولة</button></div>}
     <section className="panel">

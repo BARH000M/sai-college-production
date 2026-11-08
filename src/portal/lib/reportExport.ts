@@ -2,6 +2,7 @@ import { buildCsv, downloadCsv } from "./csv";
 import { admissionStatuses } from "./admissions";
 import { attendanceStatuses } from "./attendance";
 import { formatDate } from "./learning";
+import type { StudentRosterExportRow } from "./management";
 import type { AdmissionsReport, AttendanceReport, DistributionReport, EnrollmentReport, HomeworkReport } from "./reports";
 
 const attendanceKeys = Object.keys(attendanceStatuses);
@@ -186,6 +187,33 @@ export function exportAdmissionsReport(report: AdmissionsReport): string {
     : [...statusRows, [...totalRow]];
 
   const fileName = `admissions-report-${stamp()}.csv`;
+  downloadCsv(fileName, buildCsv(headers, csvRows));
+  return fileName;
+}
+
+/** Student records ("سجلات الطلاب") as CSV, exported straight from the records screen. */
+export function exportStudentRecordsCsv(rows: readonly StudentRosterExportRow[], scopeLabel: string): string {
+  const headers = ["#", "الاسم الكامل", "رقم القبول", "تاريخ الميلاد", "الحالة", "الصف", "الفرع", "الجلسة"];
+  const body = rows.map((row, index) => [
+    String(index + 1),
+    row.full_name,
+    row.admission_no,
+    row.date_of_birth ? formatDate(row.date_of_birth) : "",
+    studentStatuses[row.status] ?? row.status,
+    row.class_name ?? "بدون صف",
+    row.branch_name ?? "",
+    row.session_name ?? "",
+  ]);
+
+  const statusKeys = ["active", "inactive", "graduated", "withdrawn"];
+  const summaryHeader = ["", "ملخص الحالات", "", "", "", "", "", ""];
+  const summaryRows = statusKeys.map((key) => [
+    "", studentStatuses[key], "", "", String(rows.filter((row) => row.status === key).length), "", "", "",
+  ]);
+  const totalRow = ["", "الإجمالي", "", "", String(rows.length), "", "", ""];
+
+  const csvRows = [...body, [""], summaryHeader, ...summaryRows, totalRow];
+  const fileName = `students-records-${slug(scopeLabel)}-${stamp()}.csv`;
   downloadCsv(fileName, buildCsv(headers, csvRows));
   return fileName;
 }
