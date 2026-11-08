@@ -7,6 +7,7 @@ import { exportStudentRecordsCsv } from "../lib/reportExport";
 import { isAvailableStudentClass, makeDraft, managementPayload, validateManagementDraft, type Draft } from "../lib/managementForms";
 import { StudentAccountLink } from "./students/StudentAccountLink";
 import { StudentProgressReport } from "./students/StudentProgressReport";
+import { StudentRecordsPrintSheet, type RecordsPrintScope } from "./students/StudentRecordsPrintSheet";
 
 const titles: Record<ManagementKind, string> = {
   branches: "الفروع", sessions: "الجلسات الأكاديمية", classes: "الصفوف", students: "سجلات الطلاب",
@@ -57,6 +58,7 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
   const [reportStudent, setReportStudent] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [printScope, setPrintScope] = useState<{ filters: ManagementFilters; scope: RecordsPrintScope } | null>(null);
 
   useEffect(() => {
     if (!needsScope) { setScopeLoading(false); setScopeError(null); setManagedBranches([]); return; }
@@ -197,6 +199,22 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
       setExporting(false);
     }
   }
+  async function openRosterPrint() {
+    setExportError(null);
+    if (!filters.branch || !filters.session) {
+      setExportError("اختر الفرع والجلسة أولاً، ثم أعد المحاولة لطباعة كشف الطلاب الرسمي.");
+      return;
+    }
+    setPrintScope({
+      filters: { ...filters },
+      scope: {
+        branchLabel: optionName(options.branches, filters.branch),
+        sessionLabel: filters.session === "unassigned" ? "طلاب بلا صف" : optionName(options.sessions, filters.session),
+        classLabel: filters.classId ? optionName(options.classes, filters.classId) : "كل الصفوف المتاحة",
+        statusLabel: filters.status ? statuses[filters.status] ?? filters.status : "كل الحالات",
+      },
+    });
+  }
   const scoped = kind === "classes" || kind === "students";
   const optionName = (list: Option[], id: string) => list.find((item) => item.id === id)?.name ?? id;
   const display = (key: string, value: unknown) => {
@@ -214,6 +232,9 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
       <div className="actions">
         {kind === "students" && <button className="button secondary" type="button" disabled={exporting || loading} onClick={() => void exportRoster()}>
           <i className="ri-file-excel-2-line" aria-hidden="true"></i> {exporting ? "جارٍ التصدير..." : "تصدير CSV"}
+        </button>}
+        {kind === "students" && <button className="button secondary" type="button" disabled={loading} onClick={() => void openRosterPrint()}>
+          <i className="ri-printer-line" aria-hidden="true"></i> طباعة كشف الطلاب
         </button>}
         {canCreate && <button className="button primary" disabled={saving || editing !== undefined} onClick={() => openForm(null)}>إضافة سجل</button>}
       </div>
@@ -250,6 +271,11 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
       </>}
     </section>}
     {reportStudent && <StudentProgressReport studentId={reportStudent} onClose={() => setReportStudent(null)} />}
+    {printScope && <StudentRecordsPrintSheet
+      filters={printScope.filters}
+      scope={printScope.scope}
+      onClose={() => setPrintScope(null)}
+    />}
     {editing !== undefined && <section className="panel management-detail" aria-label="نموذج السجل"><div className="page-heading"><h2>{editing ? "تعديل السجل" : "إضافة سجل"}</h2><button className="button secondary" disabled={saving} onClick={() => setEditing(undefined)}>إغلاق</button></div>
       <form className="management-form" onSubmit={(event) => void submit(event)}>
         {kind === "students" ? <><label>الاسم الكامل<input required value={draft.full_name} onChange={(event) => change("full_name", event.target.value)} /></label><label>رقم القبول<input required value={draft.admission_no} onChange={(event) => change("admission_no", event.target.value)} /></label><label>تاريخ الميلاد<input type="date" value={draft.date_of_birth} onChange={(event) => change("date_of_birth", event.target.value)} /></label></> : <label>الاسم<input required value={draft.name} onChange={(event) => change("name", event.target.value)} /></label>}

@@ -7,7 +7,9 @@ import {
   type AdmissionsReport, type AttendanceReport, type DistributionReport, type EnrollmentReport, type HomeworkReport,
 } from "../lib/reports";
 import { exportAttendanceReport, exportAdmissionsReport, exportDistributionReport, exportEnrollmentReport, exportHomeworkReport } from "../lib/reportExport";
+import { loadArchiveList, loadLastArchive, rememberArchive, type SavedArchive } from "../lib/archiveHeader";
 import { ReportSheet, ReportPeriod, type SummaryItem } from "./reports/ReportShell";
+import { ArchiveDropdown } from "./reports/ArchiveDropdown";
 import { AdmissionsSheet, AttendanceSheet, DistributionSheet, EnrollmentSheet, HomeworkSheet } from "./reports/ReportSheets";
 import { StudentProgressReport } from "./students/StudentProgressReport";
 
@@ -65,6 +67,10 @@ export function Reports({ roles }: { roles: readonly string[] }) {
   const [to, setTo] = useState(range.to);
   const [studentId, setStudentId] = useState("");
   const [studentReport, setStudentReport] = useState<{ id: string; autoPrint: boolean } | null>(null);
+  const [term, setTerm] = useState(() => loadLastArchive()?.term ?? "");
+  const [preparedBy, setPreparedBy] = useState(() => loadLastArchive()?.preparedBy ?? "");
+  const [archiveEntries, setArchiveEntries] = useState<SavedArchive[]>(() => loadArchiveList());
+  const archive = { term, preparedBy };
 
   const [optionsError, setOptionsError] = useState<string | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -139,6 +145,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
       setSheetError("اختر الفرع والجلسة والصف أولاً.");
       return;
     }
+    setArchiveEntries(rememberArchive({ term, preparedBy }));
     setSheetLoading(true);
     setSheet(null);
     try {
@@ -279,6 +286,9 @@ export function Reports({ roles }: { roles: readonly string[] }) {
       </label>}
       <label>من تاريخ<input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setSheet(null); }} /></label>
       <label>إلى تاريخ<input type="date" value={to} onChange={(event) => { setTo(event.target.value); setSheet(null); }} /></label>
+      <label>الفصل / الفترة (اختياري)<input type="text" value={term} placeholder="مثال: الفصل الأول 2025/2026" onChange={(event) => setTerm(event.target.value)} /></label>
+      <label>أعدّه (اختياري)<input type="text" value={preparedBy} placeholder="اسم الموظف المُعِد" onChange={(event) => setPreparedBy(event.target.value)} /></label>
+      <ArchiveDropdown entries={archiveEntries} onPick={(value) => { setTerm(value.term); setPreparedBy(value.preparedBy); }} />
       <div className="actions" style={{ alignSelf: "end" }}>
         <button className="button primary" type="button" disabled={sheetLoading || missingSelection} onClick={() => void openSheet()}>
           {sheetLoading ? "جارٍ التجهيز..." : "معاينة وطباعة"}
@@ -317,6 +327,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
       onRetry={() => void openSheet()}
       onClose={() => setSheet(null)}
       canPrint
+      archive={archive}
       onExportCsv={sheet?.kind === "attendance"
         ? () => exportAttendanceReport(sheet.data)
         : sheet?.kind === "homework"
@@ -341,6 +352,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
     {studentReport && <StudentProgressReport
       studentId={studentReport.id}
       autoPrint={studentReport.autoPrint}
+      archive={archive}
       onClose={() => setStudentReport(null)}
     />}
   </main>;

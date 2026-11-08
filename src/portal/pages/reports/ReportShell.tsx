@@ -1,14 +1,11 @@
 import type { ReactNode } from "react";
-import logo from "@/portal/assets/saiLogo";
 import { formatDate } from "@/portal/lib/learning";
-
-function today(): string {
-  return new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
-}
+import { printDate, buildSheetMeta, type ArchiveHeader } from "@/portal/lib/letterhead";
+import { PrintFooter, PrintLetterhead } from "@/portal/components/PrintLetterhead";
 
 export type SummaryItem = { label: string; value: string };
 
-export function ReportSheet({ title, subtitle, summary, loading, error, onRetry, children, onClose, canPrint, onExportCsv }: {
+export function ReportSheet({ title, subtitle, summary, loading, error, onRetry, children, onClose, canPrint, onExportCsv, archive }: {
   title: string;
   subtitle: string;
   summary: SummaryItem[];
@@ -19,36 +16,34 @@ export function ReportSheet({ title, subtitle, summary, loading, error, onRetry,
   onClose: () => void;
   canPrint: boolean;
   onExportCsv?: () => void;
+  archive?: ArchiveHeader;
 }) {
+  const preparedBy = archive?.preparedBy?.trim();
   return <div className="print-overlay" role="dialog" aria-modal="true" aria-label={title}>
     <div className="assignment-sheet">
-      <div className="receipt-head">
-        <img src={logo} alt="شعار كلية ساي" className="receipt-logo" />
-        <div>
-          <p className="receipt-college">كلية ساي التعليمية اليمنية الصينية</p>
-          <p className="receipt-college-en" dir="ltr">SAI Yemeni–Chinese College</p>
-          <h2 className="receipt-title">{title}</h2>
-          <p className="receipt-subtitle">{subtitle}</p>
-        </div>
-      </div>
+      <PrintLetterhead
+        title={title}
+        topic={subtitle}
+        meta={buildSheetMeta(archive)}
+      />
 
       {loading && <p role="status">جارٍ تجهيز التقرير...</p>}
       {error && <p className="error-box" role="alert">{error} <button className="text-button" type="button" onClick={onRetry}>إعادة المحاولة</button></p>}
 
       {!loading && !error && <>
-        <div className="sheet-summary">
+        {summary.length > 0 && <div className="sheet-summary">
           {summary.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>)}
-          <div><span>تاريخ الطباعة</span><strong>{today()}</strong></div>
-        </div>
-        {children}
+          <div><span>تاريخ الطباعة</span><strong>{printDate()}</strong></div>
+        </div>}
+        <div className="sheet-body">{children}</div>
         <p className="sheet-note">
           صدر هذا التقرير من نظام كلية ساي بناءً على البيانات المسجلة حتى لحظة الطباعة. يعكس ما تسمح به صلاحيات حسابك فقط.
         </p>
         <div className="receipt-signatures">
-          <div><span>إعداد / إدارة الكلية</span></div>
+          <div><span>{preparedBy ? `إعداد: ${preparedBy}` : "إعداد / إدارة الكلية"}</span></div>
           <div><span>اعتماد الإدارة الأكاديمية</span></div>
         </div>
-        <p className="receipt-footer" dir="ltr">info@saicollege.com · Sana&apos;a, Republic of Yemen · SAI College</p>
+        <PrintFooter />
       </>}
     </div>
 

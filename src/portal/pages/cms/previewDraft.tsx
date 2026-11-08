@@ -18,6 +18,9 @@ type PreviewDraftContextValue = {
   publish: (patch: Partial<PreviewDraftState>) => void;
   dirty: CmsDirtyCounts;
   setDirty: (kind: CmsDraftKind, count: number) => void;
+  /** Increments whenever the user asks to discard unsaved edits; panels reset on change. */
+  resetSignal: number;
+  requestDiscard: () => void;
 };
 
 const emptyDraft: PreviewDraftState = { content: null, programs: null, news: null };
@@ -33,6 +36,8 @@ export const PreviewDraftContext = createContext<PreviewDraftContextValue>({
   publish: () => {},
   dirty: emptyDirty,
   setDirty: () => {},
+  resetSignal: 0,
+  requestDiscard: () => {},
 });
 
 export function usePreviewDraft(): PreviewDraftContextValue {

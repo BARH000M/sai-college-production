@@ -7,6 +7,7 @@ import {
 } from "../lib/dashboard";
 import { runAdmissionRemindersNow, type ReminderRunResult } from "../lib/reminders";
 import { pendingModules } from "../lib/navigation";
+import { DashboardReportPrint } from "./DashboardReportPrint";
 
 type DashboardData = { students: Result<number>; classes: Result<number>; audit: Result<AuditEntry[]> };
 const unavailable: Result<number> = { data: null, error: null };
@@ -116,6 +117,7 @@ export function Dashboard() {
       {(students.error || classes.error || audit?.error) && <button className="button secondary" onClick={refresh}>إعادة محاولة تحميل اللوحة</button>}
       <p className="data-note">تعرض الأرقام السجلات التي تسمح بها سياسات الوصول فقط. لا تعني النتيجة الفارغة بالضرورة عدم وجود بيانات.</p>
     </section>
+    <DashboardReportPrint branchId={branchId} sessionId={sessionId} />
     <div className="dashboard-grid">
       <section id="pending" className="panel">
         <h2>أقسام قيد التجهيز</h2>

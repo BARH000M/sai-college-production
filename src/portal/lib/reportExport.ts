@@ -2,7 +2,9 @@ import { buildCsv, downloadCsv } from "./csv";
 import { admissionStatuses } from "./admissions";
 import { attendanceStatuses } from "./attendance";
 import { formatDate } from "./learning";
+import { collegeIdentity, printDate } from "./letterhead";
 import type { StudentRosterExportRow } from "./management";
+import type { StudentReport } from "./studentReport";
 import type { AdmissionsReport, AttendanceReport, DistributionReport, EnrollmentReport, HomeworkReport } from "./reports";
 
 const attendanceKeys = Object.keys(attendanceStatuses);
@@ -221,4 +223,76 @@ export function exportStudentRecordsCsv(rows: readonly StudentRosterExportRow[],
 function statusLabel(key: string): string {
   const labels = admissionStatuses as Record<string, string>;
   return labels[key] ?? key;
+}
+
+/**
+ * Single-student parent report as CSV: the same sections that are printed on the
+ * parent sheet (identity, courses, homework, grades, attendance) so the copy
+ * handed to the guardian also exists as a spreadsheet.
+ */
+export function exportStudentReportCsv(report: StudentReport): string {
+  const headers = ["القسم", "العنصر", "التفاصيل", "القيمة", "ملاحظات"];
+  const rows: (string | null)[][] = [];
+
+  rows.push(["بيانات التقرير", "اسم الكلية", collegeIdentity.nameAr, "", ""]);
+  rows.push(["بيانات التقرير", "الموقع الإلكتروني", "", collegeIdentity.website, ""]);
+  rows.push(["بيانات التقرير", "هاتف الكلية", "", collegeIdentity.phone, ""]);
+  rows.push(["بيانات التقرير", "تاريخ الإصدار", "", printDate(), ""]);
+  rows.push(["بيانات الطالب", "الاسم", report.student.full_name, "", ""]);
+  rows.push(["بيانات الطالب", "رقم القبول", report.student.admission_no, "", ""]);
+  rows.push(["بيانات الطالب", "الصف", report.className ?? "بدون صف", "", ""]);
+  rows.push(["بيانات الطالب", "الفرع", report.branchName ?? "—", "", ""]);
+  rows.push(["بيانات الطالب", "نسبة الإنجاز العامة", "", `${report.overallPercent}%`, ""]);
+  rows.push([
+    "بيانات الطالب", "المعدل العام للدرجات", "",
+    report.averageGrade === null ? "—" : `${report.averageGrade}%`, "",
+  ]);
+
+  rows.push(["", "", "", "", ""]);
+  if (!report.courses.length) {
+    rows.push(["المقررات", "لا توجد مقررات مرتبطة بصف الطالب", "", "", ""]);
+  } else {
+    report.courses.forEach((course) => rows.push([
+      "المقررات",
+      course.title,
+      course.level ?? "—",
+      `${course.completed}/${course.totalLessons} درساً`,
+      `${course.percent}%`,
+    ]));
+  }
+
+  rows.push(["", "", "", "", ""]);
+  if (!report.homework.length) {
+    rows.push(["الواجبات", "لا توجد واجبات منشورة", "", "", ""]);
+  } else {
+    report.homework.forEach((item) => rows.push([
+      "الواجبات", item.title, item.courseTitle, formatDate(item.dueAt), item.statusLabel,
+    ]));
+  }
+  rows.push(["الواجبات", "الإجمالي", `${report.homeworkDone} منجز`, `${report.homeworkPending} مستحق`, ""]);
+
+  rows.push(["", "", "", "", ""]);
+  if (!report.grades.length) {
+    rows.push(["الدرجات", "لم تُعتمد درجات بعد", "", "", ""]);
+  } else {
+    report.grades.forEach((grade) => rows.push([
+      "الدرجات",
+      grade.homeworkTitle,
+      grade.courseTitle,
+      `${grade.score} / ${grade.maxScore}`,
+      `${grade.feedback ?? "—"} (${grade.percent}%)`,
+    ]));
+  }
+
+  rows.push(["", "", "", "", ""]);
+  if (!report.attendanceTotal) {
+    rows.push(["الحضور", "لا توجد سجلات حضور لهذا الطالب بعد", "", "", ""]);
+  } else {
+    report.attendance.forEach((item) => rows.push(["الحضور", item.label, "", String(item.count), ""]));
+    rows.push(["الحضور", "إجمالي السجلات", "", String(report.attendanceTotal), ""]);
+  }
+
+  const fileName = `student-report-${slug(report.student.admission_no || report.student.full_name)}-${stamp()}.csv`;
+  downloadCsv(fileName, buildCsv(headers, rows));
+  return fileName;
 }

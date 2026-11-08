@@ -668,7 +668,47 @@
 .portal-root .homework-delete-zone strong { font-size: 12px; color: oklch(var(--primary-800)); }
 .portal-root .homework-delete-zone p { margin: 0; }
 
+/* ---- Official letterhead shared by every printable sheet ---- */
+.portal-root .print-sheet-head { border-bottom: 2px solid oklch(var(--primary-500)); padding-bottom: 10px; }
+.portal-root .print-sheet-letterhead { display: flex; gap: 14px; align-items: flex-start; }
+.portal-root .print-sheet-logo { flex: 0 0 auto; width: 60px; height: 60px; object-fit: contain; }
+.portal-root .print-sheet-identity { flex: 1; min-width: 0; }
+.portal-root .print-sheet-college { margin: 0; font-size: 15px; font-weight: 700; color: oklch(var(--foreground-950)); }
+.portal-root .print-sheet-college-en { margin: 1px 0 4px; font-size: 9.5px; letter-spacing: .07em; color: oklch(var(--foreground-600)); }
+.portal-root .print-sheet-contact { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; font-size: 10px; line-height: 1.7; color: oklch(var(--foreground-700)); }
+.portal-root .print-sheet-contact span { white-space: nowrap; overflow-wrap: anywhere; }
+.portal-root .print-sheet-doc { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 18px; margin-top: 10px; }
+.portal-root .print-sheet-title-wrap { min-width: 0; }
+.portal-root .print-sheet-title { margin: 0; font-size: 17px; line-height: 1.4; color: oklch(var(--primary-800)); }
+.portal-root .print-sheet-topic { margin: 3px 0 0; font-size: 10.5px; color: oklch(var(--foreground-600)); }
+.portal-root .print-sheet-meta { display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 0; font-size: 10px; color: oklch(var(--foreground-700)); }
+.portal-root .print-sheet-meta span { white-space: nowrap; }
+.portal-root .print-sheet-meta b { font-weight: 700; color: oklch(var(--foreground-900)); }
+.portal-root .print-sheet-footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid oklch(var(--background-300)); }
+.portal-root .print-sheet-note { margin: 0 0 6px; font-size: 9px; text-align: center; color: oklch(var(--foreground-600)); }
+.portal-root .print-sheet-contact-footer { justify-content: center; font-size: 9px; color: oklch(var(--foreground-600)); }
+.portal-root .sheet-body { display: block; }
+.portal-root .sheet-export-note {
+  flex: 1 1 100%; margin: 0; padding: 8px 10px; border-radius: 8px;
+  background: oklch(var(--secondary-100)); color: oklch(var(--secondary-900)); font-size: 11px;
+}
+.portal-root .sheet-col-index { width: 34px; text-align: center; }
+.portal-root .cms-leave-warning {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0 0 12px; padding: 12px 14px;
+  border-radius: 10px; background: oklch(var(--accent-50));
+  border: 1px solid oklch(var(--accent-300)); color: oklch(var(--accent-950));
+  font-size: 12px; line-height: 1.8;
+}
+.portal-root .cms-leave-warning i { flex: 0 0 auto; font-size: 16px; line-height: 1.5; color: oklch(var(--accent-700)); }
+
+/* ---- Print: standard A4 paper, nothing squeezed or clipped ---- */
+@page {
+  size: A4;
+  margin: 12mm 10mm 14mm;
+}
+
 @media print {
+  html,
   body { background: #ffffff; }
   body * { visibility: hidden; }
   .portal-root .print-overlay {
@@ -678,9 +718,53 @@
   .portal-root .print-overlay,
   .portal-root .print-overlay * { visibility: visible; }
   .portal-root .print-receipt,
-  .portal-root .assignment-sheet { width: 100%; border-radius: 0; padding: 0; }
+  .portal-root .assignment-sheet {
+    width: 100%; max-width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0;
+    box-shadow: none; font-size: 9.5pt; line-height: 1.55; color: #111111;
+  }
+  .portal-root .print-sheet-head { border-bottom: 1.5pt solid #1f1f1f; padding-bottom: 4pt; }
+  .portal-root .print-sheet-logo { width: 16mm; height: 16mm; }
+  .portal-root .print-sheet-college { font-size: 12.5pt; }
+  .portal-root .print-sheet-college-en { margin: 0 0 2pt; font-size: 8pt; }
+  .portal-root .print-sheet-contact { gap: 1pt 8pt; font-size: 8pt; }
+  .portal-root .print-sheet-doc { margin-top: 5pt; gap: 3pt 10pt; }
+  .portal-root .print-sheet-title { font-size: 13pt; }
+  .portal-root .print-sheet-topic { margin-top: 2pt; font-size: 8.5pt; }
+  .portal-root .print-sheet-meta { gap: 1pt 10pt; font-size: 8pt; }
+  .portal-root .sheet-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4pt; margin: 7pt 0; }
+  .portal-root .sheet-summary > div { padding: 4pt 5pt; background: #f6f6f6 !important; border: .5pt solid #cfcfcf; border-radius: 3pt; }
+  .portal-root .sheet-summary span { font-size: 7.5pt; color: #555555; }
+  .portal-root .sheet-summary strong { font-size: 9.5pt; }
+  .portal-root .sheet-table { width: 100%; table-layout: fixed; font-size: 8pt; }
+  .portal-root .sheet-table th,
+  .portal-root .sheet-table td {
+    padding: 3pt 3.5pt; border: .5pt solid #b9b9b9;
+    overflow-wrap: anywhere; word-break: break-word;
+  }
+  .portal-root .sheet-table th { background: #eeeeee !important; font-size: 7.5pt; color: #222222; }
+  .portal-root .sheet-table strong { font-size: 8pt; }
+  .portal-root .sheet-table .sheet-sub { font-size: 7pt; }
+  .portal-root .sheet-table .sheet-sign-cell { min-width: 0; height: 22pt; }
+  .portal-root .report-section { margin-top: 8pt; }
+  .portal-root .report-heading { margin-bottom: 4pt; font-size: 9.5pt; color: #1f1f1f; }
+  .portal-root .report-heading,
+  .portal-root .sheet-note,
+  .portal-root .sheet-unassigned,
+  .portal-root .receipt-signatures,
+  .portal-root .print-sheet-footer { break-inside: avoid; }
+  .portal-root .receipt-signatures { margin-top: 14pt; gap: 12pt; }
+  .portal-root .receipt-signatures span { font-size: 8pt; }
+  .portal-root .sheet-note { margin-top: 8pt; padding-top: 5pt; font-size: 8pt; }
+  .portal-root .print-sheet-footer { margin-top: 10pt; padding-top: 4pt; }
+  .portal-root .print-sheet-contact-footer { font-size: 7.5pt; }
+  .portal-root .sheet-empty,
+  .portal-root .muted { font-size: 8.5pt; }
+  .portal-root .receipt-grid { gap: 4pt 8pt; }
+  .portal-root .receipt-grid dt { font-size: 7.5pt; }
+  .portal-root .receipt-grid dd { font-size: 9pt; }
+  .portal-root .receipt-reference { margin: 6pt 0; padding: 5pt 7pt; }
+  .portal-root .table-scroll { overflow: visible !important; }
   .portal-root .print-actions { display: none !important; }
-  .portal-root .sheet-table th { background: #ffffff; }
 }
 
 .portal-root .mobile-menu,

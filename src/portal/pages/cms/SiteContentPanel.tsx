@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   cmsError, cmsSections, loadSiteContent, saveSiteContent, type SiteContentRow,
 } from "@/portal/lib/cms";
@@ -43,7 +43,18 @@ export function SiteContentPanel({ canEdit }: { canEdit: boolean }) {
     return Array.from(map.entries());
   }, [rows]);
 
-  const { publish, setDirty } = usePreviewDraft();
+  const { publish, setDirty, resetSignal } = usePreviewDraft();
+
+  // Restore every field to its last published value when the user discards edits.
+  const lastReset = useRef(resetSignal);
+  useEffect(() => {
+    if (resetSignal === lastReset.current) return;
+    lastReset.current = resetSignal;
+    const next: Draft = {};
+    rows.forEach((row) => { next[row.key] = { value_ar: row.value_ar, value_en: row.value_en }; });
+    setDraft(next);
+    setSuccess(null);
+  }, [resetSignal, rows]);
 
   useEffect(() => {
     if (!rows.length) return;

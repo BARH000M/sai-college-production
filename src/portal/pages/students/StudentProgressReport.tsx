@@ -1,21 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import logo from "@/portal/assets/saiLogo";
 import { loadStudentReport, type StudentReport } from "@/portal/lib/studentReport";
 import { formatDate } from "@/portal/lib/learning";
+import { exportStudentReportCsv } from "@/portal/lib/reportExport";
+import { printDate, buildSheetMeta, type ArchiveHeader } from "@/portal/lib/letterhead";
+import { PrintFooter, PrintLetterhead } from "@/portal/components/PrintLetterhead";
 
-function today(): string {
-  return new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
-}
-
-export function StudentProgressReport({ studentId, onClose, autoPrint = false }: {
+export function StudentProgressReport({ studentId, onClose, autoPrint = false, archive }: {
   studentId: string;
   onClose: () => void;
   autoPrint?: boolean;
+  archive?: ArchiveHeader;
 }) {
+  const preparedBy = archive?.preparedBy?.trim();
   const [report, setReport] = useState<StudentReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [exportNote, setExportNote] = useState<string | null>(null);
   const printed = useRef(false);
 
   useEffect(() => {
@@ -37,17 +38,23 @@ export function StudentProgressReport({ studentId, onClose, autoPrint = false }:
     return () => window.clearTimeout(timer);
   }, [autoPrint, report]);
 
+  function handleExport() {
+    if (!report) return;
+    try {
+      const fileName = exportStudentReportCsv(report);
+      setExportNote(`تم تنزيل نسخة الجدول (CSV): ${fileName}`);
+    } catch (failure) {
+      setExportNote(`تعذر تصدير النسخة الجدولية: ${failure instanceof Error ? failure.message : String(failure)}`);
+    }
+  }
+
   return <div className="print-overlay" role="dialog" aria-modal="true" aria-label="تقرير تقدم الطالب للفصل">
     <div className="assignment-sheet">
-      <div className="receipt-head">
-        <img src={logo} alt="شعار كلية ساي" className="receipt-logo" />
-        <div>
-          <p className="receipt-college">كلية ساي التعليمية اليمنية الصينية</p>
-          <p className="receipt-college-en" dir="ltr">SAI Yemeni–Chinese College</p>
-          <h2 className="receipt-title">تقرير تقدم الطالب للفصل الدراسي</h2>
-          <p className="receipt-subtitle">يُسلَّم لولي الأمر في اللقاء الدراسي</p>
-        </div>
-      </div>
+      <PrintLetterhead
+        title="تقرير تقدم الطالب للفصل الدراسي"
+        topic="المقررات والدرجات والحضور — نسخة ولي الأمر"
+        meta={buildSheetMeta(archive)}
+      />
 
       {loading && <p role="status">جارٍ تحميل التقرير...</p>}
       {error && <p className="error-box" role="alert">تعذر تحميل التقرير: {error} <button className="text-button" type="button" onClick={() => setRetry((v) => v + 1)}>إعادة المحاولة</button></p>}
@@ -57,48 +64,50 @@ export function StudentProgressReport({ studentId, onClose, autoPrint = false }:
           <div><span>الطالب</span><strong>{report.student.full_name}</strong></div>
           <div><span>رقم القبول</span><strong dir="ltr">{report.student.admission_no}</strong></div>
           <div><span>الصف / الفرع</span><strong>{report.className ?? "بلا صف"} · {report.branchName ?? "—"}</strong></div>
-          <div><span>تاريخ التقرير</span><strong>{today()}</strong></div>
+          <div><span>تاريخ التقرير</span><strong>{printDate()}</strong></div>
           <div><span>نسبة الإنجاز العامة</span><strong>{report.overallPercent}%</strong></div>
           <div><span>المعدل العام للدرجات</span><strong>{report.averageGrade === null ? "—" : `${report.averageGrade}%`}</strong></div>
         </div>
 
-        <div className="report-section">
-          <strong className="report-heading">المقررات ونسبة التقدم</strong>
-          {report.courses.length === 0 ? <p className="muted">لا توجد مقررات مرتبطة بصف الطالب.</p> : <table className="sheet-table">
-            <thead><tr><th>المقرر</th><th>المستوى</th><th>الدروس</th><th>المكتملة</th><th>النسبة</th></tr></thead>
-            <tbody>{report.courses.map((c) => <tr key={c.id}>
-              <td><strong>{c.title}</strong></td><td>{c.level ?? "—"}</td><td>{c.totalLessons}</td><td>{c.completed}</td><td>{c.percent}%</td>
-            </tr>)}</tbody>
-          </table>}
-        </div>
+        <div className="sheet-body">
+          <div className="report-section">
+            <strong className="report-heading">المقررات ونسبة التقدم</strong>
+            {report.courses.length === 0 ? <p className="muted">لا توجد مقررات مرتبطة بصف الطالب.</p> : <table className="sheet-table">
+              <thead><tr><th>المقرر</th><th>المستوى</th><th>الدروس</th><th>المكتملة</th><th>النسبة</th></tr></thead>
+              <tbody>{report.courses.map((c) => <tr key={c.id}>
+                <td><strong>{c.title}</strong></td><td>{c.level ?? "—"}</td><td>{c.totalLessons}</td><td>{c.completed}</td><td>{c.percent}%</td>
+              </tr>)}</tbody>
+            </table>}
+          </div>
 
-        <div className="report-section">
-          <strong className="report-heading">الواجبات — المنجز مقابل المستحق ({report.homeworkDone} منجز · {report.homeworkPending} مستحق)</strong>
-          {report.homework.length === 0 ? <p className="muted">لا توجد واجبات منشورة.</p> : <table className="sheet-table">
-            <thead><tr><th>الواجب</th><th>المقرر</th><th>موعد التسليم</th><th>الحالة</th></tr></thead>
-            <tbody>{report.homework.map((h, i) => <tr key={i}>
-              <td>{h.title}</td><td>{h.courseTitle}</td><td>{formatDate(h.dueAt)}</td>
-              <td>{h.statusLabel}</td>
-            </tr>)}</tbody>
-          </table>}
-        </div>
+          <div className="report-section">
+            <strong className="report-heading">الواجبات — المنجز مقابل المستحق ({report.homeworkDone} منجز · {report.homeworkPending} مستحق)</strong>
+            {report.homework.length === 0 ? <p className="muted">لا توجد واجبات منشورة.</p> : <table className="sheet-table">
+              <thead><tr><th>الواجب</th><th>المقرر</th><th>موعد التسليم</th><th>الحالة</th></tr></thead>
+              <tbody>{report.homework.map((h, i) => <tr key={i}>
+                <td>{h.title}</td><td>{h.courseTitle}</td><td>{formatDate(h.dueAt)}</td>
+                <td>{h.statusLabel}</td>
+              </tr>)}</tbody>
+            </table>}
+          </div>
 
-        <div className="report-section">
-          <strong className="report-heading">الدرجات المعتمدة وملاحظات المعلم</strong>
-          {report.grades.length === 0 ? <p className="muted">لم تُعتمد درجات بعد.</p> : <table className="sheet-table">
-            <thead><tr><th>الواجب</th><th>المقرر</th><th>الدرجة</th><th>النسبة</th><th>ملاحظة المعلم</th></tr></thead>
-            <tbody>{report.grades.map((g, i) => <tr key={i}>
-              <td>{g.homeworkTitle}</td><td>{g.courseTitle}</td><td dir="ltr">{g.score} / {g.maxScore}</td><td>{g.percent}%</td>
-              <td>{g.feedback ?? "—"}</td>
-            </tr>)}</tbody>
-          </table>}
-        </div>
+          <div className="report-section">
+            <strong className="report-heading">الدرجات المعتمدة وملاحظات المعلم</strong>
+            {report.grades.length === 0 ? <p className="muted">لم تُعتمد درجات بعد.</p> : <table className="sheet-table">
+              <thead><tr><th>الواجب</th><th>المقرر</th><th>الدرجة</th><th>النسبة</th><th>ملاحظة المعلم</th></tr></thead>
+              <tbody>{report.grades.map((g, i) => <tr key={i}>
+                <td>{g.homeworkTitle}</td><td>{g.courseTitle}</td><td dir="ltr">{g.score} / {g.maxScore}</td><td>{g.percent}%</td>
+                <td>{g.feedback ?? "—"}</td>
+              </tr>)}</tbody>
+            </table>}
+          </div>
 
-        <div className="report-section">
-          <strong className="report-heading">ملخص الحضور ({report.attendanceTotal} سجل)</strong>
-          {report.attendanceTotal === 0 ? <p className="muted">لا توجد سجلات حضور لهذا الطالب بعد.</p> : <div className="sheet-summary">
-            {report.attendance.map((a) => <div key={a.label}><span>{a.label}</span><strong>{a.count}</strong></div>)}
-          </div>}
+          <div className="report-section">
+            <strong className="report-heading">ملخص الحضور ({report.attendanceTotal} سجل)</strong>
+            {report.attendanceTotal === 0 ? <p className="muted">لا توجد سجلات حضور لهذا الطالب بعد.</p> : <div className="sheet-summary">
+              {report.attendance.map((a) => <div key={a.label}><span>{a.label}</span><strong>{a.count}</strong></div>)}
+            </div>}
+          </div>
         </div>
 
         <p className="sheet-note">
@@ -106,11 +115,11 @@ export function StudentProgressReport({ studentId, onClose, autoPrint = false }:
         </p>
 
         <div className="receipt-signatures">
-          <div><span>توقيع المعلم / إدارة الكلية</span></div>
+          <div><span>{preparedBy ? `إعداد: ${preparedBy}` : "توقيع المعلم / إدارة الكلية"}</span></div>
           <div><span>توقيع ولي الأمر بالاستلام</span></div>
         </div>
 
-        <p className="receipt-footer" dir="ltr">info@saicollege.com · Sana'a, Republic of Yemen · SAI College</p>
+        <PrintFooter />
       </>}
     </div>
 
@@ -118,7 +127,11 @@ export function StudentProgressReport({ studentId, onClose, autoPrint = false }:
       <button className="button primary" type="button" onClick={() => window.print()} disabled={!report || loading || !!error}>
         <i className="ri-printer-line" aria-hidden="true"></i> طباعة التقرير لولي الأمر
       </button>
+      <button className="button secondary" type="button" onClick={handleExport} disabled={!report || loading || !!error}>
+        <i className="ri-file-excel-2-line" aria-hidden="true"></i> تصدير نسخة CSV
+      </button>
       <button className="button secondary" type="button" onClick={onClose}>إغلاق</button>
+      {exportNote && <p className="sheet-export-note" role="status">{exportNote}</p>}
     </div>
   </div>;
 }

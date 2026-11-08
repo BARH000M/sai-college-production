@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { SiteContentPanel } from "./cms/SiteContentPanel";
 import { ProgramsPanel } from "./cms/ProgramsPanel";
 import { NewsPanel } from "./cms/NewsPanel";
@@ -20,6 +21,7 @@ export function Cms({ roles }: { roles: readonly string[] }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [draftState, setDraftState] = useState<PreviewDraftState>({ content: null, programs: null, news: null });
   const [dirty, setDirtyState] = useState<CmsDirtyCounts>({ content: 0, programs: 0, news: 0 });
+  const [resetSignal, setResetSignal] = useState(0);
 
   const publishDraft = useCallback((patch: Partial<PreviewDraftState>) => {
     setDraftState((current) => ({ ...current, ...patch }));
@@ -30,8 +32,19 @@ export function Cms({ roles }: { roles: readonly string[] }) {
   }, []);
 
   const totalDirty = dirty.content + dirty.programs + dirty.news;
+  useUnsavedChangesGuard(totalDirty);
 
-  return <PreviewDraftContext.Provider value={{ draft: draftState, publish: publishDraft, dirty, setDirty }}>
+  const requestDiscard = useCallback(() => {
+    setResetSignal((value) => value + 1);
+  }, []);
+
+  function discardChanges() {
+    if (totalDirty <= 0) return;
+    if (!window.confirm(`سيتم التراجع عن ${totalDirty} تعديلاً غير محفوظ وإرجاع الحقول إلى آخر نسخة منشورة. هل تريد المتابعة؟`)) return;
+    requestDiscard();
+  }
+
+  return <PreviewDraftContext.Provider value={{ draft: draftState, publish: publishDraft, dirty, setDirty, resetSignal, requestDiscard }}>
     <main className="workspace">
       <div className="page-heading">
         <div>
@@ -44,12 +57,20 @@ export function Cms({ roles }: { roles: readonly string[] }) {
             <i className="ri-error-warning-line" aria-hidden="true"></i>
             {totalDirty} تعديل غير محفوظ
           </span>}
+          {totalDirty > 0 && <button className="button secondary" type="button" onClick={discardChanges}>
+            <i className="ri-arrow-go-back-line" aria-hidden="true"></i> تجاهل التعديلات
+          </button>}
           <button className="button primary" type="button" onClick={() => setPreviewOpen(true)}>
             <i className="ri-eye-line" aria-hidden="true"></i> معاينة مباشرة
           </button>
           <a className="button secondary" href="/" target="_blank" rel="noreferrer">فتح الموقع</a>
         </div>
       </div>
+
+      {totalDirty > 0 && <p className="cms-leave-warning" role="status">
+        <i className="ri-error-warning-line" aria-hidden="true"></i>
+        <span>لديك <strong>{totalDirty}</strong> تعديلاً غير محفوظ. سيظهر تنبيه تأكيد قبل مغادرة الصفحة أو إغلاق التبويب حتى لا تفقد تعديلاتك. يمكنك أيضاً الضغط على «تجاهل التعديلات» لإرجاع الحقول إلى آخر نسخة منشورة.</span>
+      </p>}
 
       <div className="cms-tabs" role="tablist" aria-label="أقسام إدارة الموقع">
         {tabs.map((item) => <button
@@ -80,7 +101,9 @@ export function Cms({ roles }: { roles: readonly string[] }) {
           <li><i className="ri-checkbox-circle-line" aria-hidden="true"></i> أي عنصر «منشور» يظهر فوراً للزوّار في الصفحة العامة.</li>
           <li><i className="ri-eye-off-line" aria-hidden="true"></i> العنصر «المخفي» يبقى محفوظاً للإدارة ولا يظهر للزوّار.</li>
           <li><i className="ri-error-warning-line" aria-hidden="true"></i> الرقم البنّي على التبويب يعني أن لديك تعديلات لم تُحفظ في ذلك القسم.</li>
-          <li><i className="ri-shield-check-line" aria-hidden="true"></i> النشر والتعديل متاحان للإدارة العامة ومدير الأكاديمية ومحرر المحتوى فقط.</li>
+          <li><i className="ri-shield-check-line" aria-hidden="true"></i> عند وجود تعديلات غير محفوظة يظهر تأكيد قبل مغادرة الصفحة أو إغلاق التبويب، فلا تُفقد كتابتك بالخطأ.</li>
+          <li><i className="ri-arrow-go-back-line" aria-hidden="true"></i> زر «تجاهل التعديلات» يرجع كل الحقول إلى آخر نسخة منشورة دون مغادرة الصفحة (بعد تأكيد).</li>
+          <li><i className="ri-lock-line" aria-hidden="true"></i> النشر والتعديل متاحان للإدارة العامة ومدير الأكاديمية ومحرر المحتوى فقط.</li>
         </ul>
         <p className="muted">يبقى المحتوى الاحتياطي ظاهراً في حال تعذّر الوصول إلى قاعدة البيانات، حتى لا تظهر الصفحة فارغة.</p>
         <div className="actions"><Link className="button secondary" to="/portal/dashboard">العودة للرئيسية</Link></div>

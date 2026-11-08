@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   cmsError, deleteProgram, emptyProgramDraft, loadPrograms, programToDraft, saveProgram, validateProgram,
   type CmsProgram, type ProgramDraft,
@@ -29,7 +29,17 @@ export function ProgramsPanel({ canEdit }: { canEdit: boolean }) {
     return () => { active = false; };
   }, [retry]);
 
-  const { publish, setDirty } = usePreviewDraft();
+  const { publish, setDirty, resetSignal } = usePreviewDraft();
+
+  // Discarding unsaved edits closes the open form so its changes are dropped.
+  const lastReset = useRef(resetSignal);
+  useEffect(() => {
+    if (resetSignal === lastReset.current) return;
+    lastReset.current = resetSignal;
+    setEditingId(undefined);
+    setFormError(null);
+    setSuccess(null);
+  }, [resetSignal]);
 
   useEffect(() => {
     if (loading) return;

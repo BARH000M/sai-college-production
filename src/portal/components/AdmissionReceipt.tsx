@@ -1,6 +1,7 @@
-import logo from "../assets/saiLogo";
 import { QRCodeCanvas } from "qrcode.react";
 import { admissionStatuses, applicationStatusUrl, type Admission } from "../lib/admissions";
+import { printDate } from "../lib/letterhead";
+import { PrintFooter, PrintLetterhead } from "../components/PrintLetterhead";
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -25,15 +26,14 @@ export function AdmissionReceipt({ admission, branchLabel, sessionLabel, onClose
 }) {
   return <div className="print-overlay" role="dialog" aria-modal="true" aria-label="إيصال استلام طلب قبول">
     <div className="print-receipt">
-      <div className="receipt-head">
-        <img src={logo} alt="شعار كلية ساي" className="receipt-logo" />
-        <div>
-          <p className="receipt-college">كلية ساي التعليمية اليمنية الصينية</p>
-          <p className="receipt-college-en" dir="ltr">SAI Yemeni–Chinese College</p>
-          <h2 className="receipt-title">إيصال استلام طلب قبول</h2>
-          <p className="receipt-subtitle" dir="ltr">Admission Enquiry Receipt</p>
-        </div>
-      </div>
+      <PrintLetterhead
+        title="إيصال استلام طلب قبول"
+        topic="Admission Enquiry Receipt — إثبات استلام الطلب ومتابعة حالته"
+        meta={[
+          { label: "تاريخ الإصدار", value: printDate() },
+          { label: "الرقم المرجعي", value: admission.application_no },
+        ]}
+      />
 
       <div className="receipt-reference">
         <span>رقم الطلب المرجعي / Reference No.</span>
@@ -80,7 +80,7 @@ export function AdmissionReceipt({ admission, branchLabel, sessionLabel, onClose
         <div><span>توقيع المتقدم / ولي الأمر</span></div>
       </div>
 
-      <p className="receipt-footer" dir="ltr">info@saicollege.com · Sana'a, Republic of Yemen · SAI College</p>
+      <PrintFooter />
     </div>
 
     <div className="print-actions">
