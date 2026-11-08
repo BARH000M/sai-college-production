@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNotificationFeed } from "@/portal/hooks/useNotificationFeed";
 import {
-  formatNotificationTime, markNotificationsSeen, notificationCategoryIcons, notificationCategoryLabels,
-  type NotificationCategory,
+  formatNotificationTime, groupNotificationsByDay, markNotificationsSeen, notificationCategoryIcons,
+  notificationCategoryLabels, type NotificationCategory,
 } from "@/portal/lib/notifications";
 import { LabPage, LabStats, LabTabs } from "@/portal/pages/labs/LabShell";
 
@@ -20,6 +20,7 @@ export function NotificationsPage({ roles }: { roles: readonly string[] }) {
   }), [items]);
 
   const visible = tab === "all" ? items : items.filter((item) => item.category === tab);
+  const groups = useMemo(() => groupNotificationsByDay(visible), [visible]);
   const seenTime = seenAt ? new Date(seenAt).getTime() : 0;
 
   const [marking, setMarking] = useState(false);
@@ -88,27 +89,39 @@ export function NotificationsPage({ roles }: { roles: readonly string[] }) {
             <strong>لا توجد إشعارات في هذا القسم</strong>
             <p className="muted">عندما يصل طلب قبول جديد أو تسليم واجب أو غياب مسجل، سيظهر هنا تلقائياً.</p>
           </div>
-          : <ul className="notify-list">
-            {visible.map((item) => {
-              const isUnread = new Date(item.at).getTime() > seenTime;
-              return <li key={item.id}>
-                <Link className={`notify-item${isUnread ? " unread" : ""}`} to={item.href}>
-                  <span className={`notify-icon notify-${item.category}`}>
-                    <i className={notificationCategoryIcons[item.category]} aria-hidden="true"></i>
-                  </span>
-                  <span className="notify-body">
-                    <strong>{item.title}</strong>
-                    <small>{item.detail}</small>
-                  </span>
-                  <span className="notify-meta">
-                    <span className="lab-tag">{notificationCategoryLabels[item.category]}</span>
-                    <time>{formatNotificationTime(item.at)}</time>
-                  </span>
-                  <i className="ri-arrow-left-s-line notify-arrow" aria-hidden="true"></i>
-                </Link>
-              </li>;
-            })}
-          </ul>}
+          : <div className="notify-groups">
+            {groups.map((group) => <section className="notify-group" key={group.id} aria-label={group.label}>
+              <div className="notify-group-head">
+                <span className="notify-group-label">
+                  <i className={group.id === "today" ? "ri-sun-line" : group.id === "yesterday" ? "ri-history-line" : "ri-calendar-2-line"} aria-hidden="true"></i>
+                  {group.label}
+                </span>
+                <span className="notify-group-line" aria-hidden="true" />
+                <small>{group.items.length} إشعار · {group.hint}</small>
+              </div>
+              <ul className="notify-list">
+                {group.items.map((item) => {
+                  const isUnread = new Date(item.at).getTime() > seenTime;
+                  return <li key={item.id}>
+                    <Link className={`notify-item${isUnread ? " unread" : ""}`} to={item.href}>
+                      <span className={`notify-icon notify-${item.category}`}>
+                        <i className={notificationCategoryIcons[item.category]} aria-hidden="true"></i>
+                      </span>
+                      <span className="notify-body">
+                        <strong>{item.title}</strong>
+                        <small>{item.detail}</small>
+                      </span>
+                      <span className="notify-meta">
+                        <span className="lab-tag">{notificationCategoryLabels[item.category]}</span>
+                        <time>{formatNotificationTime(item.at)}</time>
+                      </span>
+                      <i className="ri-arrow-left-s-line notify-arrow" aria-hidden="true"></i>
+                    </Link>
+                  </li>;
+                })}
+              </ul>
+            </section>)}
+          </div>}
       </section>
 
       <p className="data-note">تُحفظ علامة «مقروء» في حسابك على الخادم، فتظهر على أي جهاز تدخل منه، ولا تؤثر على سجلات الطلاب أو إشعارات الواجبات في صفحة الواجبات.</p>

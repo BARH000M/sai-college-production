@@ -148,6 +148,160 @@ export const wordStatusLabels: Record<WordStatus, string> = {
   known: "أتقنتها",
 };
 
+export const partOfSpeechOptions: readonly string[] = [
+  "اسم",
+  "فعل",
+  "صفة",
+  "ظرف",
+  "حرف",
+  "عبارة",
+];
+
+export type VocabularyWordInput = {
+  courseId: string;
+  lessonId: string | null;
+  hanzi: string;
+  pinyin: string;
+  meaningAr: string;
+  meaningEn: string;
+  partOfSpeech: string;
+  exampleZh: string;
+  exampleAr: string;
+  hskLevel: number | null;
+  isPublished: boolean;
+};
+
+type CleanWord = {
+  hanzi: string;
+  pinyin: string;
+  meaningAr: string;
+  meaningEn: string | null;
+  partOfSpeech: string | null;
+  exampleZh: string | null;
+  exampleAr: string | null;
+  hskLevel: number | null;
+  isPublished: boolean;
+};
+
+/** Validates and trims a word exactly the way the table expects it. */
+function cleanWord(input: VocabularyWordInput): CleanWord {
+  const hanzi = input.hanzi.trim();
+  const pinyin = input.pinyin.trim();
+  const meaningAr = input.meaningAr.trim();
+  const meaningEn = input.meaningEn.trim();
+  const partOfSpeech = input.partOfSpeech.trim();
+  const exampleZh = input.exampleZh.trim();
+  const exampleAr = input.exampleAr.trim();
+
+  if (!input.courseId) throw new Error("اختر المقرر الذي تنتمي إليه المفردة.");
+  if (!hanzi) throw new Error("اكتب المفردة بالحروف الصينية.");
+  if (hanzi.length > 30) throw new Error("المفردة أطول من الحد المسموح (٣٠ حرفاً).");
+  if (!pinyin) throw new Error("اكتب النطق بالبينيين.");
+  if (pinyin.length > 60) throw new Error("البينيين أطول من الحد المسموح (٦٠ حرفاً).");
+  if (!meaningAr) throw new Error("اكتب معنى المفردة بالعربية.");
+  if (meaningAr.length > 120) throw new Error("المعنى العربي أطول من الحد المسموح (١٢٠ حرفاً).");
+  if (meaningEn.length > 120) throw new Error("المعنى الإنجليزي أطول من الحد المسموح (١٢٠ حرفاً).");
+  if (partOfSpeech.length > 30) throw new Error("نوع الكلمة أطول من الحد المسموح (٣٠ حرفاً).");
+  if (exampleZh.length > 200) throw new Error("الجملة التوضيحية أطول من الحد المسموح (٢٠٠ حرف).");
+  if (exampleAr.length > 200) throw new Error("ترجمة الجملة أطول من الحد المسموح (٢٠٠ حرف).");
+  if (input.hskLevel !== null && (!Number.isInteger(input.hskLevel) || input.hskLevel < 1 || input.hskLevel > 9)) {
+    throw new Error("مستوى HSK يجب أن يكون رقماً صحيحاً بين ١ و ٩.");
+  }
+
+  return {
+    hanzi,
+    pinyin,
+    meaningAr,
+    meaningEn: meaningEn || null,
+    partOfSpeech: partOfSpeech || null,
+    exampleZh: exampleZh || null,
+    exampleAr: exampleAr || null,
+    hskLevel: input.hskLevel,
+    isPublished: input.isPublished,
+  };
+}
+
+function wordPayload(input: VocabularyWordInput): Record<string, unknown> {
+  const clean = cleanWord(input);
+  return {
+    course_id: input.courseId,
+    lesson_id: input.lessonId || null,
+    hanzi: clean.hanzi,
+    pinyin: clean.pinyin,
+    meaning_ar: clean.meaningAr,
+    meaning_en: clean.meaningEn,
+    part_of_speech: clean.partOfSpeech,
+    example_zh: clean.exampleZh,
+    example_ar: clean.exampleAr,
+    hsk_level: clean.hskLevel,
+    is_published: clean.isPublished,
+  };
+}
+
+/** Loads the full word bank of one course, including unpublished drafts. */
+export async function loadCourseVocabulary(courseId: string): Promise<VocabularyWord[]> {
+  if (!courseId) return [];
+  const result = await supabase
+    .from("learning_vocabulary")
+    .select(wordColumns)
+    .eq("course_id", courseId)
+    .order("position");
+  if (result.error) throw new Error(`تعذر تحميل مفردات المقرر: ${result.error.message}`);
+  return (result.data ?? []) as VocabularyWord[];
+}
+
+export async function createVocabularyWord(input: VocabularyWordInput): Promise<VocabularyWord> {
+  const last = await supabase
+    .from("learning_vocabulary")
+    .select("position")
+    .eq("course_id", input.courseId)
+    .order("position", { ascending: false })
+    .limit(1);
+  if (last.error) throw new Error(last.error.message);
+  const position = Number(last.data?.[0]?.position ?? 0) + 1;
+
+  const result = await supabase
+    .from("learning_vocabulary")
+    .insert({ ...wordPayload(input), position })
+    .select(wordColumns);
+
+  if (result.error) throw new Error(result.error.message);
+  const row = result.data?.[0];
+  if (!row) throw new Error("لم تُحفظ المفردة؛ تحقق من صلاحيتك على هذا المقرر.");
+  return row as VocabularyWord;
+}
+
+export async function updateVocabularyWord(
+  id: string,
+  input: VocabularyWordInput,
+): Promise<VocabularyWord> {
+  if (!id) throw new Error("لم يُحدَّد السجل المطلوب تعديله.");
+  const result = await supabase
+    .from("learning_vocabulary")
+    .update(wordPayload(input))
+    .eq("id", id)
+    .select(wordColumns);
+
+  if (result.error) throw new Error(result.error.message);
+  const row = result.data?.[0];
+  if (!row) throw new Error("لم يُحفظ التعديل؛ تحقق من صلاحيتك على هذا المقرر.");
+  return row as VocabularyWord;
+}
+
+export async function deleteVocabularyWord(id: string): Promise<void> {
+  if (!id) throw new Error("لم يُحدَّد السجل المطلوب حذفه.");
+  const result = await supabase
+    .from("learning_vocabulary")
+    .delete()
+    .eq("id", id)
+    .select("id");
+
+  if (result.error) {
+    throw new Error(`${result.error.message} — قد تكون المفردة مرتبطة بسجل مراجعة لطالب.`);
+  }
+  if (!result.data?.length) throw new Error("لم تُحذف المفردة؛ تحقق من صلاحيتك على هذا المقرر.");
+}
+
 export function vocabularySummary(
   words: readonly VocabularyWord[],
   progress: readonly VocabularyProgress[],

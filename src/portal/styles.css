@@ -1514,3 +1514,75 @@
   .portal-root .flash-hanzi { font-size: 46px; }
   .portal-root .flash-card { min-height: 280px; padding: 20px 16px; }
 }
+
+/* ---- Notification day dividers ---- */
+.portal-root .notify-groups { display: grid; gap: 18px; margin-top: 8px; }
+.portal-root .notify-group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.portal-root .notify-group-label {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-size: 12px; font-weight: 700; color: oklch(var(--primary-800));
+}
+.portal-root .notify-group-label i { font-size: 15px; }
+.portal-root .notify-group-line { flex: 1 1 60px; height: 1px; background: oklch(var(--background-300)); }
+.portal-root .notify-group-head small { font-size: 10.5px; color: oklch(var(--foreground-600)); white-space: nowrap; }
+.portal-root .notify-group .notify-list { margin-top: 8px; }
+
+/* ---- Course word-bank editor ---- */
+.portal-root .course-vocab {
+  display: grid; gap: 12px; margin-top: 18px; padding-top: 16px;
+  border-top: 1px solid oklch(var(--background-200));
+}
+.portal-root .course-vocab-head h2 { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.portal-root .course-vocab-head h2 i { font-size: 18px; color: oklch(var(--primary-600)); }
+.portal-root .vocab-editor-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.portal-root .vocab-editor-stats > span {
+  display: inline-flex; align-items: baseline; gap: 4px; padding: 5px 11px; border-radius: 999px;
+  background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200));
+  font-size: 11px; color: oklch(var(--foreground-700));
+}
+.portal-root .vocab-editor-stats strong { font-size: 13px; color: oklch(var(--foreground-950)); }
+.portal-root .vocab-editor-form {
+  display: grid; gap: 12px; padding: 14px; border-radius: 10px;
+  background: oklch(var(--accent-50)); border: 1px solid oklch(var(--accent-200));
+}
+.portal-root .vocab-editor-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.portal-root .vocab-editor-head > strong { font-size: 13px; color: oklch(var(--accent-950)); }
+.portal-root .vocab-editor-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 10px 12px;
+}
+.portal-root .vocab-editor-grid label { display: grid; gap: 5px; min-width: 0; font-size: 11px; }
+.portal-root .vocab-editor-wide { grid-column: 1 / -1; }
+.portal-root .vocab-required { color: oklch(var(--primary-700)); }
+.portal-root .vocab-editor-checkbox {
+  display: flex !important; flex-direction: row; align-items: center; gap: 8px;
+  align-self: end; padding-bottom: 10px; white-space: nowrap;
+}
+.portal-root .vocab-editor-checkbox input { width: 16px; height: 16px; accent-color: oklch(var(--primary-600)); }
+.portal-root .vocab-editor-empty {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 16px; border-radius: 10px;
+  background: oklch(var(--background-100)); border: 1px dashed oklch(var(--background-300));
+  font-size: 12px; color: oklch(var(--foreground-700)); line-height: 1.8;
+}
+.portal-root .vocab-editor-empty i { flex: 0 0 auto; font-size: 18px; color: oklch(var(--primary-600)); }
+.portal-root .vocab-editor-table td { vertical-align: middle; }
+.portal-root .vocab-editor-table .data-note { display: block; }
+.portal-root .vocab-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.portal-root .vocab-row-actions .button { min-height: 32px; padding: 5px 10px; font-size: 11px; }
+
+/* ---- Printable vocabulary review sheet ---- */
+.portal-root .vocab-sheet-table td { vertical-align: middle; }
+.portal-root .vocab-sheet-hanzi { font-size: 14px; }
+.portal-root .vocab-sheet-example { display: block; font-size: 10px; }
+.portal-root .vocab-sheet-practice { width: 110px; height: 40px; }
+
+@media (max-width: 700px) {
+  .portal-root .vocab-editor-stats > span { flex: 1 1 auto; }
+  .portal-root .vocab-row-actions { width: 100%; }
+}
+
+@media print {
+  .portal-root .vocab-sheet-table { font-size: 7.5pt; }
+  .portal-root .vocab-sheet-hanzi { font-size: 10pt; }
+  .portal-root .vocab-sheet-example { font-size: 6.8pt; }
+  .portal-root .vocab-sheet-practice { width: 24mm; height: 12mm; }
+}

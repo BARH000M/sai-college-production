@@ -6,6 +6,7 @@ import {
 import { LabPage, LabStats, LabTabs } from "@/portal/pages/labs/LabShell";
 import { Flashcards } from "@/portal/pages/vocabulary/Flashcards";
 import { WordBank } from "@/portal/pages/vocabulary/WordBank";
+import { VocabularyReviewSheet } from "@/portal/pages/vocabulary/VocabularyReviewSheet";
 
 type Tab = "bank" | "cards" | "lessons";
 
@@ -20,6 +21,7 @@ export function VocabularyPage({ roles }: { roles: readonly string[] }) {
   const [search, setSearch] = useState("");
   const [courseId, setCourseId] = useState("");
   const [lessonId, setLessonId] = useState("");
+  const [printLessonId, setPrintLessonId] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -91,6 +93,8 @@ export function VocabularyPage({ roles }: { roles: readonly string[] }) {
     .filter((group) => group.rows.length > 0), [lessons, courses, courseId, filtered]);
 
   const courseLessons = lessons.filter((lesson) => !courseId || lesson.course_id === courseId);
+  const printLesson = lessons.find((lesson) => lesson.id === printLessonId) ?? null;
+  const printWords = printLesson ? words.filter((word) => word.lesson_id === printLesson.id) : [];
 
   return <LabPage
     eyebrow="تعلم اللغة الصينية"
@@ -194,10 +198,24 @@ export function VocabularyPage({ roles }: { roles: readonly string[] }) {
                 >
                   <i className="ri-stack-line" aria-hidden="true"></i> دراسة البطاقات
                 </button>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => setPrintLessonId(group.lesson.id)}
+                >
+                  <i className="ri-printer-line" aria-hidden="true"></i> طباعة كشف المراجعة
+                </button>
               </li>;
             })}
           </ul>}
       </section>}
+
+      {printLesson && <VocabularyReviewSheet
+        lesson={printLesson}
+        course={courses.find((course) => course.id === printLesson.course_id)}
+        words={printWords}
+        onClose={() => setPrintLessonId("")}
+      />}
     </>}
   </LabPage>;
 }

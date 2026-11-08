@@ -4,6 +4,7 @@ import {
   type LearningScope, type LearningCourse, type LessonStatus,
 } from "@/portal/lib/learning";
 import { LessonContent } from "@/portal/pages/learning/LessonContent";
+import { CourseVocabularyPanel } from "@/portal/pages/learning/CourseVocabularyPanel";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -165,6 +166,8 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
         })}
       </ol>
       {!lessons.length && <p className="muted">لم تُضف دروس لهذا المقرر بعد.</p>}
+
+      {canManageContent && <CourseVocabularyPanel key={active.id} course={active} lessons={lessons} />}
     </section>}
   </>;
 }

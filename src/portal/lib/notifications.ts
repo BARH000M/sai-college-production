@@ -80,6 +80,42 @@ export function unreadCount(items: readonly AppNotification[], seenAt: string | 
   return items.filter((item) => new Date(item.at).getTime() > seenTime).length;
 }
 
+export type NotificationDayGroup = {
+  id: "today" | "yesterday" | "week" | "older";
+  label: string;
+  hint: string;
+  items: AppNotification[];
+};
+
+/**
+ * Splits the feed into Today / Yesterday / This week / Older buckets so long
+ * lists can be scanned by day instead of one continuous ribbon. Items are
+ * already sorted newest first, so bucket order stays chronological.
+ */
+export function groupNotificationsByDay(items: readonly AppNotification[]): NotificationDayGroup[] {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
+
+  const groups: NotificationDayGroup[] = [
+    { id: "today", label: "اليوم", hint: "أحدث التحديثات", items: [] },
+    { id: "yesterday", label: "أمس", hint: "خلال آخر ٢٤ ساعة", items: [] },
+    { id: "week", label: "هذا الأسبوع", hint: "آخر ٧ أيام", items: [] },
+    { id: "older", label: "أقدم من ذلك", hint: "أرشيف الإشعارات", items: [] },
+  ];
+
+  for (const item of items) {
+    const at = time(item.at);
+    if (at >= startOfToday) groups[0].items.push(item);
+    else if (at >= startOfYesterday) groups[1].items.push(item);
+    else if (at >= startOfWeek) groups[2].items.push(item);
+    else groups[3].items.push(item);
+  }
+
+  return groups.filter((group) => group.items.length > 0);
+}
+
 function time(value: string | null | undefined): number {
   if (!value) return 0;
   const parsed = new Date(value).getTime();
