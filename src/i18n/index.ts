@@ -7,8 +7,14 @@ i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    lng: 'en',
-    fallbackLng: 'en',
+    lng: 'ar',
+    fallbackLng: 'ar',
+    supportedLngs: ['ar', 'en'],
+    detection: {
+      order: ['localStorage'],
+      caches: ['localStorage'],
+      lookupLocalStorage: 'sai-lang',
+    },
     debug: false,
     resources: messages,
     interpolation: {

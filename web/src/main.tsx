@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./styles.css";
 
-const App = lazy(() => import("./App"));
+const App = lazy(() => import("./AppRoot"));
 const root = document.getElementById("root");
 if (!root) throw new Error("The application root element is missing.");
 

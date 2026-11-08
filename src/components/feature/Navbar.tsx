@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import useLang from '@/hooks/useLang';
 import { navLinks } from '@/mocks/home';
+import saiLogo from '@/portal/assets/saiLogo';
 
 export default function Navbar() {
   const { lang, toggle, isAr } = useLang();
@@ -19,7 +21,9 @@ export default function Navbar() {
     <header className={`fixed top-0 inset-x-0 z-50 transition-colors duration-300 ${light ? 'bg-background-50 border-b border-background-200' : 'bg-transparent'}`}>
       <nav className="flex items-center justify-between px-4 md:px-10 h-16 md:h-20">
         <a href="#top" className="flex items-center gap-2 cursor-pointer">
-          <span className="w-9 h-9 rounded-md bg-primary-500 text-background-50 flex items-center justify-center font-heading font-bold">S</span>
+          <span className="w-11 h-11 rounded-md bg-background-50 flex items-center justify-center p-1">
+            <img src={saiLogo} alt="شعار كلية ساي التعليمية اليمنية الصينية" className="w-full h-full object-contain" />
+          </span>
           <span className={`font-heading font-semibold text-base ${light ? 'text-foreground-950' : 'text-background-50'}`}>
             {isAr ? 'كلية ساي' : 'SAI College'}
           </span>
@@ -37,6 +41,9 @@ export default function Navbar() {
           <button type="button" onClick={toggle} className={`whitespace-nowrap cursor-pointer text-sm px-3 py-1.5 rounded-full border ${light ? 'border-background-300 text-foreground-800' : 'border-background-50/40 text-background-50'}`}>
             {isAr ? 'English' : 'العربية'}
           </button>
+          <Link to="/portal/login" className={`hidden md:inline-flex whitespace-nowrap cursor-pointer text-sm px-3 py-2 rounded-md border ${light ? 'border-background-300 text-foreground-800 hover:bg-background-100' : 'border-background-50/50 text-background-50 hover:bg-background-50/10'}`}>
+            {isAr ? 'بوابة الكلية' : 'College portal'}
+          </Link>
           <a href="#admissions" className="hidden md:inline-flex whitespace-nowrap cursor-pointer text-sm px-4 py-2 rounded-md bg-primary-500 hover:bg-primary-600 text-background-50">
             {isAr ? 'قدّم الآن' : 'Apply now'}
           </a>
@@ -52,6 +59,9 @@ export default function Navbar() {
               <a href={`#${l.id}`} onClick={() => setOpen(false)} className="block py-2 text-sm text-foreground-800 cursor-pointer">{l[lang]}</a>
             </li>
           ))}
+          <li>
+            <Link to="/portal/login" onClick={() => setOpen(false)} className="block py-2 text-sm text-primary-700 cursor-pointer">{isAr ? 'بوابة الكلية' : 'College portal'}</Link>
+          </li>
         </ul>
       )}
     </header>

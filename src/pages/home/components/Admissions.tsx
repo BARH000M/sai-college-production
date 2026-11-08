@@ -1,13 +1,24 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import useLang from '@/hooks/useLang';
+import { supabase } from '@/portal/lib/supabase';
 import { admissionSteps, programs } from '@/mocks/home';
 
-const FORM_URL = 'https://readdy.ai/api/form/dbo74dv53qvvv5m6cf30';
+const errorCopy: Record<string, { ar: string; en: string }> = {
+  INVALID_NAME: { ar: 'يرجى إدخال الاسم الكامل بشكل صحيح.', en: 'Please enter a valid full name.' },
+  INVALID_PHONE: { ar: 'يرجى إدخال رقم هاتف صحيح.', en: 'Please enter a valid phone number.' },
+  INVALID_EMAIL: { ar: 'يرجى إدخال بريد إلكتروني صحيح.', en: 'Please enter a valid email address.' },
+  MESSAGE_TOO_LONG: { ar: 'الرسالة أطول من 500 حرف.', en: 'Message exceeds 500 characters.' },
+  NO_ACTIVE_TERM: { ar: 'القبول غير مفتوح حالياً. تواصل مع مكتب القبول.', en: 'Admissions are not open right now. Please contact the admissions office.' },
+  NO_ADMISSIONS_OWNER: { ar: 'تعذر تسجيل الطلب حالياً. تواصل مع مكتب القبول.', en: 'We could not register the enquiry. Please contact the admissions office.' },
+};
 
 export default function Admissions() {
   const { isAr } = useLang();
   const [status, setStatus] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle');
   const [formError, setFormError] = useState('');
+  const [reference, setReference] = useState('');
+  const [emailNote, setEmailNote] = useState<'idle' | 'pending' | 'sent' | 'unconfigured' | 'failed'>('idle');
   const [msgLen, setMsgLen] = useState(0);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -24,20 +35,42 @@ export default function Admissions() {
     }
     setStatus('sending');
     setFormError('');
+    setReference('');
+    setEmailNote('idle');
     try {
-      const body = new URLSearchParams();
-      fd.forEach((v, k) => body.append(k, String(v)));
-      const response = await fetch(FORM_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
-      const responseText = await response.text();
-      let parsed: { code?: string; message?: string; meta?: { message?: string; detail?: string } } | null = null;
-      try { parsed = JSON.parse(responseText); } catch { parsed = null; }
-      const serverMsg = parsed?.meta?.message || parsed?.message || parsed?.meta?.detail || responseText;
-      if (response.ok && parsed?.code === 'OK' && !/spam/i.test(serverMsg || '')) {
+      const { data, error } = await supabase.rpc('sai_public_admission_submit', {
+        p_full_name: String(fd.get('full_name') || '').trim(),
+        p_phone: String(fd.get('phone') || '').trim(),
+        p_email: String(fd.get('email') || '').trim(),
+        p_program: String(fd.get('program') || '').trim(),
+        p_message: String(fd.get('message') || '').trim(),
+      });
+      if (error) {
+        const key = Object.keys(errorCopy).find((code) => (error.message || '').includes(code));
+        setFormError(key ? errorCopy[key][isAr ? 'ar' : 'en'] : (isAr ? 'تعذر إرسال الطلب. حاول مرة أخرى.' : 'We could not send your enquiry. Please try again.'));
+        setStatus('error');
+        return;
+      }
+      const ref = Array.isArray(data) ? data[0] : data;
+      if (typeof ref === 'string' && ref.trim()) {
+        const trimmedRef = ref.trim();
+        setReference(trimmedRef);
         setStatus('ok');
         form.reset();
         setMsgLen(0);
+        setEmailNote('pending');
+        const base = __BASE_PATH__.replace(/\/$/, '');
+        void supabase.functions.invoke('admission-notify', {
+          body: { reference: trimmedRef, statusUrl: `${window.location.origin}${base}/application-status` },
+        }).then(({ data, error: notifyError }) => {
+          if (notifyError) { setEmailNote('failed'); return; }
+          const result = data as { sent?: boolean; reason?: string } | null;
+          if (result?.sent) setEmailNote('sent');
+          else if (result?.reason === 'EMAIL_NOT_CONFIGURED') setEmailNote('unconfigured');
+          else setEmailNote('failed');
+        }).catch(() => setEmailNote('failed'));
       } else {
-        setFormError(serverMsg || (isAr ? 'تعذر الإرسال.' : 'Submission failed.'));
+        setFormError(isAr ? 'تعذر إنشاء رقم مرجعي. حاول مرة أخرى.' : 'We could not create a reference number. Please try again.');
         setStatus('error');
       }
     } catch {
@@ -66,7 +99,7 @@ export default function Admissions() {
             ))}
           </ul>
         </div>
-        <form id="sai-admissions-inquiry" data-readdy-form onSubmit={onSubmit} className="relative rounded-lg bg-background-50 border border-background-200 p-5 md:p-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form id="sai-admissions-inquiry" onSubmit={onSubmit} className="relative rounded-lg bg-background-50 border border-background-200 p-5 md:p-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <input type="text" name="contact_alt" className="form-extra-field" tabIndex={-1} autoComplete="off" aria-hidden="true" readOnly />
           <div className="min-w-0"><label className="text-xs text-foreground-700">{isAr ? 'الاسم الكامل' : 'Full name'}</label><input required name="full_name" className={`${field} mt-1`} /></div>
           <div className="min-w-0"><label className="text-xs text-foreground-700">{isAr ? 'رقم الهاتف' : 'Phone'}</label><input required name="phone" type="tel" className={`${field} mt-1`} /></div>
@@ -86,7 +119,25 @@ export default function Admissions() {
             <button type="submit" disabled={status === 'sending'} className="w-full whitespace-nowrap cursor-pointer rounded-md bg-primary-500 hover:bg-primary-600 text-background-50 py-3 text-sm font-label disabled:opacity-60">
               {status === 'sending' ? (isAr ? 'جارٍ الإرسال...' : 'Sending...') : (isAr ? 'إرسال الاستفسار' : 'Send inquiry')}
             </button>
-            {status === 'ok' && <p className="mt-3 text-sm text-secondary-700">{isAr ? 'شكرًا! سيتواصل معك فريق القبول قريبًا.' : 'Thank you! Our admissions team will contact you soon.'}</p>}
+            {status === 'ok' && (reference ? (
+              <div className="mt-3 rounded-md border border-secondary-300 bg-secondary-100 px-4 py-3">
+                <p className="text-xs text-secondary-900">{isAr ? 'تم استلام طلبك وتسجيله في نظام القبول. رقم الطلب المرجعي:' : 'Your enquiry is registered in our admissions system. Reference number:'}</p>
+                <p className="mt-1 font-heading text-lg text-foreground-950" dir="ltr">{reference}</p>
+                <p className="mt-1 text-xs text-foreground-700">{isAr ? 'احتفظ بهذا الرقم لمتابعة طلبك مع مكتب القبول.' : 'Keep this number to follow up with the admissions office.'}</p>
+                <p className="mt-2 text-xs text-foreground-700">
+                  {emailNote === 'pending' && (isAr ? 'جارٍ إرسال رسالة التأكيد إلى بريدك الإلكتروني...' : 'Sending your confirmation email...')}
+                  {emailNote === 'sent' && (isAr ? 'أرسلنا رقم الطلب إلى بريدك الإلكتروني، وأبلغنا فريق القبول بالطلب الجديد.' : 'We emailed your reference number and alerted the admissions team.')}
+                  {emailNote === 'failed' && (isAr ? 'تم تسجيل طلبك، لكن تعذر إرسال رسالة التأكيد الآن. احتفظ بالرقم أعلاه.' : 'Your enquiry is registered, but the confirmation email could not be sent. Keep the number above.')}
+                  {emailNote === 'unconfigured' && (isAr ? 'احتفظ بالرقم أعلاه؛ سيتواصل معك فريق القبول.' : 'Keep the number above; our admissions team will contact you.')}
+                </p>
+                <Link to="/application-status" className="mt-3 inline-flex items-center gap-1 text-xs text-primary-700 underline cursor-pointer whitespace-nowrap">
+                  {isAr ? 'متابعة حالة الطلب' : 'Track application status'}
+                  <i className="ri-arrow-left-line"></i>
+                </Link>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-secondary-700">{isAr ? 'شكرًا! سيتواصل معك فريق القبول قريبًا.' : 'Thank you! Our admissions team will contact you soon.'}</p>
+            ))}
             {status === 'error' && <p className="mt-3 text-sm text-primary-700">{formError}</p>}
           </div>
         </form>

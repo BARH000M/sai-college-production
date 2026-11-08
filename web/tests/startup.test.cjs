@@ -55,7 +55,7 @@ test("Arabic branded boundary distinguishes startup failures from rendering erro
   const { SupabaseInitializationError } = await import(errorUrl);
   const boundaryUrl = await moduleUrl("components/ErrorBoundary.tsx", (source) => source
     .replace('"react"', JSON.stringify(pathToFileURL(require.resolve("react")).href))
-    .replace('import logo from "../assets/sai-logo.png";', 'const logo = "logo.png";')
+    .replace('import logo from "../assets/saiLogo";', 'const logo = "logo.png";')
     .replace('"../lib/initializationError"', JSON.stringify(errorUrl)));
   const reactJsxUrl = pathToFileURL(require.resolve("react/jsx-runtime")).href;
   const source = Buffer.from(boundaryUrl.split(",")[1], "base64").toString("utf8")
