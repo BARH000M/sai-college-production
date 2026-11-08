@@ -6,30 +6,11 @@ import '../../core/app_role.dart';
 import '../../core/sai_theme.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/state_views.dart';
-
-class _ClassRow {
-  const _ClassRow({
-    required this.id,
-    required this.name,
-    required this.program,
-    required this.capacity,
-    required this.enrolled,
-    required this.isActive,
-  });
-
-  final String id;
-  final String name;
-  final String program;
-  final int capacity;
-  final int enrolled;
-  final bool isActive;
-
-  double get ratio => capacity <= 0 ? 0 : (enrolled / capacity).clamp(0, 1).toDouble();
-  int get percent => (ratio * 100).round();
-  bool get isFull => capacity > 0 && enrolled >= capacity;
-  bool get isNearFull => !isFull && capacity > 0 && ratio >= 0.8;
-  int get available => capacity - enrolled > 0 ? capacity - enrolled : 0;
-}
+import '../attendance/class_register_page.dart';
+import 'class_form_sheet.dart';
+import 'class_models.dart';
+import 'class_roster_sheet.dart';
+import 'teacher_directory.dart';
 
 /// Screen 1 of the mockup: the class list with seats, occupancy and status.
 class ClassesSeatsPage extends StatefulWidget {
@@ -51,9 +32,20 @@ class ClassesSeatsPage extends StatefulWidget {
 }
 
 class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
-  late Future<List<_ClassRow>> _future;
+  late Future<List<SaiClass>> _future;
   String _query = '';
   String _program = 'all';
+  List<String> _knownPrograms = const [];
+
+  bool get _canManageClasses =>
+      widget.identity.roles.contains(AppRole.superAdmin) || widget.identity.roles.contains(AppRole.admin);
+
+  bool get _canMarkAttendance => const {
+        AppRole.superAdmin,
+        AppRole.admin,
+        AppRole.teacher,
+        AppRole.receptionist,
+      }.any(widget.identity.roles.contains);
 
   @override
   void initState() {
@@ -61,11 +53,11 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
     _future = _load();
   }
 
-  Future<List<_ClassRow>> _load() async {
+  Future<List<SaiClass>> _load() async {
     final client = Supabase.instance.client;
     final classRows = await client
         .from('classes')
-        .select('id,name,program,capacity,is_active')
+        .select('id,name,program,capacity,is_active,teacher_id,branch_id,session_id')
         .order('name', ascending: true);
     final studentRows = await client.from('students').select('class_id,status');
 
@@ -78,34 +70,70 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
       counts[classId] = (counts[classId] ?? 0) + 1;
     }
 
-    return (classRows as List).map((row) {
-      final map = row as Map<String, dynamic>;
-      final id = map['id'] as String;
-      return _ClassRow(
-        id: id,
-        name: (map['name'] as String?)?.trim().isNotEmpty == true ? (map['name'] as String).trim() : 'صف بدون اسم',
-        program: (map['program'] as String?)?.trim().isNotEmpty == true ? (map['program'] as String).trim() : 'غير محدد',
-        capacity: (map['capacity'] as num?)?.toInt() ?? 0,
-        enrolled: counts[id] ?? 0,
-        isActive: map['is_active'] != false,
-      );
-    }).toList();
+    final teacherNames = await loadTeacherNames(client);
+    final branchNames = await _nameMap(client, 'branches');
+    final sessionNames = await _nameMap(client, 'academic_sessions');
+
+    final rows = (classRows as List)
+        .whereType<Map<String, dynamic>>()
+        .map((row) => SaiClass.fromRow(
+              row,
+              enrolledByClass: counts,
+              teacherNames: teacherNames,
+              branchNames: branchNames,
+              sessionNames: sessionNames,
+            ))
+        .toList();
+
+    _knownPrograms = rows.map((row) => row.program).where((program) => program != 'غير محدد').toSet().toList()..sort();
+    return rows;
+  }
+
+  Future<Map<String, String>> _nameMap(SupabaseClient client, String table) async {
+    try {
+      final rows = await client.from(table).select('id,name');
+      return {
+        for (final row in (rows as List).whereType<Map<String, dynamic>>())
+          row['id'] as String: (row['name'] as String?) ?? ''
+      };
+    } catch (_) {
+      return const {};
+    }
   }
 
   void _retry() => setState(() => _future = _load());
 
-  List<_ClassRow> _filter(List<_ClassRow> rows) {
+  Future<void> _openForm({SaiClass? existing}) async {
+    final saved = await ClassFormSheet.show(context, existing: existing, knownPrograms: _knownPrograms);
+    if (saved == true && mounted) {
+      _retry();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(existing == null ? 'تمت إضافة الصف بنجاح.' : 'تم تحديث بيانات الصف.'),
+      ));
+    }
+  }
+
+  void _openRegister(SaiClass row) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ClassRegisterPage(cls: row)));
+  }
+
+  void _openRoster(SaiClass row) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ClassRosterSheetPage(cls: row)));
+  }
+
+  List<SaiClass> _filter(List<SaiClass> rows) {
     final query = _query.trim().toLowerCase();
     return rows.where((row) {
       final matchesProgram = _program == 'all' || row.program == _program;
       final matchesQuery = query.isEmpty ||
           row.name.toLowerCase().contains(query) ||
-          row.program.toLowerCase().contains(query);
+          row.program.toLowerCase().contains(query) ||
+          (row.teacherName ?? '').toLowerCase().contains(query);
       return matchesProgram && matchesQuery;
     }).toList();
   }
 
-  void _openSheet(_ClassRow row) {
+  void _openSheet(SaiClass row) {
     final color = row.isFull ? SaiColors.danger : (row.isNearFull ? SaiColors.warning : SaiColors.success);
     final tint = row.isFull ? SaiColors.dangerTint : (row.isNearFull ? SaiColors.warningTint : SaiColors.successTint);
     showModalBottomSheet<void>(
@@ -121,16 +149,28 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
             Row(
               children: [
                 Expanded(child: Text(row.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: SaiColors.ink))),
-                TintChip(
-                  label: row.isFull ? 'ممتلئ' : (row.isNearFull ? 'قريب من الامتلاء' : 'متاح'),
-                  color: color,
-                  tint: tint,
-                ),
+                TintChip(label: row.statusLabel, color: color, tint: tint),
               ],
             ),
             const SizedBox(height: 4),
             Text(row.program, style: const TextStyle(fontSize: 11.5, color: SaiColors.muted)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: SaiColors.cream,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: SaiColors.border),
+              ),
+              child: Column(
+                children: [
+                  _InfoLine(icon: Icons.person_outline, label: 'معلم الصف', value: row.teacherName ?? 'غير مسند'),
+                  _InfoLine(icon: Icons.apartment_outlined, label: 'الفرع', value: row.branchName ?? '—'),
+                  _InfoLine(icon: Icons.calendar_month_outlined, label: 'الفصل الدراسي', value: row.sessionName ?? '—'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
@@ -149,10 +189,52 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
                 _SheetStat(label: 'نسبة الإشغال', value: '${row.percent}%'),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      _openRoster(row);
+                    },
+                    icon: const Icon(Icons.description_outlined, size: 16),
+                    label: const Text('كشف الصف'),
+                  ),
+                ),
+                if (_canMarkAttendance) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(sheetContext).pop();
+                        _openRegister(row);
+                      },
+                      icon: const Icon(Icons.fact_check_outlined, size: 16),
+                      label: const Text('الحضور'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (_canManageClasses) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    _openForm(existing: row);
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('تعديل السعة والمعلم'),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton(onPressed: () => Navigator.of(sheetContext).pop(), child: const Text('إغلاق')),
+              child: TextButton(onPressed: () => Navigator.of(sheetContext).pop(), child: const Text('إغلاق')),
             ),
           ],
         ),
@@ -162,7 +244,7 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<_ClassRow>>(
+    return FutureBuilder<List<SaiClass>>(
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const LoadingState();
@@ -172,7 +254,7 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
             onRetry: _retry,
           );
         }
-        final rows = snapshot.data ?? const <_ClassRow>[];
+        final rows = snapshot.data ?? const <SaiClass>[];
         final programs = rows.map((row) => row.program).toSet().toList()..sort();
         final filtered = _filter(rows);
         final totalSeats = rows.fold<int>(0, (sum, row) => sum + row.capacity);
@@ -184,9 +266,9 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
             SectionHeader(
               icon: Icons.meeting_room_outlined,
               title: 'إدارة الصفوف والمقاعد',
-              actionLabel: 'استيراد',
-              actionIcon: Icons.upload_file_outlined,
-              onAction: widget.onOpenImport,
+              actionLabel: _canManageClasses ? 'إضافة صف' : 'استيراد',
+              actionIcon: _canManageClasses ? Icons.add : Icons.upload_file_outlined,
+              onAction: _canManageClasses ? () => _openForm() : widget.onOpenImport,
             ),
             const SizedBox(height: 10),
             _SummaryStrip(count: rows.length, enrolled: totalEnrolled, seats: totalSeats),
@@ -206,7 +288,7 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  height: 42,
+                  height: 46,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -234,10 +316,12 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
             ),
             const SizedBox(height: 12),
             if (rows.isEmpty)
-              const EmptyState(
+              EmptyState(
                 icon: Icons.meeting_room_outlined,
                 title: 'لا توجد صفوف مسجلة',
-                message: 'أنشئ الصفوف من بوابة الويب أو استورد الطلاب لبدء تشكيل الصفوف والمقاعد.',
+                message: _canManageClasses
+                    ? 'استخدم زر «إضافة صف» لإنشاء أول صف وتحديد السعة ومعلم الصف من الجوال.'
+                    : 'لم تُسند إليك صفوف بعد. تواصل مع إدارة الكلية.',
               )
             else if (filtered.isEmpty)
               const EmptyState(
@@ -248,7 +332,13 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
             else
               ...filtered.map((row) => Padding(
                     padding: const EdgeInsets.only(bottom: 9),
-                    child: _ClassCard(row: row, onTap: () => _openSheet(row)),
+                    child: _ClassCard(
+                      row: row,
+                      onTap: () => _openSheet(row),
+                      onRoster: () => _openRoster(row),
+                      onRegister: _canMarkAttendance ? () => _openRegister(row) : null,
+                      onEdit: _canManageClasses ? () => _openForm(existing: row) : null,
+                    ),
                   )),
             const SizedBox(height: 6),
             _ToolsRow(onImport: widget.onOpenImport, onParentLink: widget.onOpenParentLink),
@@ -259,83 +349,203 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
   }
 }
 
-class _ClassCard extends StatelessWidget {
-  const _ClassCard({required this.row, required this.onTap});
+class _InfoLine extends StatelessWidget {
+  const _InfoLine({required this.icon, required this.label, required this.value});
 
-  final _ClassRow row;
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: SaiColors.muted),
+          const SizedBox(width: 6),
+          Text('$label: ', style: const TextStyle(fontSize: 10.5, color: SaiColors.muted)),
+          Expanded(
+            child: Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClassCard extends StatelessWidget {
+  const _ClassCard({
+    required this.row,
+    required this.onTap,
+    required this.onRoster,
+    required this.onRegister,
+    required this.onEdit,
+  });
+
+  final SaiClass row;
   final VoidCallback onTap;
+  final VoidCallback onRoster;
+  final VoidCallback? onRegister;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
     final color = row.isFull ? SaiColors.danger : (row.isNearFull ? SaiColors.warning : SaiColors.success);
     final tint = row.isFull ? SaiColors.dangerTint : (row.isNearFull ? SaiColors.warningTint : SaiColors.successTint);
-    final label = row.isFull ? 'ممتلئ' : (row.isNearFull ? 'قريب من الامتلاء' : 'متاح');
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(11, 11, 11, 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: SaiColors.border),
-        ),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TintChip(label: label, color: color, tint: tint),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SaiColors.border),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(11, 11, 9, 10),
+              child: Column(
+                children: [
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(row.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
-                      const SizedBox(height: 1),
-                      Text(row.program, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
+                      TintChip(label: row.statusLabel, color: color, tint: tint),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(row.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                            const SizedBox(height: 1),
+                            Text(row.program,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                const Icon(Icons.person_outline, size: 11, color: SaiColors.muted),
+                                const SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(row.teacherName ?? 'بدون معلم',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 9.5, color: SaiColors.muted)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Row(
+                            children: [
+                              Text('${row.enrolled} / ${row.capacity}',
+                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.people_alt_outlined, size: 15, color: SaiColors.ink),
+                            ],
+                          ),
+                          const Text('المسجلون / السعة', style: TextStyle(fontSize: 8.5, color: SaiColors.muted)),
+                        ],
+                      ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Row(
-                      children: [
-                        Text('${row.enrolled} / ${row.capacity}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.people_alt_outlined, size: 15, color: SaiColors.ink),
-                      ],
-                    ),
-                    const Text('المسجلون / السعة', style: TextStyle(fontSize: 8.5, color: SaiColors.muted)),
-                  ],
-                ),
-                const SizedBox(width: 2),
-                const Icon(Icons.chevron_left, size: 18, color: SaiColors.muted),
-              ],
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 34,
+                        child: Text('${row.percent}%',
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+                      ),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: row.ratio,
+                            minHeight: 5,
+                            backgroundColor: SaiColors.creamDeep,
+                            valueColor: AlwaysStoppedAnimation<Color>(color),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 9),
-            Row(
+          ),
+          Container(height: 1, color: SaiColors.border),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+            child: Row(
               children: [
-                SizedBox(
-                  width: 34,
-                  child: Text('${row.percent}%', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+                Expanded(child: _CardAction(icon: Icons.description_outlined, label: 'كشف الصف', onTap: onRoster)),
+                Expanded(
+                  child: _CardAction(
+                    icon: Icons.fact_check_outlined,
+                    label: 'الحضور',
+                    onTap: onRegister,
+                  ),
                 ),
                 Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: row.ratio,
-                      minHeight: 5,
-                      backgroundColor: SaiColors.creamDeep,
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                    ),
+                  child: _CardAction(
+                    icon: Icons.edit_outlined,
+                    label: 'تعديل',
+                    onTap: onEdit,
                   ),
                 ),
               ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CardAction extends StatelessWidget {
+  const _CardAction({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(9),
+      child: Opacity(
+        opacity: enabled ? 1 : 0.35,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: SaiColors.maroon),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+              ),
+            ],
+          ),
         ),
       ),
     );
