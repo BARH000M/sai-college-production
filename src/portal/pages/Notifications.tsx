@@ -22,9 +22,16 @@ export function NotificationsPage({ roles }: { roles: readonly string[] }) {
   const visible = tab === "all" ? items : items.filter((item) => item.category === tab);
   const seenTime = seenAt ? new Date(seenAt).getTime() : 0;
 
-  function markAll() {
-    if (!userId) return;
-    applySeen(markNotificationsSeen(userId));
+  const [marking, setMarking] = useState(false);
+
+  async function markAll() {
+    if (!userId || marking) return;
+    setMarking(true);
+    try {
+      applySeen(await markNotificationsSeen(userId));
+    } finally {
+      setMarking(false);
+    }
   }
 
   return <LabPage
@@ -60,8 +67,8 @@ export function NotificationsPage({ roles }: { roles: readonly string[] }) {
           <button className="button secondary" type="button" onClick={() => void refresh()}>
             <i className="ri-refresh-line" aria-hidden="true"></i> تحديث
           </button>
-          <button className="button primary" type="button" onClick={markAll} disabled={!unread}>
-            <i className="ri-check-double-line" aria-hidden="true"></i> تحديد الكل كمقروء
+          <button className="button primary" type="button" onClick={() => void markAll()} disabled={!unread || marking}>
+            <i className="ri-check-double-line" aria-hidden="true"></i> {marking ? "جارٍ الحفظ..." : "تحديد الكل كمقروء"}
           </button>
         </div>
       </div>
@@ -104,7 +111,7 @@ export function NotificationsPage({ roles }: { roles: readonly string[] }) {
           </ul>}
       </section>
 
-      <p className="data-note">تُحفظ علامة «مقروء» في هذا المتصفح لهذا الحساب، ولا تؤثر على سجلات الطلاب أو إشعارات الواجبات في صفحة الواجبات.</p>
+      <p className="data-note">تُحفظ علامة «مقروء» في حسابك على الخادم، فتظهر على أي جهاز تدخل منه، ولا تؤثر على سجلات الطلاب أو إشعارات الواجبات في صفحة الواجبات.</p>
     </>}
   </LabPage>;
 }

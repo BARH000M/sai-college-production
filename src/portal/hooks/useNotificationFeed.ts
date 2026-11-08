@@ -22,7 +22,7 @@ export function useNotificationFeed(roles: readonly string[]) {
   const load = useCallback(async () => {
     try {
       const feed = await loadNotifications(roles);
-      const seenAt = feed.userId ? readSeenAt(feed.userId) : null;
+      const seenAt = feed.userId ? await readSeenAt(feed.userId) : null;
       setState({ items: feed.items, userId: feed.userId, seenAt, loading: false, error: null });
     } catch (failure) {
       setState({ items: [], userId: null, seenAt: null, loading: false, error: failure instanceof Error ? failure.message : String(failure) });

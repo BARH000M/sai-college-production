@@ -19,7 +19,7 @@ export type NotificationFeed = {
 export const notificationsSeenEvent = "sai:notifications-seen";
 const seenKey = (userId: string) => `sai:notifications-seen:${userId}`;
 
-export function readSeenAt(userId: string): string | null {
+function cachedSeenAt(userId: string): string | null {
   try {
     return window.localStorage.getItem(seenKey(userId));
   } catch {
@@ -27,12 +27,48 @@ export function readSeenAt(userId: string): string | null {
   }
 }
 
-export function markNotificationsSeen(userId: string): string {
-  const now = new Date().toISOString();
+function cacheSeenAt(userId: string, value: string): void {
   try {
-    window.localStorage.setItem(seenKey(userId), now);
+    window.localStorage.setItem(seenKey(userId), value);
   } catch {
-    // Storage can be blocked in private mode; the feed still works, it just stays unread.
+    // Storage can be blocked in private mode; the database copy still holds the marker.
+  }
+}
+
+/**
+ * The read marker lives in notification_reads, so it follows the account across
+ * devices. The browser copy is only an offline fallback.
+ */
+export async function readSeenAt(userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("notification_reads")
+      .select("seen_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!error && data && typeof data.seen_at === "string") {
+      cacheSeenAt(userId, data.seen_at);
+      return data.seen_at;
+    }
+  } catch {
+    // Fall through to the local copy below.
+  }
+  return cachedSeenAt(userId);
+}
+
+export async function markNotificationsSeen(userId: string): Promise<string> {
+  const now = new Date().toISOString();
+  cacheSeenAt(userId, now);
+  try {
+    const { error } = await supabase
+      .from("notification_reads")
+      .upsert(
+        { user_id: userId, seen_at: now, updated_at: now },
+        { onConflict: "user_id" },
+      );
+    if (error) throw new Error(error.message);
+  } catch {
+    // Keep the local marker; the next refresh retries the database write.
   }
   window.dispatchEvent(new CustomEvent(notificationsSeenEvent));
   return now;
