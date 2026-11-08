@@ -67,6 +67,22 @@ export type AdmissionsReport = {
   to: string;
 };
 
+export type DistributionRow = {
+  branchName: string;
+  program: string;
+  classCount: number;
+  active: number;
+  other: number;
+  total: number;
+};
+
+export type DistributionReport = {
+  rows: DistributionRow[];
+  branchTotals: { branchName: string; active: number; other: number; total: number }[];
+  programTotals: { program: string; active: number; other: number; total: number }[];
+  totals: { active: number; other: number; total: number; classes: number; branches: number; programs: number };
+};
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -274,4 +290,129 @@ export async function loadAdmissionsReport(options: {
   const counts: Record<string, number> = {};
   rows.forEach((row) => { counts[row.status] = (counts[row.status] ?? 0) + 1; });
   return { rows, counts, total: rows.length, from: options.from, to: options.to };
+}
+
+const noProgram = "بدون صف";
+
+function cleanProgram(value: string | null): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : noProgram;
+}
+
+/**
+ * College-wide distribution of students across branches and academic programs.
+ * Counts come from classes (program + branch) joined to students; students with no
+ * class are grouped under a "بدون صف" bucket so the totals always add up.
+ */
+export async function loadDistributionReport(options: {
+  branch: string | null;
+  session: string | null;
+}): Promise<DistributionReport> {
+  const branchRes = await supabase.from("branches").select("id,name");
+  if (branchRes.error) throw new Error(branchRes.error.message);
+  const branchNames = new Map(
+    ((branchRes.data ?? []) as { id: string; name: string }[]).map((row) => [row.id, row.name]),
+  );
+
+  let classQuery = supabase.from("classes").select("id,program,branch_id,session_id,is_active");
+  if (options.branch) classQuery = classQuery.eq("branch_id", options.branch);
+  if (options.session) classQuery = classQuery.eq("session_id", options.session);
+  const classRes = await classQuery;
+  if (classRes.error) throw new Error(classRes.error.message);
+  const classes = (classRes.data ?? []) as {
+    id: string; program: string | null; branch_id: string; session_id: string;
+  }[];
+  const classMap = new Map(classes.map((row) => [row.id, row]));
+
+  let studentQuery = supabase.from("students").select("id,status,class_id,branch_id");
+  if (options.branch) studentQuery = studentQuery.eq("branch_id", options.branch);
+  const studentRes = await studentQuery;
+  if (studentRes.error) throw new Error(studentRes.error.message);
+  const students = (studentRes.data ?? []) as {
+    id: string; status: string; class_id: string | null; branch_id: string;
+  }[];
+
+  const grouped = new Map<string, DistributionRow>();
+
+  function ensureRow(branchName: string, program: string): DistributionRow {
+    const key = `${branchName}|||${program}`;
+    let row = grouped.get(key);
+    if (!row) {
+      row = { branchName, program, classCount: 0, active: 0, other: 0, total: 0 };
+      grouped.set(key, row);
+    }
+    return row;
+  }
+
+  classes.forEach((cls) => {
+    const branchName = branchNames.get(cls.branch_id) ?? "—";
+    ensureRow(branchName, cleanProgram(cls.program)).classCount += 1;
+  });
+
+  students.forEach((student) => {
+    const cls = student.class_id ? classMap.get(student.class_id) ?? null : null;
+    if (student.class_id && !cls) return;
+    const branchName = cls
+      ? branchNames.get(cls.branch_id) ?? "—"
+      : branchNames.get(student.branch_id) ?? "—";
+    const program = cls ? cleanProgram(cls.program) : noProgram;
+    const row = ensureRow(branchName, program);
+    row.total += 1;
+    if (student.status === "active") row.active += 1;
+    else row.other += 1;
+  });
+
+  const rows = Array.from(grouped.values()).sort(
+    (a, b) => a.branchName.localeCompare(b.branchName, "ar") || a.program.localeCompare(b.program, "ar"),
+  );
+
+  function reduceBy(keyOf: (row: DistributionRow) => string) {
+    const map = new Map<string, { active: number; other: number; total: number }>();
+    rows.forEach((row) => {
+      const key = keyOf(row);
+      const bucket = map.get(key) ?? { active: 0, other: 0, total: 0 };
+      bucket.active += row.active;
+      bucket.other += row.other;
+      bucket.total += row.total;
+      map.set(key, bucket);
+    });
+    return map;
+  }
+
+  const branchMap = reduceBy((row) => row.branchName);
+  if (!options.branch) {
+    branchNames.forEach((name) => {
+      if (!branchMap.has(name)) branchMap.set(name, { active: 0, other: 0, total: 0 });
+    });
+  }
+  const programMap = reduceBy((row) => row.program);
+
+  const branchTotals = Array.from(branchMap.entries())
+    .map(([branchName, value]) => ({ branchName, ...value }))
+    .sort((a, b) => a.branchName.localeCompare(b.branchName, "ar"));
+
+  const programTotals = Array.from(programMap.entries())
+    .map(([program, value]) => ({ program, ...value }))
+    .sort((a, b) => a.program.localeCompare(b.program, "ar"));
+
+  const totals = rows.reduce(
+    (acc, row) => ({
+      active: acc.active + row.active,
+      other: acc.other + row.other,
+      total: acc.total + row.total,
+    }),
+    { active: 0, other: 0, total: 0 },
+  );
+
+  return {
+    rows,
+    branchTotals,
+    programTotals,
+    totals: {
+      ...totals,
+      classes: classes.length,
+      branches: branchTotals.length,
+      programs: programTotals.filter((row) => row.program !== noProgram).length,
+    },
+  };
 }

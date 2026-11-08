@@ -5,6 +5,7 @@ import Hero from './components/Hero';
 import About from './components/About';
 import Programs from './components/Programs';
 import Partnership from './components/Partnership';
+import CampusLife from './components/CampusLife';
 import CampusNews from './components/CampusNews';
 import Admissions from './components/Admissions';
 
@@ -25,6 +26,7 @@ export default function Home() {
         <About />
         <Programs />
         <Partnership />
+        <CampusLife />
         <CampusNews />
         <Admissions />
       </main>

@@ -288,7 +288,7 @@
 }
 .portal-root .export-controls label { flex: 1 1 180px; min-width: 0; }
 .portal-root .export-controls .button { flex: 0 0 auto; }
-.portal-root .print-actions { display: flex; gap: 10px; }
+.portal-root .print-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .portal-root .export-blocks {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px;
@@ -759,7 +759,19 @@
   background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200));
 }
 .portal-root .cms-field label { font-size: 11px; }
-.portal-root .cms-field .cms-sub-label { font-weight: 600; color: oklch(var(--foreground-600)); }
+.portal-root .cms-label-row,
+.portal-root .cms-sub-label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.portal-root .cms-field .cms-label-row { font-weight: 700; color: oklch(var(--foreground-900)); }
+.portal-root .cms-dirty-badge {
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  padding: 2px 8px; border-radius: 999px;
+  background: oklch(var(--accent-100)); color: oklch(var(--accent-950));
+  border: 1px solid oklch(var(--accent-300));
+  font-size: 9.5px; font-weight: 700; line-height: 1.6;
+}
+.portal-root .cms-dirty-badge i { font-size: 11px; width: 11px; height: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.portal-root .cms-dirty-note { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.portal-root .cms-dirty-note strong { font-size: 11px; }
 .portal-root .cms-key { font-size: 10px; color: oklch(var(--foreground-500)); }
 .portal-root .cms-checkbox { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .portal-root .cms-checkbox input { width: 16px; height: 16px; accent-color: oklch(var(--primary-600)); }

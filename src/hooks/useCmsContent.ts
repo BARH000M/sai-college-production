@@ -18,10 +18,22 @@ export type NewsView = {
   tag: LangPair;
   en: string;
   ar: string;
+  den: string;
+  dar: string;
   img: string;
 };
 
 const fallbackNewsImage = "https://readdy.ai/api/search-image?query=Chinese%20culture%20event%20with%20red%20lanterns%20and%20students%20on%20a%20warm%20cream%20campus%2C%20soft%20natural%20light%2C%20minimal%20editorial%20illustration%20in%20red%20and%20gold%20tones&width=800&height=520&seq=sai-news-fallback&orientation=landscape";
+
+const fallbackNewsRows: NewsView[] = fallbackNews.map((item) => ({
+  date: item.date,
+  tag: item.tag,
+  en: item.en,
+  ar: item.ar,
+  den: "",
+  dar: "",
+  img: item.img,
+}));
 
 function datePair(value: string): LangPair {
   const date = new Date(value);
@@ -59,7 +71,7 @@ export function useCmsPrograms(): ProgramView[] {
 }
 
 export function useCmsNews(): NewsView[] {
-  const [rows, setRows] = useState<NewsView[]>(fallbackNews);
+  const [rows, setRows] = useState<NewsView[]>(fallbackNewsRows);
   useEffect(() => {
     let active = true;
     void loadNews(false)
@@ -70,6 +82,8 @@ export function useCmsNews(): NewsView[] {
           tag: { ar: item.tag_ar, en: item.tag_en },
           en: item.title_en,
           ar: item.title_ar,
+          den: item.summary_en,
+          dar: item.summary_ar,
           img: item.image_url?.trim() ? item.image_url : fallbackNewsImage,
         })));
       })

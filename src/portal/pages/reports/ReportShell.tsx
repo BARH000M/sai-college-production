@@ -8,7 +8,7 @@ function today(): string {
 
 export type SummaryItem = { label: string; value: string };
 
-export function ReportSheet({ title, subtitle, summary, loading, error, onRetry, children, onClose, canPrint }: {
+export function ReportSheet({ title, subtitle, summary, loading, error, onRetry, children, onClose, canPrint, onExportCsv }: {
   title: string;
   subtitle: string;
   summary: SummaryItem[];
@@ -18,6 +18,7 @@ export function ReportSheet({ title, subtitle, summary, loading, error, onRetry,
   children: ReactNode;
   onClose: () => void;
   canPrint: boolean;
+  onExportCsv?: () => void;
 }) {
   return <div className="print-overlay" role="dialog" aria-modal="true" aria-label={title}>
     <div className="assignment-sheet">
@@ -52,6 +53,7 @@ export function ReportSheet({ title, subtitle, summary, loading, error, onRetry,
     </div>
 
     <div className="print-actions">
+      {onExportCsv && <button className="button secondary" type="button" onClick={onExportCsv} disabled={loading || Boolean(error)}>تصدير CSV</button>}
       <button className="button primary" type="button" onClick={() => window.print()} disabled={!canPrint}>طباعة التقرير</button>
       <button className="button secondary" type="button" onClick={onClose}>إغلاق</button>
     </div>

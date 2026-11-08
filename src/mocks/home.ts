@@ -75,3 +75,38 @@ export const contactInfo = {
   phone: '+967 1 234 567',
   email: 'admissions@saicollege.edu.ye',
 };
+
+export const campusLife = {
+  kicker: { en: 'Campus life', ar: 'الحياة الجامعية' },
+  title: { en: 'A vibrant campus life between two cultures', ar: 'حياة جامعية نابضة بين ثقافتين' },
+  sub: {
+    en: 'Study spaces, cultural and sports activities that bring Yemeni and Chinese students together all year round.',
+    ar: 'مساحات للدراسة والأنشطة الثقافية والرياضية تجمع الطلاب اليمنيين والصينيين على مدار العام.',
+  },
+  items: [
+    {
+      en: 'College library and reading halls', ar: 'مكتبة الكلية وقاعات المطالعة',
+      img: 'https://readdy.ai/api/search-image?query=Modern%20college%20library%20interior%20with%20wooden%20shelves%20and%20students%20reading%2C%20warm%20cream%20walls%2C%20soft%20daylight%2C%20editorial%20photography%20with%20red%20and%20gold%20accents&width=900&height=700&seq=sai-campus-1&orientation=landscape',
+    },
+    {
+      en: 'Modern computer laboratories', ar: 'مختبرات الحاسوب الحديثة',
+      img: 'https://readdy.ai/api/search-image?query=Bright%20computer%20laboratory%20with%20rows%20of%20monitors%20and%20students%20coding%2C%20warm%20cream%20walls%2C%20soft%20natural%20light%2C%20clean%20minimal%20editorial%20photography%20with%20teal%20and%20gold%20details&width=900&height=700&seq=sai-campus-2&orientation=landscape',
+    },
+    {
+      en: 'Chinese calligraphy and culture club', ar: 'نادي الخط الصيني والثقافة',
+      img: 'https://readdy.ai/api/search-image?query=Students%20practicing%20Chinese%20calligraphy%20with%20brushes%20and%20ink%20at%20wooden%20desks%2C%20warm%20cream%20background%2C%20soft%20natural%20light%2C%20artistic%20editorial%20photography%20in%20red%20and%20gold%20tones&width=900&height=700&seq=sai-campus-3&orientation=landscape',
+    },
+    {
+      en: 'Chinese New Year celebrations', ar: 'احتفالات رأس السنة الصينية',
+      img: 'https://readdy.ai/api/search-image?query=Chinese%20New%20Year%20celebration%20on%20campus%20with%20red%20lanterns%20and%20students%20in%20traditional%20dress%2C%20warm%20cream%20courtyard%2C%20soft%20evening%20light%2C%20festive%20editorial%20photography%20in%20red%20and%20gold&width=900&height=700&seq=sai-campus-4&orientation=landscape',
+    },
+    {
+      en: 'Sports fields and activities', ar: 'الأنشطة والملاعب الرياضية',
+      img: 'https://readdy.ai/api/search-image?query=College%20sports%20court%20with%20students%20playing%20volleyball%20and%20cheering%2C%20warm%20cream%20surroundings%2C%20soft%20afternoon%20light%2C%20energetic%20editorial%20photography%20with%20red%20and%20teal%20accents&width=900&height=700&seq=sai-campus-5&orientation=landscape',
+    },
+    {
+      en: 'Campus courtyards', ar: 'ساحات الحرم الجامعي',
+      img: 'https://readdy.ai/api/search-image?query=College%20courtyard%20with%20greenery%20and%20students%20walking%20together%2C%20warm%20cream%20architecture%2C%20soft%20golden%20daylight%2C%20calm%20editorial%20photography%20with%20subtle%20Chinese%20architectural%20details&width=900&height=700&seq=sai-campus-6&orientation=landscape',
+    },
+  ],
+};

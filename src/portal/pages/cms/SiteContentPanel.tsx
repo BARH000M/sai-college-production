@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   cmsError, cmsSections, loadSiteContent, saveSiteContent, type SiteContentRow,
 } from "@/portal/lib/cms";
+import { usePreviewDraft } from "./previewDraft";
+import { CmsDirtyBadge } from "./CmsDirtyBadge";
 
 type Draft = Record<string, { value_ar: string; value_en: string }>;
 
@@ -41,10 +43,40 @@ export function SiteContentPanel({ canEdit }: { canEdit: boolean }) {
     return Array.from(map.entries());
   }, [rows]);
 
+  const { publish } = usePreviewDraft();
+
+  useEffect(() => {
+    if (!rows.length) return;
+    const next: Record<string, { value_ar: string; value_en: string }> = {};
+    rows.forEach((row) => {
+      const values = draft[row.key];
+      next[row.key] = {
+        value_ar: values?.value_ar ?? row.value_ar,
+        value_en: values?.value_en ?? row.value_en,
+      };
+    });
+    publish({ content: next });
+  }, [rows, draft, publish]);
+
   const dirtyCount = rows.filter((row) => {
     const values = draft[row.key];
     return values && (values.value_ar !== row.value_ar || values.value_en !== row.value_en);
   }).length;
+
+  function isFieldDirty(key: string, field: "value_ar" | "value_en"): boolean {
+    const row = rows.find((item) => item.key === key);
+    const values = draft[key];
+    if (!row || !values) return false;
+    return values[field] !== row[field];
+  }
+
+  const longFields = new Set([
+    "hero.title", "hero.subtitle", "about.p1", "about.p2", "campus.subtitle",
+  ]);
+
+  function isLongField(key: string): boolean {
+    return longFields.has(key);
+  }
 
   function change(key: string, field: "value_ar" | "value_en", value: string) {
     setDraft((current) => ({ ...current, [key]: { ...current[key], [field]: value } }));
@@ -98,8 +130,8 @@ export function SiteContentPanel({ canEdit }: { canEdit: boolean }) {
         <h3 className="cms-group-title">{cmsSections[section] ?? section}</h3>
         <div className="cms-field-grid">
           {items.map((row) => <div key={row.key} className="cms-field">
-            <label htmlFor={`cms-${row.key}`}>{row.label_ar}</label>
-            {row.key === "hero.subtitle" || row.key.startsWith("about.p") || row.key === "hero.title"
+            <label htmlFor={`cms-${row.key}`} className="cms-label-row">{row.label_ar}<CmsDirtyBadge show={isFieldDirty(row.key, "value_ar")} /></label>
+            {isLongField(row.key)
               ? <textarea
                   id={`cms-${row.key}`}
                   rows={3}
@@ -109,12 +141,13 @@ export function SiteContentPanel({ canEdit }: { canEdit: boolean }) {
                 />
               : <input
                   id={`cms-${row.key}`}
+                  dir={row.key.endsWith(".icon") || row.key.endsWith(".image") ? "ltr" : undefined}
                   value={draft[row.key]?.value_ar ?? ""}
                   disabled={!canEdit || saving}
                   onChange={(event) => change(row.key, "value_ar", event.target.value)}
                 />}
-            <label htmlFor={`cms-${row.key}-en`} className="cms-sub-label">English</label>
-            {row.key === "hero.subtitle" || row.key.startsWith("about.p") || row.key === "hero.title"
+            <label htmlFor={`cms-${row.key}-en`} className="cms-sub-label">English<CmsDirtyBadge show={isFieldDirty(row.key, "value_en")} /></label>
+            {isLongField(row.key)
               ? <textarea
                   id={`cms-${row.key}-en`}
                   dir="ltr"

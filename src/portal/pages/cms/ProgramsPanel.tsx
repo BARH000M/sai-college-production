@@ -3,6 +3,8 @@ import {
   cmsError, deleteProgram, emptyProgramDraft, loadPrograms, programToDraft, saveProgram, validateProgram,
   type CmsProgram, type ProgramDraft,
 } from "@/portal/lib/cms";
+import { usePreviewDraft } from "./previewDraft";
+import { CmsDirtyBadge } from "./CmsDirtyBadge";
 
 export function ProgramsPanel({ canEdit }: { canEdit: boolean }) {
   const [rows, setRows] = useState<CmsProgram[]>([]);
@@ -27,6 +29,21 @@ export function ProgramsPanel({ canEdit }: { canEdit: boolean }) {
     return () => { active = false; };
   }, [retry]);
 
+  const { publish } = usePreviewDraft();
+
+  useEffect(() => {
+    if (loading) return;
+    let next: CmsProgram[];
+    if (editingId === null) {
+      next = [...rows, { id: "__new_draft__", ...draft }];
+    } else if (typeof editingId === "string") {
+      next = rows.map((row) => (row.id === editingId ? { ...row, ...draft } : row));
+    } else {
+      next = rows;
+    }
+    publish({ programs: next });
+  }, [rows, editingId, draft, loading, publish]);
+
   function openForm(row: CmsProgram | null) {
     if (!canEdit) return;
     setFormError(null);
@@ -39,6 +56,7 @@ export function ProgramsPanel({ canEdit }: { canEdit: boolean }) {
 
   function change<K extends keyof ProgramDraft>(key: K, value: ProgramDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+    setSuccess(null);
   }
 
   async function submit() {
@@ -93,6 +111,23 @@ export function ProgramsPanel({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  const unsavedFields: string[] = (() => {
+    if (editingId === undefined) return [];
+    const baseline: ProgramDraft = typeof editingId === "string"
+      ? (() => {
+          const row = rows.find((item) => item.id === editingId);
+          return row ? programToDraft(row) : emptyProgramDraft();
+        })()
+      : emptyProgramDraft();
+    return (Object.keys(baseline) as (keyof ProgramDraft)[])
+      .filter((key) => !(key === "sort_order" && editingId === null) && draft[key] !== baseline[key])
+      .map((key) => String(key));
+  })();
+
+  function fieldDirty(key: keyof ProgramDraft): boolean {
+    return unsavedFields.includes(String(key));
+  }
+
   return <div className="cms-panels">
     <section className="panel">
       <div className="page-heading">
@@ -126,16 +161,20 @@ export function ProgramsPanel({ canEdit }: { canEdit: boolean }) {
         <h2>{editingId ? "تعديل برنامج" : "برنامج جديد"}</h2>
         <button className="button secondary" type="button" disabled={saving} onClick={() => setEditingId(undefined)}>إغلاق</button>
       </div>
+      {unsavedFields.length > 0 && <p className="notice cms-dirty-note">
+        <CmsDirtyBadge show />
+        <strong>{unsavedFields.length} حقل لم يُنشر بعد.</strong> اضغط «حفظ البرنامج» لتطبيق التعديلات على الموقع.
+      </p>}
       <div className="management-form">
-        <label>الاسم بالعربية<input required value={draft.title_ar} onChange={(event) => change("title_ar", event.target.value)} /></label>
-        <label>الاسم بالإنجليزية<input dir="ltr" value={draft.title_en} onChange={(event) => change("title_en", event.target.value)} /></label>
-        <label>المدة بالعربية<input value={draft.duration_ar} onChange={(event) => change("duration_ar", event.target.value)} /></label>
-        <label>المدة بالإنجليزية<input dir="ltr" value={draft.duration_en} onChange={(event) => change("duration_en", event.target.value)} /></label>
-        <label>الأيقونة (Remix Icon)<input dir="ltr" value={draft.icon} onChange={(event) => change("icon", event.target.value)} placeholder="ri-book-open-line" /></label>
-        <label>الترتيب<input type="number" value={draft.sort_order} onChange={(event) => change("sort_order", Number(event.target.value) || 0)} /></label>
-        <label>الوصف بالعربية<textarea rows={3} value={draft.summary_ar} onChange={(event) => change("summary_ar", event.target.value)} /></label>
-        <label>الوصف بالإنجليزية<textarea dir="ltr" rows={3} value={draft.summary_en} onChange={(event) => change("summary_en", event.target.value)} /></label>
-        <label className="cms-checkbox"><input type="checkbox" checked={draft.is_published} onChange={(event) => change("is_published", event.target.checked)} /> نشر على الموقع فوراً</label>
+        <label><span className="cms-label-row">الاسم بالعربية<CmsDirtyBadge show={fieldDirty("title_ar")} /></span><input required value={draft.title_ar} onChange={(event) => change("title_ar", event.target.value)} /></label>
+        <label><span className="cms-label-row">الاسم بالإنجليزية<CmsDirtyBadge show={fieldDirty("title_en")} /></span><input dir="ltr" value={draft.title_en} onChange={(event) => change("title_en", event.target.value)} /></label>
+        <label><span className="cms-label-row">المدة بالعربية<CmsDirtyBadge show={fieldDirty("duration_ar")} /></span><input value={draft.duration_ar} onChange={(event) => change("duration_ar", event.target.value)} /></label>
+        <label><span className="cms-label-row">المدة بالإنجليزية<CmsDirtyBadge show={fieldDirty("duration_en")} /></span><input dir="ltr" value={draft.duration_en} onChange={(event) => change("duration_en", event.target.value)} /></label>
+        <label><span className="cms-label-row">الأيقونة (Remix Icon)<CmsDirtyBadge show={fieldDirty("icon")} /></span><input dir="ltr" value={draft.icon} onChange={(event) => change("icon", event.target.value)} placeholder="ri-book-open-line" /></label>
+        <label><span className="cms-label-row">الترتيب<CmsDirtyBadge show={fieldDirty("sort_order")} /></span><input type="number" value={draft.sort_order} onChange={(event) => change("sort_order", Number(event.target.value) || 0)} /></label>
+        <label><span className="cms-label-row">الوصف بالعربية<CmsDirtyBadge show={fieldDirty("summary_ar")} /></span><textarea rows={3} value={draft.summary_ar} onChange={(event) => change("summary_ar", event.target.value)} /></label>
+        <label><span className="cms-label-row">الوصف بالإنجليزية<CmsDirtyBadge show={fieldDirty("summary_en")} /></span><textarea dir="ltr" rows={3} value={draft.summary_en} onChange={(event) => change("summary_en", event.target.value)} /></label>
+        <label className="cms-checkbox"><input type="checkbox" checked={draft.is_published} onChange={(event) => change("is_published", event.target.checked)} /> نشر على الموقع فوراً<CmsDirtyBadge show={fieldDirty("is_published")} /></label>
         {formError && <p className="error-box" role="alert">{formError}</p>}
         <div className="actions">
           <button className="button primary" type="button" disabled={saving} onClick={() => void submit()}>{saving ? "جارٍ الحفظ..." : "حفظ البرنامج"}</button>

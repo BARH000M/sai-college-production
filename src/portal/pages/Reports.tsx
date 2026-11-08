@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import {
-  loadAdmissionsReport, loadAttendanceReport, loadEnrollmentReport, loadHomeworkReport,
+  loadAdmissionsReport, loadAttendanceReport, loadDistributionReport, loadEnrollmentReport, loadHomeworkReport,
   loadReportBranches, loadReportClasses, loadReportSessions,
-  type AdmissionsReport, type AttendanceReport, type EnrollmentReport, type HomeworkReport,
+  type AdmissionsReport, type AttendanceReport, type DistributionReport, type EnrollmentReport, type HomeworkReport,
 } from "../lib/reports";
+import { exportAttendanceReport, exportAdmissionsReport, exportDistributionReport, exportEnrollmentReport, exportHomeworkReport } from "../lib/reportExport";
 import { ReportSheet, ReportPeriod, type SummaryItem } from "./reports/ReportShell";
-import { AdmissionsSheet, AttendanceSheet, EnrollmentSheet, HomeworkSheet } from "./reports/ReportSheets";
+import { AdmissionsSheet, AttendanceSheet, DistributionSheet, EnrollmentSheet, HomeworkSheet } from "./reports/ReportSheets";
 import { StudentProgressReport } from "./students/StudentProgressReport";
 
-type ReportKind = "students" | "attendance" | "homework" | "admissions";
+type ReportKind = "students" | "attendance" | "homework" | "admissions" | "distribution";
 
 type ReportOption = { id: string; name: string };
 type StudentOption = { id: string; full_name: string; admission_no: string };
@@ -19,13 +20,15 @@ type SheetState =
   | { kind: "students"; data: EnrollmentReport }
   | { kind: "attendance"; data: AttendanceReport }
   | { kind: "homework"; data: HomeworkReport }
-  | { kind: "admissions"; data: AdmissionsReport };
+  | { kind: "admissions"; data: AdmissionsReport }
+  | { kind: "distribution"; data: DistributionReport };
 
 const reportCards: { id: ReportKind; title: string; icon: string; description: string }[] = [
   { id: "students", title: "كشف طلاب الصف", icon: "ri-file-list-3-line", description: "قائمة كاملة بطلاب الصف وحالاتهم مع خانة توقيع، للطباعة والتسليم." },
   { id: "attendance", title: "تقرير الحضور والغياب", icon: "ri-calendar-check-line", description: "ملخص حضور كل طالب داخل فترة محددة مع النسب والإجماليات." },
   { id: "homework", title: "تقرير الواجبات والتسليم", icon: "ri-task-line", description: "حالة كل واجب منشور: من سلّم، من صُحّح، ومن لم يسلّم بعد." },
   { id: "admissions", title: "تقرير القبول والتسجيل", icon: "ri-user-add-line", description: "كشف طلبات القبول وتوزيعها حسب الحالة داخل فرع وجلسة." },
+  { id: "distribution", title: "توزيع الطلاب حسب البرنامج والفرع", icon: "ri-pie-chart-line", description: "كشف عام لكل الكلية يوضح عدد الطلاب في كل برنامج وفرع مع الإجماليات." },
 ];
 
 function isoDate(date: Date): string {
@@ -124,7 +127,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
     return () => { active = false; };
   }, [classId]);
 
-  const needsClass = kind !== "admissions";
+  const needsClass = kind !== "admissions" && kind !== "distribution";
   const missingSelection = needsClass && !classId;
   const className = classes.find((row) => row.id === classId)?.name ?? "—";
 
@@ -132,7 +135,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
     setSheetError(null);
     if (kind === "admissions") {
       if (!from || !to) { setSheetError("حدد بداية ونهاية الفترة."); return; }
-    } else if (!classId) {
+    } else if (kind !== "distribution" && !classId) {
       setSheetError("اختر الفرع والجلسة والصف أولاً.");
       return;
     }
@@ -145,6 +148,8 @@ export function Reports({ roles }: { roles: readonly string[] }) {
         setSheet({ kind, data: await loadAttendanceReport(classId, from, to) });
       } else if (kind === "homework") {
         setSheet({ kind, data: await loadHomeworkReport(classId) });
+      } else if (kind === "distribution") {
+        setSheet({ kind, data: await loadDistributionReport({ branch: branch || null, session: session || null }) });
       } else {
         setSheet({ kind, data: await loadAdmissionsReport({ branch: branch || null, session: session || null, from, to }) });
       }
@@ -187,6 +192,15 @@ export function Reports({ roles }: { roles: readonly string[] }) {
         { label: "تسليمات لم تُنجز", value: String(current.data.totalPending) },
       ];
     }
+    if (current.kind === "distribution") {
+      return [
+        { label: "إجمالي الطلاب", value: String(current.data.totals.total) },
+        { label: "الطلاب النشطون", value: String(current.data.totals.active) },
+        { label: "الفروع", value: String(current.data.totals.branches) },
+        { label: "البرامج", value: String(current.data.totals.programs) },
+        { label: "الصفوف", value: String(current.data.totals.classes) },
+      ];
+    }
     return [
       { label: "الفرع", value: branches.find((row) => row.id === branch)?.name ?? "كل الفروع المتاحة" },
       { label: "الجلسة", value: sessions.find((row) => row.id === session)?.name ?? "كل الجلسات" },
@@ -201,6 +215,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
     attendance: "تقرير الحضور والغياب",
     homework: "تقرير الواجبات والتسليم",
     admissions: "تقرير القبول والتسجيل",
+    distribution: "توزيع الطلاب حسب البرنامج والفرع",
   };
 
   if (!isStaff) {
@@ -252,7 +267,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
       </label>
       <label>الجلسة
         <select value={session} onChange={(event) => { setSession(event.target.value); setSheet(null); }}>
-          <option value="">{kind === "admissions" ? "كل الجلسات" : "اختر جلسة"}</option>
+          <option value="">{(kind === "admissions" || kind === "distribution") ? "كل الجلسات" : "اختر جلسة"}</option>
           {sessions.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
         </select>
       </label>
@@ -299,6 +314,17 @@ export function Reports({ roles }: { roles: readonly string[] }) {
       onRetry={() => void openSheet()}
       onClose={() => setSheet(null)}
       canPrint
+      onExportCsv={sheet?.kind === "attendance"
+        ? () => exportAttendanceReport(sheet.data)
+        : sheet?.kind === "homework"
+          ? () => exportHomeworkReport(sheet.data)
+          : sheet?.kind === "students"
+            ? () => exportEnrollmentReport(sheet.data)
+            : sheet?.kind === "distribution"
+              ? () => exportDistributionReport(sheet.data)
+              : sheet?.kind === "admissions"
+                ? () => exportAdmissionsReport(sheet.data)
+                : undefined}
     >
       {sheet?.kind === "admissions" && <ReportPeriod from={sheet.data.from} to={sheet.data.to} />}
       {sheet?.kind === "attendance" && <ReportPeriod from={sheet.data.from} to={sheet.data.to} />}
@@ -306,6 +332,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
       {sheet?.kind === "attendance" && <AttendanceSheet report={sheet.data} />}
       {sheet?.kind === "homework" && <HomeworkSheet report={sheet.data} />}
       {sheet?.kind === "admissions" && <AdmissionsSheet report={sheet.data} />}
+      {sheet?.kind === "distribution" && <DistributionSheet report={sheet.data} />}
     </ReportSheet>}
 
     {studentReport && <StudentProgressReport studentId={studentReport} onClose={() => setStudentReport(null)} />}

@@ -1,8 +1,10 @@
 import useLang from '@/hooks/useLang';
-import { programs } from '@/mocks/home';
+import { useCmsPrograms } from '@/hooks/useCmsContent';
 
 export default function Programs() {
   const { tx, isAr } = useLang();
+  const programs = useCmsPrograms();
+
   return (
     <section id="programs" className="reveal px-4 md:px-10 py-16 md:py-24 bg-background-100">
       <div className="max-w-6xl mx-auto">
@@ -15,7 +17,7 @@ export default function Programs() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
           {programs.map((p) => (
-            <article key={p.en} className="group rounded-lg bg-background-50 border border-background-200 p-5 md:p-6 hover:border-primary-300 transition-colors">
+            <article key={`${p.ar}-${p.en}`} className="group rounded-lg bg-background-50 border border-background-200 p-5 md:p-6 hover:border-primary-300 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="w-12 h-12 rounded-md bg-primary-100 text-primary-700 flex items-center justify-center group-hover:bg-primary-500 group-hover:text-background-50 transition-colors"><i className={`${p.icon} text-xl`}></i></span>
                 <span className="text-xs px-2.5 py-1 rounded-full bg-secondary-100 text-secondary-900">{tx(p.years)}</span>

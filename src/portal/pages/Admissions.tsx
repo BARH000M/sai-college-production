@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { loadManagementBranches, loadManagementOptions, type Option } from "../lib/management";
 import { AdmissionReceipt } from "../components/AdmissionReceipt";
+import { AdmissionPrintSheet, type AdmissionPrintKind } from "./admissions/AdmissionPrintSheet";
 import { exportAdmissionHistoryCsv, exportAdmissionRosterCsv } from "../lib/admissionExport";
 import {
   admissionDraft, admissionStatuses, admissionsPageSize, applicationStatusUrl, canManageAdmissions, isAdmissionStatus,
@@ -77,6 +78,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
   const [success, setSuccess] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [printKind, setPrintKind] = useState<AdmissionPrintKind | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState("");
@@ -375,6 +377,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
           <h3>سجل تغييرات الحالات</h3>
           <p className="data-note">كل تغيير حالة أو إسناد أو تعديل بيانات، مع اسم الموظف ووقت التغيير.</p>
           <button className="button primary" disabled={exporting !== false} onClick={() => void exportRange()}>{exporting === "range" ? "جارٍ التصدير..." : "تصدير سجل الحالات CSV"}</button>
+          <button className="button secondary" type="button" onClick={() => setPrintKind("history")}>طباعة سجل الحالات</button>
           {exportError && <p className="error-box" role="alert">{exportError}</p>}
           {exportNote && <p className="success-box" role="status">{exportNote}</p>}
         </div>
@@ -385,11 +388,24 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
             {filters.session || filters.status ? " يخضع الكشف لتصفية الجلسة والحالة الحالية أعلى الصفحة." : ""}
           </p>
           <button className="button secondary" disabled={exporting !== false} onClick={() => void exportRoster()}>{exporting === "roster" ? "جارٍ التصدير..." : "تصدير كشف الطلبات CSV"}</button>
+          <button className="button secondary" type="button" onClick={() => setPrintKind("roster")}>طباعة كشف الطلبات</button>
           {rosterError && <p className="error-box" role="alert">{rosterError}</p>}
           {rosterNote && <p className="success-box" role="status">{rosterNote}</p>}
         </div>
       </div>
     </section>
+    {printKind && <AdmissionPrintSheet
+      kind={printKind}
+      scope={{
+        branch: isSuper ? (filters.branch || null) : filters.branch || null,
+        session: filters.session || null,
+        status: filters.status || null,
+        from: exportFrom || null,
+        to: exportTo || null,
+        branchLabel: filters.branch ? branchName(filters.branch) : "كل الفروع المتاحة لحسابك",
+      }}
+      onClose={() => setPrintKind(null)}
+    />}
     {editing !== undefined && <section className="panel management-detail" aria-label="نموذج الطلب"><div className="page-heading"><h2>{editing ? "تعديل الطلب" : "إضافة طلب"}</h2><button className="button secondary" disabled={saving} onClick={() => setEditing(undefined)}>إغلاق</button></div>
       <form className="management-form" onSubmit={(event) => void submit(event)}>
         <label>الفرع<input value={branchName(draft.branch_id)} disabled /></label>

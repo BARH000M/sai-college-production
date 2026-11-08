@@ -42,7 +42,8 @@ export type NewsDraft = Omit<CmsNews, "id">;
 export const cmsSections: Record<string, string> = {
   hero: "الواجهة الرئيسية",
   stats: "الأرقام والإحصاءات",
-  about: "قسم عن الكلية",
+  about: "قسم عن الكلية ونقاطه",
+  campus: "قسم الحياة الجامعية والمعرض",
 };
 
  const programColumns = "id,title_ar,title_en,summary_ar,summary_en,duration_ar,duration_en,icon,is_published,sort_order";

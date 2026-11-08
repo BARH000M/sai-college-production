@@ -1,8 +1,10 @@
 import useLang from '@/hooks/useLang';
-import { newsItems } from '@/mocks/home';
+import { useCmsNews } from '@/hooks/useCmsContent';
 
 export default function CampusNews() {
   const { tx, isAr } = useLang();
+  const newsItems = useCmsNews();
+
   return (
     <>
       <section id="campus" className="reveal px-4 md:px-10 py-16 md:py-24 bg-background-50">
@@ -30,7 +32,7 @@ export default function CampusNews() {
           <h2 className="font-heading text-2xl md:text-4xl text-foreground-950">{isAr ? 'آخر الأخبار' : 'Latest news'}</h2>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {newsItems.map((n) => (
-              <article key={n.en} className="rounded-lg bg-background-50 overflow-hidden border border-background-200">
+              <article key={`${n.ar}-${n.en}`} className="rounded-lg bg-background-50 overflow-hidden border border-background-200">
                 <div className="w-full h-48"><img src={n.img} alt={n.en} title={n.en} className="w-full h-full object-cover object-top" /></div>
                 <div className="p-4 md:p-5">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -38,6 +40,7 @@ export default function CampusNews() {
                     <span className="text-foreground-500">{tx(n.date)}</span>
                   </div>
                   <h3 className="mt-3 font-heading text-sm md:text-base text-foreground-950 leading-snug">{isAr ? n.ar : n.en}</h3>
+                  {(isAr ? n.dar : n.den) && <p className="mt-2 text-xs md:text-sm text-foreground-600 leading-relaxed line-clamp-2">{isAr ? n.dar : n.den}</p>}
                 </div>
               </article>
             ))}

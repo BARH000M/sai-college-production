@@ -1,7 +1,7 @@
 import { attendanceStatuses } from "@/portal/lib/attendance";
 import { admissionStatuses } from "@/portal/lib/admissions";
 import { formatDate } from "@/portal/lib/learning";
-import type { AdmissionsReport, AttendanceReport, EnrollmentReport, HomeworkReport } from "@/portal/lib/reports";
+import type { AdmissionsReport, AttendanceReport, DistributionReport, EnrollmentReport, HomeworkReport } from "@/portal/lib/reports";
 
 const studentStatuses: Record<string, string> = {
   active: "نشط", inactive: "غير نشط", graduated: "متخرج", withdrawn: "منسحب",
@@ -106,6 +106,65 @@ export function AdmissionsSheet({ report }: { report: AdmissionsReport }) {
           <td>{row.created_at ? formatDate(row.created_at) : "—"}</td>
         </tr>)}</tbody>
       </table></div>}
+    </div>
+  </>;
+}
+
+export function DistributionSheet({ report }: { report: DistributionReport }) {
+  return <>
+    <div className="report-section">
+      <strong className="report-heading">ملخص التوزيع على مستوى الكلية</strong>
+      <div className="sheet-summary">
+        <div><span>إجمالي الطلاب</span><strong>{report.totals.total}</strong></div>
+        <div><span>الطلاب النشطون</span><strong>{report.totals.active}</strong></div>
+        <div><span>الفروع</span><strong>{report.totals.branches}</strong></div>
+        <div><span>البرامج</span><strong>{report.totals.programs}</strong></div>
+        <div><span>الصفوف</span><strong>{report.totals.classes}</strong></div>
+      </div>
+    </div>
+
+    <div className="report-section">
+      <strong className="report-heading">التوزيع حسب الفرع والبرنامج</strong>
+      {report.rows.length === 0
+        ? <p className="sheet-empty">لا توجد صفوف أو طلاب داخل النطاق المحدد.</p>
+        : <div className="table-scroll"><table className="sheet-table">
+          <thead><tr><th>#</th><th>الفرع</th><th>البرنامج</th><th>عدد الصفوف</th><th>نشط</th><th>غير نشط</th><th>الإجمالي</th></tr></thead>
+          <tbody>{report.rows.map((row, index) => <tr key={`${row.branchName}-${row.program}`}>
+            <td>{index + 1}</td>
+            <td><strong>{row.branchName}</strong></td>
+            <td>{row.program}</td>
+            <td>{row.classCount}</td>
+            <td>{row.active}</td>
+            <td>{row.other}</td>
+            <td>{row.total}</td>
+          </tr>)}</tbody>
+        </table></div>}
+    </div>
+
+    <div className="report-section">
+      <strong className="report-heading">الإجمالي حسب الفرع</strong>
+      <div className="table-scroll"><table className="sheet-table">
+        <thead><tr><th>الفرع</th><th>نشط</th><th>غير نشط</th><th>الإجمالي</th></tr></thead>
+        <tbody>{report.branchTotals.map((row) => <tr key={row.branchName}>
+          <td><strong>{row.branchName}</strong></td>
+          <td>{row.active}</td>
+          <td>{row.other}</td>
+          <td>{row.total}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </div>
+
+    <div className="report-section">
+      <strong className="report-heading">الإجمالي حسب البرنامج</strong>
+      <div className="table-scroll"><table className="sheet-table">
+        <thead><tr><th>البرنامج</th><th>نشط</th><th>غير نشط</th><th>الإجمالي</th></tr></thead>
+        <tbody>{report.programTotals.map((row) => <tr key={row.program}>
+          <td><strong>{row.program}</strong></td>
+          <td>{row.active}</td>
+          <td>{row.other}</td>
+          <td>{row.total}</td>
+        </tr>)}</tbody>
+      </table></div>
     </div>
   </>;
 }

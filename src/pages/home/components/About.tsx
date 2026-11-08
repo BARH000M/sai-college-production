@@ -1,8 +1,23 @@
 import useLang from '@/hooks/useLang';
 import { aboutText } from '@/mocks/home';
+import { useSiteContent } from '@/hooks/useCmsContent';
 
 export default function About() {
   const { tx, lang } = useLang();
+  const { get } = useSiteContent();
+
+  const kicker = get('about.kicker', aboutText.kicker);
+  const title = get('about.title', aboutText.title);
+  const p1 = get('about.p1', aboutText.p1);
+  const p2 = get('about.p2', aboutText.p2);
+
+  const points = aboutText.points.map((point, index) => {
+    const position = index + 1;
+    const label = get(`about.point.${position}`, { ar: point.ar, en: point.en });
+    const icon = get(`about.point.${position}.icon`, { ar: point.icon, en: point.icon });
+    return { icon: (lang === 'ar' ? icon.ar : icon.en) || point.icon, label };
+  });
+
   return (
     <section id="about" className="reveal px-4 md:px-10 py-16 md:py-24 bg-background-50">
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
@@ -15,15 +30,15 @@ export default function About() {
           />
         </div>
         <div>
-          <span className="text-xs font-label uppercase tracking-wider text-secondary-600">{tx(aboutText.kicker)}</span>
-          <h2 className="mt-3 font-heading text-2xl md:text-4xl text-foreground-950 leading-tight">{tx(aboutText.title)}</h2>
-          <p className="mt-5 text-sm md:text-base text-foreground-700 leading-relaxed">{tx(aboutText.p1)}</p>
-          <p className="mt-3 text-sm md:text-base text-foreground-700 leading-relaxed">{tx(aboutText.p2)}</p>
+          <span className="text-xs font-label uppercase tracking-wider text-secondary-600">{tx(kicker)}</span>
+          <h2 className="mt-3 font-heading text-2xl md:text-4xl text-foreground-950 leading-tight">{tx(title)}</h2>
+          <p className="mt-5 text-sm md:text-base text-foreground-700 leading-relaxed">{tx(p1)}</p>
+          <p className="mt-3 text-sm md:text-base text-foreground-700 leading-relaxed">{tx(p2)}</p>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {aboutText.points.map((p) => (
-              <div key={p.en} className="flex items-center gap-3 rounded-lg bg-background-100 p-3">
-                <span className="w-10 h-10 rounded-md bg-secondary-100 text-secondary-800 flex items-center justify-center"><i className={`${p.icon} text-lg`}></i></span>
-                <span className="text-sm text-foreground-900">{p[lang]}</span>
+            {points.map((point, index) => (
+              <div key={index} className="flex items-center gap-3 rounded-lg bg-background-100 p-3">
+                <span className="w-10 h-10 rounded-md bg-secondary-100 text-secondary-800 flex items-center justify-center"><i className={`${point.icon} text-lg`}></i></span>
+                <span className="text-sm text-foreground-900">{tx(point.label)}</span>
               </div>
             ))}
           </div>

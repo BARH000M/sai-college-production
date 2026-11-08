@@ -3,6 +3,8 @@ import {
   cmsError, deleteNews, emptyNewsDraft, loadNews, newsToDraft, saveNews, validateNews,
   type CmsNews, type NewsDraft,
 } from "@/portal/lib/cms";
+import { usePreviewDraft } from "./previewDraft";
+import { CmsDirtyBadge } from "./CmsDirtyBadge";
 
 export function NewsPanel({ canEdit }: { canEdit: boolean }) {
   const [rows, setRows] = useState<CmsNews[]>([]);
@@ -27,6 +29,21 @@ export function NewsPanel({ canEdit }: { canEdit: boolean }) {
     return () => { active = false; };
   }, [retry]);
 
+  const { publish } = usePreviewDraft();
+
+  useEffect(() => {
+    if (loading) return;
+    let next: CmsNews[];
+    if (editingId === null) {
+      next = [...rows, { id: "__new_draft__", ...draft }];
+    } else if (typeof editingId === "string") {
+      next = rows.map((row) => (row.id === editingId ? { ...row, ...draft } : row));
+    } else {
+      next = rows;
+    }
+    publish({ news: next });
+  }, [rows, editingId, draft, loading, publish]);
+
   function openForm(row: CmsNews | null) {
     if (!canEdit) return;
     setFormError(null);
@@ -39,6 +56,7 @@ export function NewsPanel({ canEdit }: { canEdit: boolean }) {
 
   function change<K extends keyof NewsDraft>(key: K, value: NewsDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+    setSuccess(null);
   }
 
   async function submit() {
@@ -92,6 +110,23 @@ export function NewsPanel({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  const unsavedFields: string[] = (() => {
+    if (editingId === undefined) return [];
+    const baseline: NewsDraft = typeof editingId === "string"
+      ? (() => {
+          const row = rows.find((item) => item.id === editingId);
+          return row ? newsToDraft(row) : emptyNewsDraft();
+        })()
+      : emptyNewsDraft();
+    return (Object.keys(baseline) as (keyof NewsDraft)[])
+      .filter((key) => !(key === "sort_order" && editingId === null) && draft[key] !== baseline[key])
+      .map((key) => String(key));
+  })();
+
+  function fieldDirty(key: keyof NewsDraft): boolean {
+    return unsavedFields.includes(String(key));
+  }
+
   return <div className="cms-panels">
     <section className="panel">
       <div className="page-heading">
@@ -134,19 +169,23 @@ export function NewsPanel({ canEdit }: { canEdit: boolean }) {
         <h2>{editingId ? "تعديل خبر" : "خبر جديد"}</h2>
         <button className="button secondary" type="button" disabled={saving} onClick={() => setEditingId(undefined)}>إغلاق</button>
       </div>
+      {unsavedFields.length > 0 && <p className="notice cms-dirty-note">
+        <CmsDirtyBadge show />
+        <strong>{unsavedFields.length} حقل لم يُنشر بعد.</strong> اضغط «حفظ الخبر» لتطبيق التعديلات على الموقع.
+      </p>}
       <div className="management-form">
-        <label>العنوان بالعربية<input required value={draft.title_ar} onChange={(event) => change("title_ar", event.target.value)} /></label>
-        <label>العنوان بالإنجليزية<input dir="ltr" value={draft.title_en} onChange={(event) => change("title_en", event.target.value)} /></label>
-        <label>التصنيف بالعربية<input value={draft.tag_ar} onChange={(event) => change("tag_ar", event.target.value)} /></label>
-        <label>التصنيف بالإنجليزية<input dir="ltr" value={draft.tag_en} onChange={(event) => change("tag_en", event.target.value)} /></label>
-        <label>تاريخ النشر<input type="date" value={draft.published_at} onChange={(event) => change("published_at", event.target.value)} /></label>
-        <label>الترتيب<input type="number" value={draft.sort_order} onChange={(event) => change("sort_order", Number(event.target.value) || 0)} /></label>
-        <label>الملخص بالعربية<textarea rows={3} value={draft.summary_ar} onChange={(event) => change("summary_ar", event.target.value)} /></label>
-        <label>الملخص بالإنجليزية<textarea dir="ltr" rows={3} value={draft.summary_en} onChange={(event) => change("summary_en", event.target.value)} /></label>
-        <label className="cms-image-field">رابط الصورة (اختياري)
+        <label><span className="cms-label-row">العنوان بالعربية<CmsDirtyBadge show={fieldDirty("title_ar")} /></span><input required value={draft.title_ar} onChange={(event) => change("title_ar", event.target.value)} /></label>
+        <label><span className="cms-label-row">العنوان بالإنجليزية<CmsDirtyBadge show={fieldDirty("title_en")} /></span><input dir="ltr" value={draft.title_en} onChange={(event) => change("title_en", event.target.value)} /></label>
+        <label><span className="cms-label-row">التصنيف بالعربية<CmsDirtyBadge show={fieldDirty("tag_ar")} /></span><input value={draft.tag_ar} onChange={(event) => change("tag_ar", event.target.value)} /></label>
+        <label><span className="cms-label-row">التصنيف بالإنجليزية<CmsDirtyBadge show={fieldDirty("tag_en")} /></span><input dir="ltr" value={draft.tag_en} onChange={(event) => change("tag_en", event.target.value)} /></label>
+        <label><span className="cms-label-row">تاريخ النشر<CmsDirtyBadge show={fieldDirty("published_at")} /></span><input type="date" value={draft.published_at} onChange={(event) => change("published_at", event.target.value)} /></label>
+        <label><span className="cms-label-row">الترتيب<CmsDirtyBadge show={fieldDirty("sort_order")} /></span><input type="number" value={draft.sort_order} onChange={(event) => change("sort_order", Number(event.target.value) || 0)} /></label>
+        <label><span className="cms-label-row">الملخص بالعربية<CmsDirtyBadge show={fieldDirty("summary_ar")} /></span><textarea rows={3} value={draft.summary_ar} onChange={(event) => change("summary_ar", event.target.value)} /></label>
+        <label><span className="cms-label-row">الملخص بالإنجليزية<CmsDirtyBadge show={fieldDirty("summary_en")} /></span><textarea dir="ltr" rows={3} value={draft.summary_en} onChange={(event) => change("summary_en", event.target.value)} /></label>
+        <label className="cms-image-field"><span className="cms-label-row">رابط الصورة (اختياري)<CmsDirtyBadge show={fieldDirty("image_url")} /></span>
           <input dir="ltr" value={draft.image_url ?? ""} onChange={(event) => change("image_url", event.target.value)} placeholder="https://..." />
         </label>
-        <label className="cms-checkbox"><input type="checkbox" checked={draft.is_published} onChange={(event) => change("is_published", event.target.checked)} /> نشر على الموقع فوراً</label>
+        <label className="cms-checkbox"><input type="checkbox" checked={draft.is_published} onChange={(event) => change("is_published", event.target.checked)} /> نشر على الموقع فوراً<CmsDirtyBadge show={fieldDirty("is_published")} /></label>
         {draft.image_url && <div className="cms-image-preview"><img src={draft.image_url} alt="معاينة صورة الخبر" title={draft.title_ar || "معاينة"} className="w-full h-full object-cover object-top" /></div>}
         {formError && <p className="error-box" role="alert">{formError}</p>}
         <div className="actions">
