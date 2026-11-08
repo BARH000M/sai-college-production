@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { loadManagementBranches, loadManagementOptions, type Option } from "../lib/management";
 import {
   admissionDraft, admissionStatuses, admissionsPageSize, canManageAdmissions, isAdmissionStatus,
-  loadAdmissions, loadAdmissionStaff, saveAdmission, validateAdmission,
+  loadAdmissions, loadAdmissionSessions, loadAdmissionStaff, saveAdmission, validateAdmission,
   type Admission, type AdmissionDraft, type AdmissionFilters, type StaffOption,
 } from "../lib/admissions";
 
@@ -29,6 +29,8 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
   const [staffError, setStaffError] = useState<string | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [filters, setFilters] = useState(initialFilters);
   const [rows, setRows] = useState<Admission[]>([]);
   const [count, setCount] = useState(0);
@@ -59,12 +61,24 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
     let active = true;
     setOptionsLoading(true); setOptionsError(null);
     void loadManagementOptions("", "").then((value) => {
-      if (active) { setBranches(value.branches); setSessions(value.sessions); }
+      if (active) { setBranches(value.branches); if (!manager) setSessions(value.sessions); }
     }).catch((failure: unknown) => {
       if (active) { setBranches([]); setSessions([]); setOptionsError(errorText(failure)); }
     }).finally(() => { if (active) setOptionsLoading(false); });
     return () => { active = false; };
-  }, [retry]);
+  }, [retry, manager]);
+
+  useEffect(() => {
+    if (!manager) { setSessionLoading(false); setSessionError(null); return; }
+    setSessions([]); setSessionError(null);
+    if (!staffBranch || !canEditBranch(staffBranch)) { setSessionLoading(false); return; }
+    let active = true;
+    setSessionLoading(true);
+    void loadAdmissionSessions(staffBranch).then((value) => { if (active) setSessions(value); })
+      .catch((failure: unknown) => { if (active) setSessionError(errorText(failure)); })
+      .finally(() => { if (active) setSessionLoading(false); });
+    return () => { active = false; };
+  }, [staffBranch, isSuper, manager, scope, scopeLoading, scopeError, retry]);
 
   useEffect(() => {
     let active = true;
@@ -91,7 +105,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
 
   function filter(key: keyof AdmissionFilters, value: string) {
     setSelected(null);
-    setFilters((current) => ({ ...current, [key]: value, page: 0, ...(key === "branch" ? { assignee: "" } : {}) }));
+    setFilters((current) => ({ ...current, [key]: value, page: 0, ...(key === "branch" ? { assignee: "", session: "" } : {}) }));
   }
   function openForm(row: Admission | null) {
     const branch = row?.branch_id ?? filters.branch;
@@ -107,6 +121,10 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
     if (saving || editing === undefined || !canEditBranch(draft.branch_id)) return;
     const validation = validateAdmission(draft);
     if (validation) { setFormError(validation); return; }
+    if (sessionLoading || sessionError || (draft.academic_session_id !== editing?.academic_session_id
+      && !sessions.some((session) => session.id === draft.academic_session_id))) {
+      setFormError("تعذر التحقق من الجلسة النشطة؛ أعد تحميل قائمة الجلسات."); return;
+    }
     if (staffLoading || staffError || (draft.assigned_to && draft.assigned_to !== editing?.assigned_to && !staff.some((person) => person.user_id === draft.assigned_to))) {
       setFormError("تعذر التحقق من الموظف المسند إليه الطلب؛ أعد تحميل القائمة."); return;
     }
@@ -140,8 +158,10 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
     </fieldset>
     {optionsLoading && <p role="status">جارٍ تحميل الفروع والجلسات...</p>}
     {staffLoading && <p role="status">جارٍ تحميل الموظفين...</p>}
+    {sessionLoading && <p role="status">جارٍ تحميل الجلسات النشطة...</p>}
     {optionsError && <p className="error-box" role="alert">تعذر تحميل الفروع والجلسات: {optionsError} <button className="text-button" onClick={() => setRetry((v) => v + 1)}>إعادة المحاولة</button></p>}
     {staffError && <p className="error-box" role="alert">تعذر تحميل الموظفين: {staffError} <button className="text-button" onClick={() => setRetry((v) => v + 1)}>إعادة المحاولة</button></p>}
+    {sessionError && <p className="error-box" role="alert">تعذر تحميل الجلسات النشطة: {sessionError} <button className="text-button" onClick={() => setRetry((v) => v + 1)}>إعادة المحاولة</button></p>}
     {error && <p className="error-box" role="alert">تعذر تحميل الطلبات: {error} <button className="text-button" onClick={() => setRetry((v) => v + 1)}>إعادة المحاولة</button></p>}
     {success && <p className="success-box" role="status">{success}</p>}
     <section className="panel">
@@ -159,12 +179,12 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
     {editing !== undefined && <section className="panel management-detail" aria-label="نموذج الطلب"><div className="page-heading"><h2>{editing ? "تعديل الطلب" : "إضافة طلب"}</h2><button className="button secondary" disabled={saving} onClick={() => setEditing(undefined)}>إغلاق</button></div>
       <form className="management-form" onSubmit={(event) => void submit(event)}>
         <label>الفرع<input value={branchName(draft.branch_id)} disabled /></label>
-        <label>الجلسة<select required value={draft.academic_session_id} onChange={(e) => change("academic_session_id", e.target.value)}><option value="">اختر جلسة</option>{editing && draft.academic_session_id && !sessions.some((item) => item.id === draft.academic_session_id) && <option value={draft.academic_session_id}>الجلسة الحالية غير متاحة في القائمة</option>}{sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label>الجلسة<select required value={draft.academic_session_id} disabled={sessionLoading || !!sessionError} onChange={(e) => change("academic_session_id", e.target.value)}><option value="">اختر جلسة</option>{editing?.academic_session_id && !sessions.some((item) => item.id === editing.academic_session_id) && <option value={editing.academic_session_id}>الجلسة الحالية غير متاحة في القائمة</option>}{sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         {textFields.map((field) => <label key={field.key}>{field.label}{field.key === "notes" ? <textarea value={draft.notes} onChange={(e) => change("notes", e.target.value)} /> : <input required={field.key === "applicant_full_name"} type={field.key === "email" ? "email" : field.key === "phone" ? "tel" : "text"} value={draft[field.key]} onChange={(e) => change(field.key, e.target.value)} />}</label>)}
         <label>المسند إليه<select value={draft.assigned_to} disabled={staffLoading || !!staffError} onChange={(e) => change("assigned_to", e.target.value)}><option value="">غير مسند</option>{editing?.assigned_to && !staff.some((item) => item.user_id === editing.assigned_to) && <option value={editing.assigned_to}>الموظف الحالي غير متاح في القائمة</option>}{staff.map((person) => <option key={person.user_id} value={person.user_id}>{person.full_name}</option>)}</select></label>
         {editing && <label>الحالة<select value={draft.status} onChange={(e) => { if (isAdmissionStatus(e.target.value)) change("status", e.target.value); }} >{Object.entries(admissionStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>}
         {formError && <p className="error-box" role="alert">{formError}</p>}
-        <div className="actions"><button className="button primary" disabled={saving || staffLoading || !!staffError || optionsLoading || !!optionsError}>{saving ? "جارٍ الحفظ..." : "حفظ"}</button><button type="button" className="button secondary" disabled={saving} onClick={() => setEditing(undefined)}>إلغاء</button></div>
+        <div className="actions"><button className="button primary" disabled={saving || staffLoading || !!staffError || optionsLoading || !!optionsError || sessionLoading || !!sessionError}>{saving ? "جارٍ الحفظ..." : "حفظ"}</button><button type="button" className="button secondary" disabled={saving} onClick={() => setEditing(undefined)}>إلغاء</button></div>
       </form>
     </section>}
   </main>;

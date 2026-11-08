@@ -14,6 +14,7 @@ export type Admission = {
 };
 export type AdmissionFilters = { branch: string; session: string; status: string; assignee: string; search: string; page: number };
 export type StaffOption = { user_id: string; full_name: string };
+export type AdmissionSession = { id: string; name: string };
 export type AdmissionDraft = {
   branch_id: string; academic_session_id: string; applicant_full_name: string;
   guardian_name: string; phone: string; email: string; preferred_program: string;
@@ -58,6 +59,29 @@ function isStaffOption(value: unknown): value is StaffOption {
   return typeof value === "object" && value !== null
     && "user_id" in value && typeof value.user_id === "string"
     && "full_name" in value && typeof value.full_name === "string";
+}
+
+function isAdmissionSession(value: unknown): value is AdmissionSession {
+  return typeof value === "object" && value !== null
+    && "id" in value && typeof value.id === "string"
+    && "name" in value && typeof value.name === "string";
+}
+
+export async function loadAdmissionSessions(branch: string): Promise<AdmissionSession[]> {
+  const sessions: AdmissionSession[] = [];
+  let total = 0;
+  do {
+    const result = await supabase.rpc("sai_admissions_sessions", { wanted_branch: branch }, { count: "exact" })
+      .range(sessions.length, sessions.length + 999);
+    if (result.error) throw new Error(result.error.message);
+    if (!Array.isArray(result.data) || !result.data.every(isAdmissionSession) || result.count === null) {
+      throw new Error("تعذر تحميل قائمة الجلسات وعددها.");
+    }
+    total = result.count;
+    if (!result.data.length && sessions.length < total) throw new Error("تعذر تحميل جميع الجلسات.");
+    sessions.push(...result.data);
+  } while (sessions.length < total);
+  return sessions;
 }
 
 export async function loadAdmissionStaff(branch: string): Promise<StaffOption[]> {

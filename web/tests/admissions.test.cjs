@@ -54,6 +54,33 @@ test("status validation and immutable edit fields", async () => {
   assert.equal("status" in api.admissionPayload(draft, false), false);
 });
 
+test("enquiries require both branch and session", async () => {
+  const api = await load("required");
+  const draft = api.admissionDraft(null, "branch", "session");
+  draft.applicant_full_name = "Applicant";
+  assert.equal(api.validateAdmission(draft), null);
+  assert.ok(api.validateAdmission({ ...draft, branch_id: "" }));
+  assert.ok(api.validateAdmission({ ...draft, academic_session_id: "" }));
+});
+
+test("session directory is branch-scoped, paginated and surfaces errors", async () => {
+  const calls = [];
+  const db = { rpc(name, args, options) {
+    calls.push([name, args, options]);
+    return { range: async (start, end) => {
+      calls.push([start, end]);
+      return { data: [{ id: "session", name: "Active" }], count: 1, error: null };
+    } };
+  } };
+  const api = await load("sessions", db);
+  assert.deepEqual(await api.loadAdmissionSessions("branch"), [{ id: "session", name: "Active" }]);
+  assert.deepEqual(calls, [["sai_admissions_sessions", { wanted_branch: "branch" }, { count: "exact" }], [0, 999]]);
+  db.rpc = () => ({ range: async () => ({ data: null, count: null, error: { message: "permission denied" } }) });
+  await assert.rejects(api.loadAdmissionSessions("other"), /permission denied/);
+  db.rpc = () => ({ range: async () => ({ data: [{ id: "session" }], count: 1, error: null }) });
+  await assert.rejects(api.loadAdmissionSessions("branch"), /تعذر تحميل/);
+});
+
 test("queries require branch scope and apply filters and four-field search", async () => {
   const db = client({ data: [], count: 0, error: null });
   const api = await load("scope", db);
