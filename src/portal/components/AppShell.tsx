@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import logo from "../assets/saiLogo";
 import { isAppRole, modulePath, roleLabels, visibleNavigation } from "../lib/navigation";
 import { useLearningNotifications } from "../hooks/useLearningNotifications";
+import { useNotificationFeed } from "../hooks/useNotificationFeed";
 
 export function AppShell({ profileName, email, roles, onSignOut, busy, signOutError, children }: {
   profileName: string; email: string | null; roles: readonly string[]; onSignOut: () => void; busy: boolean;
@@ -12,6 +13,7 @@ export function AppShell({ profileName, email, roles, onSignOut, busy, signOutEr
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { count: unreadCount } = useLearningNotifications(roles);
+  const { unread: noticeCount } = useNotificationFeed(roles);
   const links = visibleNavigation(roles);
   const matches = links.filter((item) => item.label.includes(search.trim()));
   const names = roles.filter(isAppRole).map((role) => roleLabels[role]).join(" · ");
@@ -37,12 +39,10 @@ export function AppShell({ profileName, email, roles, onSignOut, busy, signOutEr
         <div className="search-wrap"><label className="sr-only" htmlFor="global-search">البحث في أقسام اللوحة</label><input id="global-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="البحث في أقسام اللوحة" />
           {search.trim() && <div className="search-results">{matches.length ? matches.map((item) => <NavLink key={item.id} to={modulePath(item)} onClick={() => setSearch("")}>{item.label}</NavLink>) : <span>لا توجد أقسام مطابقة.</span>}</div>}
         </div>
-        {unreadCount > 0
-          ? <NavLink className="icon-button notice-link" to="/portal/modules/homework" title={`${unreadCount} تحديثاً جديداً في الواجبات`} aria-label={`${unreadCount} تحديثاً جديداً في الواجبات`}>
-            <span aria-hidden="true">♧</span>
-            <span className="notice-badge" aria-hidden="true">{unreadCount}</span>
-          </NavLink>
-          : <button className="icon-button" disabled title="لا توجد إشعارات جديدة" aria-label="لا توجد إشعارات جديدة">♧</button>}
+        <NavLink className="icon-button notice-link" to="/portal/modules/notifications" title={noticeCount > 0 ? `${noticeCount} إشعاراً غير مقروء` : "مركز الإشعارات"} aria-label={noticeCount > 0 ? `${noticeCount} إشعاراً غير مقروء` : "مركز الإشعارات"}>
+          <i className="ri-notification-3-line" aria-hidden="true"></i>
+          {noticeCount > 0 && <span className="notice-badge" aria-hidden="true">{noticeCount}</span>}
+        </NavLink>
         <details className="profile-menu"><summary>{profileName}</summary><div><span dir="ltr">{email ?? "البريد غير متاح"}</span><button onClick={onSignOut} disabled={busy}>{busy ? "جارٍ تسجيل الخروج..." : "تسجيل الخروج"}</button></div></details>
       </header>
       {signOutError && <p className="error-box global-error" role="alert">تعذر تسجيل الخروج: {signOutError}</p>}

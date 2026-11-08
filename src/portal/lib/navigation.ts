@@ -23,6 +23,7 @@ const allRoles = Object.keys(roleLabels) as AppRole[];
 // Navigation follows the approved role/module map; the database enforces access.
 export const navigation: readonly NavigationItem[] = [
   { id: "home", label: "الرئيسية", icon: "ri-home-5-line", roles: allRoles },
+  { id: "notifications", label: "مركز الإشعارات", icon: "ri-notification-3-line", roles: allRoles },
   { id: "admissions", label: "القبول والتسجيل", icon: "ri-user-add-line", roles: ["super_admin", "admin", "receptionist", "teacher"] },
   { id: "scanner", label: "ماسح إيصالات القبول", icon: "ri-qr-scan-2-line", roles: ["super_admin", "admin", "receptionist"] },
   { id: "students", label: "سجلات الطلاب", icon: "ri-group-line", roles: ["super_admin", "admin", "teacher", "receptionist", "parent", "student"] },
@@ -65,10 +66,10 @@ export const navigation: readonly NavigationItem[] = [
  * so a user can never land on a screen that pretends to be ready but is not.
  */
 const availableModuleIds: readonly string[] = [
-  "home", "branches", "sessions", "classes", "students", "admissions", "scanner",
+  "home", "notifications", "branches", "sessions", "classes", "students", "admissions", "scanner",
   "courses", "homework", "progress", "attendance", "roles", "reports", "cms",
-  "academics", "timetable", "qr", "listening", "speaking", "tones", "handwriting",
-  "reading", "review",
+  "academics", "timetable", "qr", "listening", "speaking", "tones", "vocabulary",
+  "handwriting", "reading", "review",
 ];
 
 export function isAppRole(value: string): value is AppRole {
@@ -98,7 +99,6 @@ export const pendingModules: readonly { id: string; label: string; reason: strin
     label: "الرسوم والمالية",
     reason: "لا توجد جداول رسوم أو فواتير أو مدفوعات في قاعدة البيانات بعد، لذلك لا يمكن تشغيلها.",
   },
-  { id: "vocabulary", label: "المفردات", reason: "تحتاج بنك مفردات وبطاقات مراجعة مرتبطة بالدروس." },
   { id: "quizzes", label: "الاختبارات القصيرة", reason: "تحتاج جداول أسئلة ومحاولات وحساب درجات." },
   { id: "exams", label: "الامتحانات", reason: "تحتاج جدولة امتحانات وربطها بالجلسات الأكاديمية." },
   { id: "certificates", label: "الشهادات والبطاقات", reason: "تحتاج قوالب شهادات وأرقام تحقق." },

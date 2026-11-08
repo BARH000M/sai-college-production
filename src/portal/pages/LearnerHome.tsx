@@ -171,6 +171,7 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
       <Link className="button primary" to="/portal/modules/courses">فتح المقررات</Link>
       <Link className="button secondary" to="/portal/modules/homework">الواجبات</Link>
       <Link className="button secondary" to="/portal/modules/progress">التقدم والأداء</Link>
+      <Link className="button secondary" to="/portal/modules/notifications">الإشعارات</Link>
     </div>}
 
     {learner && <nav className="learner-links lab-skill-links" aria-label="تدريب مهارات اللغة الصينية">
@@ -178,6 +179,7 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
       <Link className="button secondary" to="/portal/modules/listening">الاستماع</Link>
       <Link className="button secondary" to="/portal/modules/speaking">التحدث والنطق</Link>
       <Link className="button secondary" to="/portal/modules/tones">النغمات</Link>
+      <Link className="button secondary" to="/portal/modules/vocabulary">المفردات والبطاقات</Link>
       <Link className="button secondary" to="/portal/modules/handwriting">الكتابة اليدوية</Link>
       <Link className="button secondary" to="/portal/modules/reading">القراءة</Link>
       <Link className="button secondary" to="/portal/modules/review">المراجعة المتباعدة</Link>
