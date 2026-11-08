@@ -1263,6 +1263,27 @@
 .portal-root .review-result-grid span { display: block; font-size: 10px; color: oklch(var(--foreground-600)); }
 .portal-root .review-result-grid strong { display: block; font-size: 17px; margin-top: 2px; }
 
+/* ---- Weekly review activity ---- */
+.portal-root .review-week {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px;
+  margin-top: 10px; padding: 10px 8px 6px; border-radius: 10px;
+  background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200));
+}
+.portal-root .review-week-day {
+  display: grid; justify-items: center; gap: 4px; min-width: 0;
+}
+.portal-root .review-week-bar {
+  display: flex; align-items: flex-end; width: 100%; height: 62px;
+  border-radius: 6px; background: oklch(var(--background-200) / .55); overflow: hidden;
+}
+.portal-root .review-week-bar > span {
+  display: block; width: 100%; border-radius: 6px;
+  background: oklch(var(--secondary-300)); transition: height .2s ease;
+}
+.portal-root .review-week-bar > span.filled { background: oklch(var(--primary-500)); }
+.portal-root .review-week-day strong { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.portal-root .review-week-day small { font-size: 10px; color: oklch(var(--foreground-600)); white-space: nowrap; }
+
 /* ---- Timetable & calendar ---- */
 .portal-root .timetable-wrap { overflow-x: auto; margin-top: 12px; }
 .portal-root .timetable { width: 100%; min-width: 940px; border-collapse: collapse; font-size: 11px; }
@@ -1568,6 +1589,96 @@
 .portal-root .vocab-editor-table .data-note { display: block; }
 .portal-root .vocab-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .portal-root .vocab-row-actions .button { min-height: 32px; padding: 5px 10px; font-size: 11px; }
+
+/* ---- Bulk paste import ---- */
+.portal-root .vocab-bulk {
+  display: grid; gap: 12px; padding: 14px; border-radius: 10px;
+  background: oklch(var(--secondary-50)); border: 1px solid oklch(var(--secondary-200));
+}
+.portal-root .vocab-bulk-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.portal-root .vocab-bulk-head strong { font-size: 13px; color: oklch(var(--secondary-900)); }
+.portal-root .vocab-bulk-head p { margin: 3px 0 0; max-width: 720px; }
+.portal-root .vocab-bulk-grid {
+  display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; align-items: start;
+}
+.portal-root .vocab-bulk-text textarea {
+  min-height: 170px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; line-height: 1.9; white-space: pre; overflow-wrap: normal;
+}
+.portal-root .vocab-bulk-side {
+  display: grid; gap: 10px; padding: 12px; border-radius: 10px;
+  background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-200));
+}
+.portal-root .vocab-bulk-side label { display: grid; gap: 5px; font-size: 11px; }
+.portal-root .vocab-bulk-check {
+  display: flex !important; flex-direction: row; align-items: center; gap: 8px; white-space: nowrap;
+}
+.portal-root .vocab-bulk-check input { width: 16px; height: 16px; accent-color: oklch(var(--primary-600)); }
+.portal-root .vocab-bulk-tally {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0;
+}
+.portal-root .vocab-bulk-tally > div {
+  padding: 7px 9px; border-radius: 8px; background: oklch(var(--background-100));
+  border: 1px solid oklch(var(--background-200)); text-align: center;
+}
+.portal-root .vocab-bulk-tally dt { font-size: 10px; color: oklch(var(--foreground-600)); }
+.portal-root .vocab-bulk-tally dd { margin: 2px 0 0; font-size: 16px; font-weight: 700; }
+.portal-root .vocab-bulk-preview { display: grid; gap: 8px; }
+.portal-root .vocab-bulk-preview-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.portal-root .vocab-bulk-preview-head strong { font-size: 12px; }
+.portal-root .vocab-bulk-table { background: oklch(var(--background-50)); border-radius: 8px; font-size: 11.5px; }
+.portal-root .vocab-bulk-table th { background: oklch(var(--background-100)); font-size: 11px; }
+.portal-root .vocab-bulk-table td { padding: 7px 9px; }
+.portal-root .vocab-bulk-row-error { background: oklch(var(--primary-50)); }
+.portal-root .vocab-bulk-error {
+  display: block; margin-top: 3px; font-size: 10px; line-height: 1.7;
+  color: oklch(var(--primary-800)); overflow-wrap: anywhere;
+}
+
+/* ---- Per-lesson print strip inside the course screen ---- */
+.portal-root .vocab-print {
+  display: grid; gap: 10px; padding: 14px; border-radius: 10px;
+  background: oklch(var(--background-100)); border: 1px dashed oklch(var(--background-300));
+}
+.portal-root .vocab-print-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.portal-root .vocab-print-head strong {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: oklch(var(--primary-800));
+}
+.portal-root .vocab-print-head strong i { font-size: 15px; }
+.portal-root .vocab-print-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 8px;
+}
+.portal-root .vocab-print-card {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0;
+  padding: 9px 11px; border-radius: 8px;
+  background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-200));
+}
+.portal-root .vocab-print-index {
+  flex: 0 0 26px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: oklch(var(--secondary-100)); color: oklch(var(--secondary-900));
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.portal-root .vocab-print-body { flex: 1 1 120px; min-width: 0; display: grid; gap: 2px; }
+.portal-root .vocab-print-body strong { font-size: 12px; overflow-wrap: anywhere; }
+.portal-root .vocab-print-card .button { min-height: 32px; padding: 5px 10px; font-size: 11px; }
+
+@media (max-width: 900px) {
+  .portal-root .vocab-bulk-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- Class attendance register ---- */
+.portal-root .attendance-bulk {
+  display: grid; gap: 8px; margin: 12px 0; padding: 12px 14px; border-radius: 10px;
+  background: oklch(var(--secondary-50)); border: 1px solid oklch(var(--secondary-200));
+}
+.portal-root .attendance-bulk-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.portal-root .attendance-bulk-head strong {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: oklch(var(--secondary-900));
+}
+.portal-root .attendance-bulk-head strong i { font-size: 15px; }
+.portal-root .attendance-bulk .button { min-height: 36px; padding: 7px 12px; font-size: 11.5px; }
+.portal-root .attendance-sheet-table td { vertical-align: middle; }
+.portal-root .attendance-sheet-table .sheet-sign-cell { height: 26px; }
 
 /* ---- Printable vocabulary review sheet ---- */
 .portal-root .vocab-sheet-table td { vertical-align: middle; }

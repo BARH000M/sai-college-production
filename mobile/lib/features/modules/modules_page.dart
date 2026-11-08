@@ -19,12 +19,33 @@ class ModulesPage extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 26),
       children: [
-        Text('خدماتك', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, color: SaiColors.navy)),
-        const SizedBox(height: 4),
-        Text('الوحدات المتاحة لدور ${role.label}', style: const TextStyle(color: SaiColors.muted)),
-        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          decoration: BoxDecoration(color: SaiColors.maroon, borderRadius: BorderRadius.circular(14)),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), borderRadius: BorderRadius.circular(9)),
+                child: const Icon(Icons.grid_view_outlined, size: 16, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('كل الخدمات', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                    Text('الوحدات المتاحة لدورك الحالي', style: TextStyle(color: Color(0xFFEBC98A), fontSize: 9.5)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         if (groups.isEmpty)
           const Text('لا توجد وحدات متاحة لهذا الدور.'),
         ...groups.entries.map((entry) => _ModuleGroup(
@@ -46,28 +67,36 @@ class _ModuleGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsetsDirectional.only(start: 4, bottom: 10),
-            child: Text(title, style: const TextStyle(color: SaiColors.red, fontWeight: FontWeight.w700)),
+            padding: const EdgeInsetsDirectional.only(start: 2, bottom: 8),
+            child: Row(
+              children: [
+                Container(width: 3, height: 12, decoration: BoxDecoration(color: SaiColors.maroon, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 6),
+                Text(title, style: const TextStyle(color: SaiColors.ink, fontWeight: FontWeight.w700, fontSize: 11.5)),
+              ],
+            ),
           ),
           ...modules.map((module) => Padding(
-                padding: const EdgeInsets.only(bottom: 9),
+                padding: const EdgeInsets.only(bottom: 7),
                 child: Card(
                   child: ListTile(
                     onTap: () => onOpenFeature(module),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(0xFFFFE9EC),
-                      foregroundColor: SaiColors.red,
-                      child: Icon(module.icon),
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                    leading: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(color: SaiColors.maroonTint, borderRadius: BorderRadius.circular(11)),
+                      child: Icon(module.icon, size: 19, color: SaiColors.maroon),
                     ),
-                    title: Text(module.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(module.tabs.join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    trailing: const Icon(Icons.chevron_left),
+                    title: Text(module.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: SaiColors.ink)),
+                    subtitle: Text(module.tabs.join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
+                    trailing: const Icon(Icons.chevron_left, size: 17, color: SaiColors.muted),
                   ),
                 ),
               )),

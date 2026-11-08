@@ -5,6 +5,8 @@ import {
 } from "@/portal/lib/vocabulary";
 import type { LearningCourse, LearningLesson } from "@/portal/lib/learning";
 import { VocabularyWordForm } from "@/portal/pages/learning/VocabularyWordForm";
+import { VocabularyBulkImport } from "@/portal/pages/learning/VocabularyBulkImport";
+import { VocabularyReviewSheet } from "@/portal/pages/vocabulary/VocabularyReviewSheet";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -24,6 +26,8 @@ export function CourseVocabularyPanel({
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [printLessonId, setPrintLessonId] = useState("");
   const [editing, setEditing] = useState<VocabularyWord | null>(null);
   const [confirmId, setConfirmId] = useState("");
   const [deletingId, setDeletingId] = useState("");
@@ -53,12 +57,42 @@ export function CourseVocabularyPanel({
   const published = words.filter((word) => word.is_published).length;
   const linked = words.filter((word) => word.lesson_id).length;
 
+  const printGroups = useMemo(
+    () => courseLessons
+      .map((lesson) => ({ lesson, rows: words.filter((word) => word.lesson_id === lesson.id) }))
+      .filter((group) => group.rows.length > 0),
+    [courseLessons, words],
+  );
+  const printLesson = courseLessons.find((lesson) => lesson.id === printLessonId) ?? null;
+
   function refresh() { setRetry((value) => value + 1); }
 
   function startAdd() {
     setEditing(null);
     setEditorOpen(true);
+    setImportOpen(false);
     setNotice(null);
+    setActionError(null);
+  }
+
+  function startImport() {
+    setEditorOpen(false);
+    setEditing(null);
+    setImportOpen(true);
+    setNotice(null);
+    setActionError(null);
+  }
+
+  function handleImported(rows: VocabularyWord[]) {
+    setWords((current) => {
+      const added = new Set(rows.map((row) => row.id));
+      return [...current.filter((word) => !added.has(word.id)), ...rows]
+        .sort((a, b) => a.position - b.position);
+    });
+    setImportOpen(false);
+    setNotice(rows.length === 1
+      ? `أُضيفت مفردة «${rows[0].hanzi}» من القائمة.`
+      : `أُضيفت ${rows.length} مفردة من القائمة إلى بنك كلمات المقرر.`);
     setActionError(null);
   }
 
@@ -110,6 +144,9 @@ export function CourseVocabularyPanel({
         <button className="button secondary" type="button" onClick={refresh} disabled={loading}>
           <i className="ri-refresh-line" aria-hidden="true"></i> تحديث
         </button>
+        <button className="button secondary" type="button" onClick={startImport} disabled={loading}>
+          <i className="ri-file-list-3-line" aria-hidden="true"></i> استيراد قائمة
+        </button>
         <button className="button primary" type="button" onClick={startAdd} disabled={editorOpen && !editing}>
           <i className="ri-add-line" aria-hidden="true"></i> إضافة مفردة
         </button>
@@ -133,6 +170,14 @@ export function CourseVocabularyPanel({
       word={editing}
       onSaved={handleSaved}
       onCancel={() => { setEditorOpen(false); setEditing(null); }}
+    />}
+
+    {importOpen && <VocabularyBulkImport
+      courseId={course.id}
+      lessons={courseLessons}
+      existingHanzi={words.map((word) => word.hanzi)}
+      onImported={handleImported}
+      onCancel={() => setImportOpen(false)}
     />}
 
     {loading && <p className="muted" role="status">جارٍ تحميل مفردات المقرر...</p>}
@@ -201,8 +246,42 @@ export function CourseVocabularyPanel({
         </table>
       </div>)}
 
+    {!loading && !error && printGroups.length > 0 && <section className="vocab-print">
+      <div className="vocab-print-head">
+        <strong>
+          <i className="ri-printer-line" aria-hidden="true"></i> كشوف مراجعة الدروس
+        </strong>
+        <small className="data-note">اطبع كشف الدرس مباشرة من هنا، بنفس الترويسة الرسمية وبخانة تدريب كتابي.</small>
+      </div>
+      <div className="vocab-print-grid">
+        {printGroups.map((group) => <div className="vocab-print-card" key={group.lesson.id}>
+          <span className="vocab-print-index">{group.lesson.position}</span>
+          <div className="vocab-print-body">
+            <strong>{group.lesson.title}</strong>
+            <small className="data-note">
+              {group.rows.length} مفردة · {group.rows.filter((word) => word.is_published).length} منشورة
+            </small>
+          </div>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => setPrintLessonId(group.lesson.id)}
+          >
+            <i className="ri-printer-line" aria-hidden="true"></i> طباعة الكشف
+          </button>
+        </div>)}
+      </div>
+    </section>}
+
     <p className="data-note">
       تُحفظ المفردات في قاعدة البيانات مباشرة، وتتبع صلاحية إدارة المقرر. تغييراتك تُسجَّل باسم حسابك.
     </p>
+
+    {printLesson && <VocabularyReviewSheet
+      lesson={printLesson}
+      course={course}
+      words={words.filter((word) => word.lesson_id === printLesson.id)}
+      onClose={() => setPrintLessonId("")}
+    />}
   </div>;
 }

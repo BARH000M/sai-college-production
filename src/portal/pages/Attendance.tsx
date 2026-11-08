@@ -3,10 +3,11 @@ import { loadManagementBranches, loadManagementOptions, type Option } from "../l
 import {
   attendancePageSize, attendanceStatuses, attendanceToday, canCorrectAttendance, canManageAttendance,
   createAttendanceSession, isAttendanceStatus, loadAttendanceClasses, loadAttendanceHistory, loadAttendanceRoster,
-  loadAttendanceSessions, saveAttendance, setAttendanceSessionStatus,
+  loadAttendanceSessions, saveAttendance, saveAttendanceBatch, setAttendanceSessionStatus,
   type AttendanceClass, type AttendanceFilters, type AttendanceRecord, type AttendanceSession,
   type AttendanceStatus, type RosterEntry,
 } from "../lib/attendance";
+import { AttendanceRegisterSheet, type RegisterEntry } from "./attendance/AttendanceRegisterSheet";
 
 const initialFilters: AttendanceFilters = { branch: "", session: "", classId: "", date: "", page: 0 };
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -29,6 +30,7 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -96,6 +98,44 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
   const sessionLabels = { open: "مفتوحة", closed: "مغلقة", cancelled: "ملغاة" };
   const visibleStatuses = manager || corrector ? roster.map((row) => row.attendance_status) : history.map((row) => row.status);
 
+  const editableRows = roster.filter((row) => selected?.status === "open" && (manager || (corrector && !!row.record_id)));
+  const pendingDrafts = editableRows.filter((row) => !!drafts[row.student_id]?.status);
+  const registerEntries: RegisterEntry[] = roster.map((row) => {
+    const draft = drafts[row.student_id];
+    return {
+      key: row.student_id,
+      name: row.full_name,
+      status: (draft?.status || row.attendance_status || null) as AttendanceStatus | null,
+      note: draft?.note ?? row.note,
+      saved: !!row.record_id,
+    };
+  });
+
+  /** Fills the whole register with one status so the teacher only edits exceptions. */
+  function markAll(status: AttendanceStatus) {
+    setDrafts((current) => Object.fromEntries(editableRows.map((row) => [row.student_id,
+      { status, note: current[row.student_id]?.note ?? row.note ?? "" }])));
+  }
+
+  function clearDrafts() {
+    setDrafts((current) => Object.fromEntries(roster.map((row) => [row.student_id,
+      { status: row.attendance_status ?? "", note: row.note ?? "" }])));
+  }
+
+  function saveAllDrafts() {
+    if (!selected || !pendingDrafts.length) return;
+    const items = pendingDrafts.map((row) => ({
+      row,
+      status: drafts[row.student_id].status as AttendanceStatus,
+      note: drafts[row.student_id].note,
+    }));
+    void mutate(
+      async () => { await saveAttendanceBatch(selected.id, items); },
+      `حُفظ ${items.length} سجل حضور للصف.`,
+      true,
+    );
+  }
+
   if (!allowed) return <main className="workspace"><section className="panel" role="alert"><h1>الوصول غير متاح</h1><p>لا يتيح دورك الوصول إلى سجلات الحضور.</p></section></main>;
   return <main className="workspace">
     <div className="page-heading"><div><p className="eyebrow">إدارة الأكاديمية</p><h1>الحضور والغياب</h1></div></div>
@@ -113,14 +153,34 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
     {detailError && <p className="error-box" role="alert">تعذر تنفيذ الطلب: {detailError} <button className="text-button" onClick={() => setRetry((value) => value + 1)}>إعادة المحاولة</button></p>}
     {!loading && !error && <section className="panel management-detail"><h2>جلسات الحضور</h2>
       {!rows.length ? <p className="muted">لا توجد جلسات متاحة تطابق التصفية.</p> : <div className="table-scroll"><table className="management-table"><thead><tr><th>التاريخ</th><th>الفرع</th><th>الصف</th><th>الحالة</th><th>التفاصيل</th></tr></thead><tbody>
-        {rows.map((row) => <tr key={row.id}><td>{row.attendance_date}</td><td>{branchName(row.branch_id)}</td><td>{className(row.class_id)}</td><td>{sessionLabels[row.status]}</td><td><button className="button secondary" disabled={saving} onClick={() => { setSelected(row); setDrafts({}); setMessage(null); }}>عرض</button></td></tr>)}
+        {rows.map((row) => <tr key={row.id}><td>{row.attendance_date}</td><td>{branchName(row.branch_id)}</td><td>{className(row.class_id)}</td><td>{sessionLabels[row.status]}</td><td><button className="button secondary" disabled={saving} onClick={() => { setSelected(row); setDrafts({}); setPrinting(false); setMessage(null); }}>عرض</button></td></tr>)}
       </tbody></table></div>}
       <div className="pagination"><button className="button secondary" disabled={filters.page === 0 || saving} onClick={() => setFilters((value) => ({ ...value, page: value.page - 1 }))}>السابق</button><span>صفحة {filters.page + 1} · {count} جلسة</span><button className="button secondary" disabled={(filters.page + 1) * attendancePageSize >= count || saving} onClick={() => setFilters((value) => ({ ...value, page: value.page + 1 }))}>التالي</button></div>
     </section>}
-    {selected && <section className="panel management-detail"><div className="page-heading"><h2>تفاصيل الحضور · {selected.attendance_date}</h2><button className="button secondary" disabled={saving} onClick={() => setSelected(null)}>إغلاق التفاصيل</button></div>
+    {selected && <section className="panel management-detail"><div className="page-heading"><h2>تفاصيل الحضور · {selected.attendance_date}</h2><div className="actions"><button className="button secondary" disabled={saving} onClick={() => setPrinting(true)}><i className="ri-printer-line" aria-hidden="true"></i> طباعة الكشف</button><button className="button secondary" disabled={saving} onClick={() => setSelected(null)}>إغلاق التفاصيل</button></div></div>
       {detailLoading ? <p role="status">جارٍ تحميل السجل...</p> : !detailError && <>
         <p>ملخص السجلات المعروضة: {Object.entries(attendanceStatuses).map(([key, label]) => `${label}: ${visibleStatuses.filter((status) => status === key).length}`).join(" · ")}</p>
         {manager && selected.status === "open" && <div className="actions"><button className="button primary" disabled={saving} onClick={() => void mutate(() => setAttendanceSessionStatus(selected.id, "closed"), "تم إغلاق الجلسة.")}>إغلاق الجلسة</button><button className="button secondary" disabled={saving} onClick={() => void mutate(() => setAttendanceSessionStatus(selected.id, "cancelled"), "تم إلغاء الجلسة دون حذفها.")}>إلغاء الجلسة</button></div>}
+        {(manager || corrector) && selected.status === "open" && !!editableRows.length && <div className="attendance-bulk">
+          <div className="attendance-bulk-head">
+            <strong><i className="ri-group-line" aria-hidden="true"></i> تسجيل سريع للصف</strong>
+            <small className="data-note">حدّد الكل ثم غيّر حالات الغياب والتأخر فقط، واحفظ الجميع بضغطة واحدة.</small>
+          </div>
+          <div className="actions">
+            <button className="button secondary" type="button" disabled={saving} onClick={() => markAll("present")}>
+              <i className="ri-checkbox-circle-line" aria-hidden="true"></i> الكل حاضر
+            </button>
+            <button className="button secondary" type="button" disabled={saving} onClick={() => markAll("absent")}>
+              <i className="ri-close-circle-line" aria-hidden="true"></i> الكل غائب
+            </button>
+            <button className="button secondary" type="button" disabled={saving} onClick={clearDrafts}>
+              <i className="ri-arrow-go-back-line" aria-hidden="true"></i> استرجاع المحفوظ
+            </button>
+            <button className="button primary" type="button" disabled={saving || !pendingDrafts.length} onClick={saveAllDrafts}>
+              <i className="ri-save-3-line" aria-hidden="true"></i> {saving ? "جارٍ الحفظ..." : `حفظ الكل (${pendingDrafts.length})`}
+            </button>
+          </div>
+        </div>}
         {(manager || corrector) ? (!roster.length ? <p className="muted">لا توجد سجلات أو طلاب متاحون.</p> : <div className="table-scroll"><table className="management-table"><thead><tr><th>الطالب</th><th>الحضور</th><th>ملاحظة</th><th>الحفظ</th></tr></thead><tbody>
           {roster.map((row) => {
             const draft = drafts[row.student_id] ?? { status: "", note: "" };
@@ -130,5 +190,12 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
         </tbody></table></div>) : (!history.length ? <p className="muted">لا يوجد سجل حضور متاح.</p> : <div className="table-scroll"><table className="management-table"><thead><tr><th>معرّف الطالب</th><th>الحالة</th><th>ملاحظة</th></tr></thead><tbody>{history.map((record) => <tr key={record.id}><td>{record.student_id}</td><td>{attendanceStatuses[record.status]}</td><td>{record.note ?? "—"}</td></tr>)}</tbody></table></div>)}
       </>}
     </section>}
+    {printing && selected && <AttendanceRegisterSheet
+      session={selected}
+      className={className(selected.class_id)}
+      branchName={branchName(selected.branch_id)}
+      entries={registerEntries}
+      onClose={() => setPrinting(false)}
+    />}
   </main>;
 }

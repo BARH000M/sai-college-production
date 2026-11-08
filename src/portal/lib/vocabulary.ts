@@ -318,3 +318,140 @@ export function vocabularySummary(
   const percent = total ? Math.round((known / total) * 100) : 0;
   return { total, known, learning, linked, percent };
 }
+
+/* ------------------------------------------------------------------ *
+ * Bulk paste import
+ * ------------------------------------------------------------------ */
+
+export type VocabularyImportRow = {
+  line: number;
+  raw: string;
+  error: string | null;
+  word: VocabularyWordInput | null;
+};
+
+export const vocabularyImportColumns = [
+  "المفردة (汉字)",
+  "البينيين",
+  "المعنى بالعربية",
+  "المعنى بالإنجليزية",
+  "نوع الكلمة",
+  "مستوى HSK",
+  "الجملة التوضيحية",
+  "ترجمة الجملة",
+] as const;
+
+const importLimit = 200;
+
+function splitImportLine(line: string): string[] {
+  if (line.includes("\t")) return line.split("\t");
+  if (line.includes("|")) return line.split("|");
+  if (line.includes(";")) return line.split(";");
+  if (line.includes(",")) return line.split(",");
+  return [line];
+}
+
+function cleanHsk(value: string): number | null {
+  const digits = value.replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const level = Number(digits);
+  return Number.isInteger(level) ? level : null;
+}
+
+/**
+ * Reads a pasted word list (one word per line) and validates every line the
+ * same way the single-word form does, so a teacher can paste from Excel or a
+ * book and see exactly which lines need fixing before anything is written.
+ */
+export function parseVocabularyText(
+  text: string,
+  base: { courseId: string; lessonId: string | null; isPublished: boolean },
+): VocabularyImportRow[] {
+  const lines = text.split(/\r?\n/);
+  const rows: VocabularyImportRow[] = [];
+
+  lines.forEach((line, index) => {
+    const raw = line.trim();
+    if (!raw || raw.startsWith("#")) return;
+    const cells = splitImportLine(raw).map((cell) => cell.trim());
+    if (cells.length < 3) {
+      rows.push({
+        line: index + 1,
+        raw,
+        error: "أدخل ثلاثة أعمدة على الأقل: المفردة | البينيين | المعنى، وافصل بينها بـ Tab أو |",
+        word: null,
+      });
+      return;
+    }
+
+    const input: VocabularyWordInput = {
+      courseId: base.courseId,
+      lessonId: base.lessonId,
+      hanzi: cells[0] ?? "",
+      pinyin: cells[1] ?? "",
+      meaningAr: cells[2] ?? "",
+      meaningEn: cells[3] ?? "",
+      partOfSpeech: cells[4] ?? "",
+      hskLevel: cleanHsk(cells[5] ?? ""),
+      exampleZh: cells[6] ?? "",
+      exampleAr: cells[7] ?? "",
+      isPublished: base.isPublished,
+    };
+
+    try {
+      cleanWord(input);
+      rows.push({ line: index + 1, raw, error: null, word: input });
+    } catch (failure) {
+      rows.push({
+        line: index + 1,
+        raw,
+        error: failure instanceof Error ? failure.message : String(failure),
+        word: null,
+      });
+    }
+  });
+
+  return rows;
+}
+
+/**
+ * Inserts a whole pasted batch in one request and continues the course
+ * position sequence, so the bank keeps a single stable order afterwards.
+ */
+export async function bulkCreateVocabularyWords(
+  inputs: readonly VocabularyWordInput[],
+): Promise<VocabularyWord[]> {
+  if (!inputs.length) return [];
+  if (inputs.length > importLimit) {
+    throw new Error(`الحد الأقصى للاستيراد الواحد ${importLimit} مفردة. قسّم القائمة على دفعتين.`);
+  }
+
+  const courseId = inputs[0].courseId;
+  if (!courseId) throw new Error("اختر المقرر الذي ستُضاف إليه المفردات.");
+  if (inputs.some((input) => input.courseId !== courseId)) {
+    throw new Error("يجب أن تنتمي كل مفردات الدفعة إلى المقرر نفسه.");
+  }
+
+  const payloads = inputs.map(wordPayload);
+  const last = await supabase
+    .from("learning_vocabulary")
+    .select("position")
+    .eq("course_id", courseId)
+    .order("position", { ascending: false })
+    .limit(1);
+  if (last.error) throw new Error(last.error.message);
+
+  const start = Number(last.data?.[0]?.position ?? 0);
+  const rows = payloads.map((payload, index) => ({ ...payload, position: start + index + 1 }));
+
+  const result = await supabase
+    .from("learning_vocabulary")
+    .insert(rows)
+    .select(wordColumns);
+
+  if (result.error) throw new Error(result.error.message);
+  if (!result.data?.length) throw new Error("لم تُحفظ المفردات؛ تحقق من صلاحيتك على هذا المقرر.");
+  return [...(result.data as VocabularyWord[])].sort((a, b) => a.position - b.position);
+}
+
+export const vocabularyImportLimit = importLimit;

@@ -51,7 +51,7 @@ class HomePage extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [SaiColors.navy, Color(0xFF263A79)],
+              colors: [SaiColors.maroon, SaiColors.maroonDeep],
               begin: AlignmentDirectional.topStart,
               end: AlignmentDirectional.bottomEnd,
             ),
@@ -62,13 +62,13 @@ class HomePage extends StatelessWidget {
             children: [
               Text('مرحبًا، $firstName', style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w700)),
               const SizedBox(height: 5),
-              Text(role.label, style: const TextStyle(color: Color(0xFFD9E0FA), fontSize: 13)),
+              Text(role.label, style: const TextStyle(color: Color(0xFFF0D2A8), fontSize: 13)),
               const SizedBox(height: 20),
               const Text('بوابتك إلى خدمات كلية ساي', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               const Text(
                 'اختر خدمة متاحة لحسابك. تُحمّل البيانات من النظام بصلاحيات حسابك.',
-                style: TextStyle(color: Color(0xFFE3E8F7), height: 1.7, fontSize: 12),
+                style: TextStyle(color: Color(0xFFF7E4C8), height: 1.7, fontSize: 12),
               ),
             ],
           ),
@@ -129,7 +129,7 @@ class _ShortcutCard extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
-                decoration: BoxDecoration(color: const Color(0xFFFFE9EC), borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(color: SaiColors.maroonTint, borderRadius: BorderRadius.circular(14)),
                 child: Icon(module.icon, color: SaiColors.red),
               ),
               const SizedBox(width: 13),

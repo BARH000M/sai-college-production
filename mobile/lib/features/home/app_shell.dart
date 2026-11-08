@@ -2,14 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_identity.dart';
+import '../../core/app_nav.dart';
 import '../../core/app_role.dart';
 import '../../core/auth_repository.dart';
 import '../../core/feature_catalog.dart';
 import '../../core/sai_theme.dart';
-import '../account/account_page.dart';
-import '../modules/modules_page.dart';
+import '../../widgets/sai_app_bar.dart';
+import '../../widgets/sai_drawer.dart';
+import '../academics/classes_seats_page.dart';
 import '../modules/module_page.dart';
+import '../modules/modules_page.dart';
 import '../modules/status_page.dart';
+import '../notifications/notifications_page.dart';
+import '../roles/roles_permissions_page.dart';
+import '../students/my_children_page.dart';
+import '../students/my_profile_page.dart';
+import '../students/parent_link_page.dart';
+import '../students/student_import_page.dart';
 import 'home_page.dart';
 
 class AppShell extends StatefulWidget {
@@ -22,8 +31,19 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   late AppRole _activeRole = widget.identity.roles.first;
-  int _selectedIndex = 0;
+  int _index = 0;
+
+  List<NavSlot> get _slots => navSlotsFor(_activeRole);
+
+  bool get _canManageStudents =>
+      const {AppRole.superAdmin, AppRole.admin, AppRole.receptionist}.contains(_activeRole);
+
+  void _selectSlot(String id) {
+    final index = _slots.indexWhere((slot) => slot.id == id);
+    if (index >= 0 && index != _index) setState(() => _index = index);
+  }
 
   void _openFeature(FeatureModule module) {
     Navigator.of(context).push(
@@ -33,11 +53,23 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _push(Widget page) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+  }
+
+  void _openNotifications() {
+    _push(NotificationsPage(identity: widget.identity, role: _activeRole));
+  }
+
+  void _openImport() => _push(const StudentImportPage());
+
+  void _openParentLink() => _push(ParentLinkPage(identity: widget.identity));
+
   void _switchRole(AppRole role) {
     if (!widget.identity.roles.contains(role)) return;
     setState(() {
       _activeRole = role;
-      _selectedIndex = 0;
+      _index = 0;
     });
   }
 
@@ -45,89 +77,105 @@ class _AppShellState extends State<AppShell> {
     await AuthRepository(Supabase.instance.client).signOut();
   }
 
+  FeatureModule? _moduleOrNull(String id) {
+    for (final module in modulesForRole(_activeRole)) {
+      if (module.id == id) return module;
+    }
+    return null;
+  }
+
+  Widget _moduleSlot(NavSlot slot) {
+    final module = _moduleOrNull(slot.id);
+    if (module == null) {
+      return StatusPage(
+        icon: slot.icon,
+        title: slot.label,
+        message: 'لا يتضمن دورك الحالي صلاحية الوصول إلى هذه الوحدة. تواصل مع إدارة الكلية.',
+      );
+    }
+    return ModulePage(
+      module: module,
+      identity: widget.identity,
+      role: _activeRole,
+      embedded: true,
+    );
+  }
+
+  Widget _pageForSlot(NavSlot slot) {
+    switch (slot.id) {
+      case 'home':
+        return HomePage(
+          identity: widget.identity,
+          role: _activeRole,
+          onOpenModules: () => _selectSlot('more'),
+          onOpenFeature: _openFeature,
+        );
+      case 'classes':
+        return ClassesSeatsPage(
+          identity: widget.identity,
+          role: _activeRole,
+          onOpenImport: _openImport,
+          onOpenParentLink: _openParentLink,
+        );
+      case 'users':
+        return const RolesPermissionsPage();
+      case 'children':
+        return MyChildrenPage(identity: widget.identity);
+      case 'myprofile':
+        return MyProfilePage(identity: widget.identity);
+      case 'more':
+        return ModulesPage(role: _activeRole, onOpenFeature: _openFeature);
+      default:
+        return _moduleSlot(slot);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheduleMatches = featureModules.where((m) => m.id == 'timetable' && m.roles.contains(_activeRole)).toList();
-    final FeatureModule? schedule = scheduleMatches.isEmpty ? null : scheduleMatches.first;
-    final pages = <Widget>[
-      HomePage(
-        identity: widget.identity,
-        role: _activeRole,
-        onOpenModules: () => setState(() => _selectedIndex = 1),
-        onOpenFeature: _openFeature,
-      ),
-      ModulesPage(role: _activeRole, onOpenFeature: _openFeature),
-      schedule == null
-          ? const StatusPage(
-              icon: Icons.calendar_month_outlined,
-              title: 'الجدول والتقويم',
-              message: 'لا يتضمن دورك صلاحية عرض هذه الوحدة.',
-            )
-          : ModulePage(module: schedule, identity: widget.identity, role: _activeRole),
-      const StatusPage(
-        icon: Icons.notifications_none_rounded,
-        title: 'التنبيهات',
-        message: 'ستظهر التنبيهات هنا بعد ربط خدمة الإشعارات المعتمدة في النظام.',
-      ),
-      AccountPage(
-        identity: widget.identity,
-        activeRole: _activeRole,
-        onSignOut: _signOut,
-      ),
-    ];
+    final slots = _slots;
+    final safeIndex = _index < slots.length ? _index : 0;
 
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(11),
-              child: Image.asset('assets/images/sai-logo.png', width: 40, height: 40, fit: BoxFit.cover),
-            ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text('كلية ساي', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-            ),
-          ],
-        ),
-        actions: [
-          if (widget.identity.roles.length > 1)
-            PopupMenuButton<AppRole>(
-              tooltip: 'تغيير الدور النشط',
-              initialValue: _activeRole,
-              onSelected: _switchRole,
-              itemBuilder: (context) => widget.identity.roles
-                  .map((role) => PopupMenuItem(value: role, child: Text(role.label)))
-                  .toList(),
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(start: 6, end: 12),
-                child: Row(
-                  children: [
-                    Text(_activeRole.label, style: const TextStyle(fontSize: 12, color: SaiColors.red)),
-                    const Icon(Icons.expand_more, color: SaiColors.red),
-                  ],
-                ),
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsetsDirectional.only(start: 6, end: 16),
-              child: Center(child: Text(_activeRole.label, style: const TextStyle(fontSize: 12, color: SaiColors.red))),
-            ),
-        ],
+      key: _scaffoldKey,
+      backgroundColor: SaiColors.cream,
+      drawer: SaiDrawer(
+        identity: widget.identity,
+        activeRole: _activeRole,
+        slots: slots,
+        selectedIndex: safeIndex,
+        onSelect: (index) => setState(() => _index = index),
+        onSignOut: _signOut,
+        onRoleSelected: widget.identity.roles.length > 1 ? _switchRole : null,
+        onClasses: slots.any((slot) => slot.id == 'classes') ? () => _selectSlot('classes') : null,
+        onRoles: slots.any((slot) => slot.id == 'users') ? () => _selectSlot('users') : null,
+        onImportStudents: _canManageStudents ? _openImport : null,
+        onParentLink: _canManageStudents ? _openParentLink : null,
       ),
-      body: IndexedStack(index: _selectedIndex, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'الرئيسية'),
-          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'الخدمات'),
-          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'الجدول'),
-          NavigationDestination(icon: Icon(Icons.notifications_none), selectedIcon: Icon(Icons.notifications), label: 'التنبيهات'),
-          NavigationDestination(icon: Icon(Icons.account_circle_outlined), selectedIcon: Icon(Icons.account_circle), label: 'حسابي'),
-        ],
+      appBar: saiAppBar(
+        context,
+        onMenu: () => _scaffoldKey.currentState?.openDrawer(),
+        onNotifications: _openNotifications,
+      ),
+      body: IndexedStack(
+        index: safeIndex,
+        children: slots.map(_pageForSlot).toList(growable: false),
+      ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: SaiColors.border)),
+        ),
+        child: NavigationBar(
+          selectedIndex: safeIndex,
+          onDestinationSelected: (index) => setState(() => _index = index),
+          destinations: slots
+              .map((slot) => NavigationDestination(
+                    icon: Icon(slot.icon),
+                    selectedIcon: Icon(slot.activeIcon),
+                    label: slot.label,
+                  ))
+              .toList(),
+        ),
       ),
     );
   }

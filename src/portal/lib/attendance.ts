@@ -106,3 +106,31 @@ export async function saveAttendance(sessionId: string, row: RosterEntry, status
     if (result.error) throw new Error(result.error.message);
   }
 }
+
+export type AttendanceBatchItem = { row: RosterEntry; status: AttendanceStatus; note: string };
+
+/**
+ * Saves a whole class register in one go — used after "mark everyone present"
+ * and by the teacher's final save. Records are written one by one so a single
+ * rejected row cannot roll back the rest of the class; the failures are
+ * summarised back to the caller.
+ */
+export async function saveAttendanceBatch(sessionId: string, items: readonly AttendanceBatchItem[]): Promise<number> {
+  if (!items.length) throw new Error("لا توجد سجلات جاهزة للحفظ.");
+  let saved = 0;
+  const failures: string[] = [];
+  for (const item of items) {
+    if (!isAttendanceStatus(item.status)) continue;
+    try {
+      await saveAttendance(sessionId, item.row, item.status, item.note);
+      saved += 1;
+    } catch (failure) {
+      const name = item.row.full_name || item.row.student_id;
+      failures.push(`${name}: ${failure instanceof Error ? failure.message : String(failure)}`);
+    }
+  }
+  if (failures.length) {
+    throw new Error(`حُفظ ${saved} سجلاً، وتعذّر حفظ ${failures.length}. أول خطأ — ${failures[0]}`);
+  }
+  return saved;
+}
