@@ -1,0 +1,34 @@
+# Dependencies and build outputs
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+google-services.json
+GoogleService-Info.plist
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# Flutter generated files
+.dart_tool/
+.flutter-plugins*
+.pub-cache/
+.pub/
+**/android/local.properties
+**/android/key.properties
+
+# Logs
+*.log

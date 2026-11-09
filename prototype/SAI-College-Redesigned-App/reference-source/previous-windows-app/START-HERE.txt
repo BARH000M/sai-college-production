@@ -1,0 +1,25 @@
+SAI COLLEGE APP — WINDOWS
+
+DO NOT OPEN index.html. It is a source file and will show a blank page when opened directly.
+
+1. Right-click the downloaded ZIP and choose "Extract All".
+   Do not run the app from inside the ZIP or Windows Temp folder.
+
+2. Open the extracted "app" folder.
+
+3. Double-click "OPEN-APP-WINDOWS.cmd".
+
+4. If Node.js is not installed, the launcher will open https://nodejs.org/.
+   Install the LTS version, then double-click the launcher again.
+
+5. On first launch, allow the installation to finish. Your browser will then open:
+   http://localhost:3000
+
+6. Keep the black command window open while using the app.
+   Close that window to stop the app.
+
+Manual alternative (from the extracted app folder):
+  npm install
+  npm start
+
+Then visit http://localhost:3000

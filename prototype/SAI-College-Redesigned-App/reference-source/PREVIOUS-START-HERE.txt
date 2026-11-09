@@ -1,0 +1,28 @@
+VERSION 1086 VISUAL UPDATE
+Open OPEN-VISUAL-MOCKUP.cmd or VISUAL-MOCKUP.html to view the updated design.
+Open OPEN-PREVIEW.cmd for interactive sample screens.
+Administrator preview: admin@ysms.school / YSMS2026!
+Parent preview: parent@ysms.school / YSMS2026!
+Student preview: student@ysms.school / YSMS2026!
+
+SAI COLLEGE — REDESIGNED APPLICATION PACKAGE
+
+ابدأ هنا:
+1. فك ضغط الملف كاملاً في مجلد عادي على جهازك.
+2. افتح OPEN-PREVIEW.cmd على Windows، أو browser-preview/index.html مباشرة.
+3. اضغط «عرض حسابات المعاينة» واختر دوراً، ثم «دخول آمن».
+4. افتح PHONE-PREVIEW.html لمعاينة التصميم بحجم الهاتف.
+
+The browser preview runs immediately with bundled fonts and sample data.
+It does NOT connect to a production database or save real records.
+Demo password: YSMS2026! (local preview only).
+
+Folders:
+ browser-preview/   Updated offline interactive HTML application.
+ windows-app/       Updated React/TypeScript app plus newly compiled dist/.
+ flutter-app/mobile/ Updated Android/iOS Flutter source; not compiled here.
+ tests/             Reproducible browser-preview and server regression checks.
+
+Read README.md and BUG-FIX-REPORT.md for exact scope and verification.
+No newly compiled APK or IPA is included. Old uploaded APKs do not contain
+these changes and were deliberately not relabeled as updated apps.
