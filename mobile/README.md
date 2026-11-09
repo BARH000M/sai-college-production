@@ -16,24 +16,26 @@
 
 ## تشغيل التطوير على Windows
 
-يستخدم التطبيق مشروع Supabase الرئيسي بناءً على اختيارك، ومفتاح `anon` العام فقط. لا تضع `service_role` أو كلمة مرور قاعدة البيانات في التطبيق.
+يستخدم التطبيق مشروع Supabase الرئيسي بناءً على اختيارك، والمفتاح العام (publishable key) فقط. لا تضع `service_role` أو كلمة مرور قاعدة البيانات في التطبيق.
 
 ```powershell
 Set-Location 'D:\SAI-College-Production\mobile'
 flutter pub get
 flutter run `
   --dart-define=SUPABASE_URL=https://aeryusbrulqdxjdynwfh.supabase.co `
-  --dart-define=SUPABASE_ANON_KEY=PASTE_PUBLIC_ANON_KEY_HERE
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=PASTE_PUBLIC_KEY_HERE
 ```
 
-استبدل `PASTE_PUBLIC_ANON_KEY_HERE` بمفتاح anon من إعدادات مشروع **sai-college-production / main**. المفتاح قيمة عامة للتطبيق؛ لا ترسل المفاتيح أو كلمات المرور في المحادثة.
+استبدل `PASTE_PUBLIC_KEY_HERE` بالمفتاح العام من إعدادات مشروع **sai-college-production / main**. المفتاح قيمة عامة للتطبيق؛ لا ترسل المفاتيح أو كلمات المرور في المحادثة.
+
+اسم المتغير القديم `SUPABASE_ANON_KEY` ما زال مقروءًا كمفتاح احتياطي، لذلك سكربتات البناء الحالية تعمل دون تعديل.
 
 لإنشاء APK تجريبي:
 
 ```powershell
 flutter build apk --debug `
   --dart-define=SUPABASE_URL=https://aeryusbrulqdxjdynwfh.supabase.co `
-  --dart-define=SUPABASE_ANON_KEY=PASTE_PUBLIC_ANON_KEY_HERE
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=PASTE_PUBLIC_KEY_HERE
 ```
 
 ## إعدادات الدخول

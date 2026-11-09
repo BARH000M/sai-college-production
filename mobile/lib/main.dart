@@ -13,21 +13,19 @@ import 'models/roles.dart' as alternate;
 import 'screens/login.dart';
 import 'screens/shell.dart' as alternate;
 
-const _publishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 const _useAlternateShell = bool.fromEnvironment('SAI_USE_ALTERNATE_SHELL');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final key =
-      _publishableKey.isNotEmpty ? _publishableKey : AppConfig.supabaseAnonKey;
-  if (AppConfig.supabaseUrl.trim().isEmpty || key.trim().isEmpty) {
+  final key = AppConfig.supabaseKey;
+  if (AppConfig.supabaseUrl.trim().isEmpty || key.isEmpty) {
     runApp(const SaiCollegeApp(configurationReady: false));
     return;
   }
 
   try {
-    await Supabase.initialize(url: AppConfig.supabaseUrl, anonKey: key);
+    await Supabase.initialize(url: AppConfig.supabaseUrl, publishableKey: key);
     runApp(const SaiCollegeApp(configurationReady: true));
   } catch (error) {
     runApp(SaiCollegeApp(configurationReady: false, startupError: error));
@@ -211,13 +209,13 @@ class ConfigurationRequiredPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   const SelectableText(
-                    'flutter run --dart-define=SUPABASE_ANON_KEY=PUBLIC_ANON_KEY',
+                    'flutter run --dart-define=SUPABASE_PUBLISHABLE_KEY=PUBLIC_KEY',
                     style: TextStyle(
                         fontFamily: 'monospace', fontSize: 12, height: 1.7),
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'يمكن أيضاً استخدام SUPABASE_PUBLISHABLE_KEY. لتشغيل الواجهة البديلة استخدم --dart-define=SAI_USE_ALTERNATE_SHELL=true.',
+                    'اسم SUPABASE_ANON_KEY القديم ما زال مقبولاً كمفتاح احتياطي. لتشغيل الواجهة البديلة استخدم --dart-define=SAI_USE_ALTERNATE_SHELL=true.',
                     style: TextStyle(
                         fontSize: 11, height: 1.7, color: SaiColors.muted),
                   ),

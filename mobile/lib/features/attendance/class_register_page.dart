@@ -518,7 +518,7 @@ class _SummaryBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: SaiColors.goldTint,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: SaiColors.gold.withOpacity(0.28)),
+        border: Border.all(color: SaiColors.gold.withValues(alpha: 0.28)),
       ),
       child: Row(
         children: [
@@ -570,7 +570,7 @@ class _BulkButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: danger ? SaiColors.dangerTint : SaiColors.maroonTint,
             borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: color.withOpacity(0.22)),
+            border: Border.all(color: color.withValues(alpha: 0.22)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,

@@ -281,7 +281,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     children: [
                                       CircleAvatar(
                                         radius: 19,
-                                        backgroundColor: item.tint.withOpacity(0.12),
+                                        backgroundColor: item.tint.withValues(alpha: 0.12),
                                         foregroundColor: item.tint,
                                         child: Icon(item.icon, size: 19),
                                       ),

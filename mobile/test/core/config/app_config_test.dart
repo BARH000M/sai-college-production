@@ -21,11 +21,20 @@ void main() {
       );
     });
 
-    test('isConfigured requires both a url and an anon key', () {
+    test('isConfigured requires both a url and a public key', () {
       expect(
         AppConfig.isConfigured,
         AppConfig.supabaseUrl.trim().isNotEmpty &&
-            AppConfig.supabaseAnonKey.trim().isNotEmpty,
+            AppConfig.supabaseKey.isNotEmpty,
+      );
+    });
+
+    test('the publishable key takes precedence over the legacy anon key', () {
+      expect(
+        AppConfig.supabaseKey,
+        AppConfig.supabasePublishableKey.trim().isNotEmpty
+            ? AppConfig.supabasePublishableKey.trim()
+            : AppConfig.legacySupabaseAnonKey.trim(),
       );
     });
 

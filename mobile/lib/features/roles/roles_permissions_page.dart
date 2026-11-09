@@ -280,7 +280,9 @@ class _FilterChip extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: selected ? Colors.white.withOpacity(0.22) : SaiColors.creamDeep,
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.22)
+                      : SaiColors.creamDeep,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: Text('$count', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: selected ? Colors.white : SaiColors.muted)),
@@ -354,7 +356,8 @@ class _UserTile extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: SaiColors.warningTint,
                         borderRadius: BorderRadius.circular(7),
-                        border: Border.all(color: SaiColors.warning.withOpacity(0.28)),
+                        border: Border.all(
+                            color: SaiColors.warning.withValues(alpha: 0.28)),
                       ),
                       child: const Row(
                         children: [

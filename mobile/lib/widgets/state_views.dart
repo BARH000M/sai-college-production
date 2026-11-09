@@ -103,7 +103,11 @@ class NoteBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11), border: Border.all(color: color.withOpacity(0.22))),
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

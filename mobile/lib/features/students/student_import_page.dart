@@ -325,7 +325,7 @@ class _StudentImportPageState extends State<StudentImportPage> {
                 icon: _busy
                     ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.save_alt, size: 17),
-                label: Text(_busy ? 'جارٍ الاستيراد...' : 'تأكيد الاستيراد (${_readyCount})'),
+                label: Text(_busy ? 'جارٍ الاستيراد...' : 'تأكيد الاستيراد ($_readyCount)'),
               ),
             ],
           );
@@ -403,13 +403,23 @@ class _CountTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
-      decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11), border: Border.all(color: color.withOpacity(0.2))),
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
       child: Column(
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(height: 5),
           Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: color.withOpacity(0.85))),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  color: color.withValues(alpha: 0.85))),
         ],
       ),
     );

@@ -41,7 +41,9 @@ class SaiStatStrip extends StatelessWidget {
         color: isGold ? SaiColors.goldTint : SaiColors.creamDeep,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isGold ? SaiColors.gold.withOpacity(0.28) : SaiColors.border,
+          color: isGold
+              ? SaiColors.gold.withValues(alpha: 0.28)
+              : SaiColors.border,
         ),
       ),
       child: Row(
@@ -51,7 +53,7 @@ class SaiStatStrip extends StatelessWidget {
               Container(
                 width: 1,
                 height: 22,
-                color: SaiColors.gold.withOpacity(0.25),
+                color: SaiColors.gold.withValues(alpha: 0.25),
               ),
             Expanded(
               child: Column(

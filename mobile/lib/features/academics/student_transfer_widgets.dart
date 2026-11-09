@@ -142,7 +142,9 @@ class TransferCapacityPanel extends StatelessWidget {
         color: overCapacity ? SaiColors.dangerTint : SaiColors.goldTint,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: overCapacity ? SaiColors.danger.withOpacity(0.3) : SaiColors.gold.withOpacity(0.28),
+          color: overCapacity
+              ? SaiColors.danger.withValues(alpha: 0.3)
+              : SaiColors.gold.withValues(alpha: 0.28),
         ),
       ),
       child: Column(

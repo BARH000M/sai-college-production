@@ -211,9 +211,9 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
           builder: (context, setSheetState) {
             final filtered = options.where((item) => query.isEmpty || matches(item, query)).toList();
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
               child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.62,
+                height: MediaQuery.sizeOf(context).height * 0.62,
                 child: Column(
                   children: [
                     const SizedBox(height: 10),
@@ -412,7 +412,10 @@ class _FieldCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: filled ? SaiColors.maroon.withOpacity(0.4) : SaiColors.border),
+          border: Border.all(
+              color: filled
+                  ? SaiColors.maroon.withValues(alpha: 0.4)
+                  : SaiColors.border),
         ),
         child: Row(
           children: [
@@ -459,12 +462,15 @@ class _SelectedPreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: SaiColors.goldTint,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: SaiColors.gold.withOpacity(0.3)),
+        border: Border.all(color: SaiColors.gold.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Expanded(child: _PreviewPerson(name: student.name, meta: student.subtitle, icon: Icons.school_outlined)),
-          Container(width: 1, height: 34, color: SaiColors.gold.withOpacity(0.35)),
+          Container(
+              width: 1,
+              height: 34,
+              color: SaiColors.gold.withValues(alpha: 0.35)),
           Expanded(child: _PreviewPerson(name: guardian.name, meta: guardian.subtitle, icon: Icons.person_outline)),
         ],
       ),

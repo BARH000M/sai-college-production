@@ -170,9 +170,9 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                 .toList();
             return Padding(
               padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom),
+                  bottom: MediaQuery.viewInsetsOf(context).bottom),
               child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.62,
+                height: MediaQuery.sizeOf(context).height * 0.62,
                 child: Column(
                   children: [
                     const SizedBox(height: 10),
@@ -362,11 +362,11 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.9,
+        height: MediaQuery.sizeOf(context).height * 0.9,
         child: Column(
           children: [
             _Header(isEdit: _isEdit),

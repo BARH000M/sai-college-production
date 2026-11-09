@@ -29,7 +29,7 @@ class ModulesPage extends StatelessWidget {
               Container(
                 width: 28,
                 height: 28,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), borderRadius: BorderRadius.circular(9)),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(9)),
                 child: const Icon(Icons.grid_view_outlined, size: 16, color: Colors.white),
               ),
               const SizedBox(width: 10),

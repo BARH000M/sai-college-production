@@ -99,7 +99,7 @@ class ModulePage extends StatelessWidget {
           decoration: BoxDecoration(
             color: SaiColors.goldTint,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: SaiColors.gold.withOpacity(0.28)),
+            border: Border.all(color: SaiColors.gold.withValues(alpha: 0.28)),
           ),
           child: const Text(
             'هذه شاشة تأسيسية للوحدة داخل التطبيق. العمليات الكاملة متاحة في بوابة الويب، وتبقى صلاحيات قاعدة البيانات هي المرجع النهائي.',

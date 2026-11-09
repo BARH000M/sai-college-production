@@ -40,7 +40,7 @@ class SaiDrawer extends StatelessWidget {
     final initials = trimmedName.isEmpty ? 'س' : trimmedName.substring(0, 1);
     return Drawer(
       backgroundColor: SaiColors.cream,
-      width: MediaQuery.of(context).size.width * 0.84,
+      width: MediaQuery.sizeOf(context).width * 0.84,
       child: SafeArea(
         child: Column(
           children: [
@@ -84,7 +84,7 @@ class SaiDrawer extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 18,
-                        backgroundColor: Colors.white.withOpacity(0.18),
+                        backgroundColor: Colors.white.withValues(alpha: 0.18),
                         child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                       ),
                       const SizedBox(width: 10),
@@ -117,7 +117,9 @@ class SaiDrawer extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: selected ? Colors.white : Colors.white.withOpacity(0.14),
+                              color: selected
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(

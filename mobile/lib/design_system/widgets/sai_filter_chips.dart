@@ -91,7 +91,7 @@ class _SaiFilterChip extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: selected
-                      ? Colors.white.withOpacity(0.22)
+                      ? Colors.white.withValues(alpha: 0.22)
                       : SaiColors.creamDeep,
                   borderRadius: BorderRadius.circular(7),
                 ),
