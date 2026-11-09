@@ -31,6 +31,16 @@ begin
     end if;
   end loop;
   if not exists (select 1 from pg_roles where rolname = 'sai_finance_owner') then raise exception 'Owner missing'; end if;
+  if exists (
+    select 1 from pg_auth_members
+    where roleid = 'sai_finance_owner'::regrole and member = current_user::regrole
+      and (set_option or inherit_option)
+  ) then
+    raise exception 'Migration executor retains finance owner privileges';
+  end if;
+  if has_schema_privilege('sai_finance_owner', 'public', 'CREATE') then
+    raise exception 'Finance owner retains public schema CREATE privilege';
+  end if;
   if exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'sai_finance' and c.relkind = 'r' and (not c.relrowsecurity or not c.relforcerowsecurity)) then
     raise exception 'Finance table missing forced RLS';

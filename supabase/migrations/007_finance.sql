@@ -15,6 +15,7 @@ end;
 $$;
 
 create role sai_finance_owner nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
+-- PostgreSQL 16+ does not give a new role's creator SET or INHERIT by default.
 do $$
 begin
   execute format('grant sai_finance_owner to %I with set true, inherit true', current_user);
