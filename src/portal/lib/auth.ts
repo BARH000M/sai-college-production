@@ -90,8 +90,46 @@ async function loadRoles(userId: string): Promise<UserRolesResult> {
   }
 }
 
+function appBasePath(): string {
+  const raw = typeof __BASE_PATH__ === "string" ? __BASE_PATH__ : "";
+  const clean = raw.split("/").filter(Boolean).join("/");
+  return clean ? `/${clean}` : "";
+}
+
+/**
+ * Creates the profile row for a fresh account when it is missing.
+ *
+ * Sign-up stores the name and preferred language in the auth metadata, so the
+ * profile can be materialised on the first signed-in session even when the
+ * visitor had to confirm their email before signing in.
+ */
+async function ensureProfileRow(user: Session["user"]): Promise<void> {
+  try {
+    const existing = await supabase
+      .schema("public")
+      .from("profiles")
+      .select("id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (existing.data) return;
+
+    const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+    const metaName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
+    const locale = metadata.preferred_locale === "en" ? "en" : "ar";
+    await supabase.schema("public").from("profiles").insert({
+      id: user.id,
+      full_name: metaName || user.email?.split("@")[0] || "مستخدم جديد",
+      email: user.email ?? null,
+      preferred_locale: locale,
+    });
+  } catch {
+    // A profile that cannot be created here is reported by the normal loader.
+  }
+}
+
 async function loadSignedInState(session: Session): Promise<AuthState> {
   const { user } = session;
+  await ensureProfileRow(user);
   const [profileResult, rolesResult] = await Promise.all([
     loadProfile(user.id),
     loadRoles(user.id),
@@ -157,6 +195,53 @@ export async function signIn(email: string, password: string): Promise<AuthState
     return {
       ...getInitialAuthState("signed-out"),
       authError: `Sign-in failed: ${errorMessage(error)}`,
+    };
+  }
+}
+
+export type SignUpInput = {
+  fullName: string;
+  email: string;
+  password: string;
+  locale: "ar" | "en";
+};
+
+export type SignUpResult = {
+  state: AuthState;
+  confirmationRequired: boolean;
+};
+
+export async function signUpAccount(input: SignUpInput): Promise<SignUpResult> {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email: input.email.trim(),
+      password: input.password,
+      options: {
+        data: {
+          full_name: input.fullName.trim(),
+          preferred_locale: input.locale,
+        },
+        emailRedirectTo: `${window.location.origin}${appBasePath()}/portal`,
+      },
+    });
+
+    if (error) {
+      return {
+        state: { ...getInitialAuthState("signed-out"), authError: error.message },
+        confirmationRequired: false,
+      };
+    }
+
+    if (!data.session) {
+      return { state: getInitialAuthState("signed-out"), confirmationRequired: true };
+    }
+
+    await ensureProfileRow(data.session.user);
+    return { state: await loadSessionState(data.session), confirmationRequired: false };
+  } catch (error) {
+    return {
+      state: { ...getInitialAuthState("signed-out"), authError: `Sign-up failed: ${errorMessage(error)}` },
+      confirmationRequired: false,
     };
   }
 }

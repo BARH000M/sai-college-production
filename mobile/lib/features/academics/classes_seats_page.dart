@@ -10,6 +10,7 @@ import '../attendance/class_register_page.dart';
 import 'class_form_sheet.dart';
 import 'class_models.dart';
 import 'class_roster_sheet.dart';
+import 'student_transfer_page.dart';
 import 'teacher_directory.dart';
 
 /// Screen 1 of the mockup: the class list with seats, occupancy and status.
@@ -121,6 +122,13 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ClassRosterSheetPage(cls: row)));
   }
 
+  Future<void> _openTransfer({SaiClass? source}) async {
+    final moved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => StudentTransferPage(initialSourceId: source?.id)),
+    );
+    if (moved == true && mounted) _retry();
+  }
+
   List<SaiClass> _filter(List<SaiClass> rows) {
     final query = _query.trim().toLowerCase();
     return rows.where((row) {
@@ -138,11 +146,13 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
     final tint = row.isFull ? SaiColors.dangerTint : (row.isNearFull ? SaiColors.warningTint : SaiColors.successTint);
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
       builder: (sheetContext) => Padding(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -221,6 +231,18 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    _openTransfer(source: row);
+                  },
+                  icon: const Icon(Icons.swap_horiz, size: 16),
+                  label: const Text('نقل طلاب من هذا الصف'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () {
                     Navigator.of(sheetContext).pop();
@@ -237,6 +259,7 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
               child: TextButton(onPressed: () => Navigator.of(sheetContext).pop(), child: const Text('إغلاق')),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -341,7 +364,11 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
                     ),
                   )),
             const SizedBox(height: 6),
-            _ToolsRow(onImport: widget.onOpenImport, onParentLink: widget.onOpenParentLink),
+            _ToolsRow(
+              onImport: widget.onOpenImport,
+              onParentLink: widget.onOpenParentLink,
+              onTransfer: _canManageClasses ? () => _openTransfer() : null,
+            ),
           ],
         );
       },
@@ -603,18 +630,34 @@ class _MiniStat extends StatelessWidget {
 }
 
 class _ToolsRow extends StatelessWidget {
-  const _ToolsRow({required this.onImport, required this.onParentLink});
+  const _ToolsRow({required this.onImport, required this.onParentLink, this.onTransfer});
 
   final VoidCallback onImport;
   final VoidCallback onParentLink;
+  final VoidCallback? onTransfer;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(child: _ToolButton(icon: Icons.upload_file_outlined, label: 'استيراد الطلاب', onTap: onImport)),
-        const SizedBox(width: 8),
-        Expanded(child: _ToolButton(icon: Icons.link, label: 'ربط ولي الأمر', onTap: onParentLink)),
+        Row(
+          children: [
+            Expanded(
+              child: _ToolButton(
+                icon: Icons.upload_file_outlined,
+                label: 'استيراد الطلاب',
+                onTap: onImport,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: _ToolButton(icon: Icons.link, label: 'ربط ولي الأمر', onTap: onParentLink)),
+          ],
+        ),
+        if (onTransfer != null) ...[
+          const SizedBox(height: 8),
+          _ToolButton(icon: Icons.swap_horiz, label: 'نقل طلاب بين الصفوف', onTap: onTransfer!),
+        ],
       ],
     );
   }

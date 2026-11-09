@@ -210,6 +210,20 @@
 .portal-root .role-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 10px; font-size: 11px; background: oklch(var(--secondary-100)); color: oklch(var(--secondary-900)); white-space: nowrap; }
 .portal-root .role-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .portal-root .role-actions .button { min-height: 34px; padding: 6px 10px; font-size: 11px; }
+.portal-root .role-count { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 24px; padding: 0 8px; border-radius: 999px; background: oklch(var(--primary-100)); color: oklch(var(--primary-800)); font-size: 12px; font-weight: 700; }
+.portal-root .role-grant-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.portal-root .role-grant-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid oklch(var(--background-200)); border-radius: 12px; background: oklch(var(--background-50)); }
+.portal-root .role-grant-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 260px; }
+.portal-root .role-grant-id { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.portal-root .role-grant-id strong { font-size: 14px; }
+.portal-root .role-grant-id small { color: oklch(var(--foreground-600)); font-size: 12px; }
+.portal-root .role-flag { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 9px; font-size: 11px; background: oklch(var(--accent-100)); color: oklch(var(--accent-900)); white-space: nowrap; }
+.portal-root .role-chip-remove { margin-inline-start: 6px; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 999px; background: oklch(var(--secondary-200)); color: oklch(var(--secondary-900)); font-size: 13px; line-height: 1; cursor: pointer; }
+.portal-root .role-chip-remove:hover:not(:disabled) { background: oklch(var(--primary-500)); color: oklch(var(--background-50)); }
+.portal-root .role-chip-remove:disabled { opacity: .5; cursor: not-allowed; }
+.portal-root .role-grant-action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.portal-root .role-grant-action select { min-height: 38px; }
+.portal-root .attendance-shortcut { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
 
 .portal-root .receipt-actions { margin-top: 12px; }
 .portal-root .print-overlay {
@@ -1696,4 +1710,81 @@
   .portal-root .vocab-sheet-hanzi { font-size: 10pt; }
   .portal-root .vocab-sheet-example { font-size: 6.8pt; }
   .portal-root .vocab-sheet-practice { width: 24mm; height: 12mm; }
+}
+
+/* ---- Role-aware portal home ---- */
+.portal-root .home-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.portal-root .home-split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 16px; margin-top: 16px; }
+.portal-root .home-panel-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.portal-root .home-panel-head h2 { margin: 0; }
+.portal-root .home-subheading { margin: 16px 0 8px; font-size: 12px; color: oklch(var(--foreground-700)); }
+.portal-root .home-section-meta { margin: 2px 0 0; font-size: 11px; }
+.portal-root .home-enquiry-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.portal-root .home-enquiry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 8px; background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200)); }
+.portal-root .home-enquiry-main { min-width: 0; display: grid; gap: 2px; }
+.portal-root .home-enquiry-main strong { font-size: 12.5px; overflow-wrap: anywhere; }
+.portal-root .home-enquiry-main small { font-size: 10.5px; color: oklch(var(--foreground-600)); }
+.portal-root .home-session-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.portal-root .home-session-list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200)); font-size: 12px; }
+.portal-root .home-session-list i { color: oklch(var(--primary-700)); font-size: 15px; }
+.portal-root .home-section-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; margin-top: 16px; }
+.portal-root .home-section-card { display: grid; gap: 10px; align-content: start; }
+.portal-root .home-roster { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.portal-root .home-roster li { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200)); font-size: 12px; }
+.portal-root .home-roster i { color: oklch(var(--primary-700)); font-size: 14px; }
+.portal-root .home-roster span { min-width: 0; overflow-wrap: anywhere; }
+.portal-root .home-roster small { margin-inline-start: auto; color: oklch(var(--foreground-600)); font-size: 10.5px; white-space: nowrap; }
+.portal-root .home-record-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0 0; }
+.portal-root .home-record-grid dt { font-size: 10.5px; color: oklch(var(--foreground-600)); }
+.portal-root .home-record-grid dd { margin: 2px 0 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.portal-root .occupancy { display: grid; gap: 4px; min-width: 130px; }
+.portal-root .occupancy .learn-bar { height: 8px; }
+.portal-root .occupancy-fill.ok { background: oklch(var(--secondary-500)); }
+.portal-root .occupancy-fill.warn { background: oklch(var(--accent-500)); }
+.portal-root .occupancy-fill.full { background: oklch(var(--primary-500)); }
+.portal-root .occupancy small { font-size: 10.5px; color: oklch(var(--foreground-600)); }
+
+/* ---- Waiting for role ---- */
+.portal-root .waiting-card { text-align: center; display: grid; justify-items: center; gap: 8px; }
+.portal-root .waiting-email { margin: 4px 0 0; padding: 6px 12px; border-radius: 999px; background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200)); font-size: 12px; }
+.portal-root .waiting-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 8px; }
+
+/* ---- Admissions workspace ---- */
+.portal-root .admission-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.portal-root .admission-status-card {
+  display: grid; gap: 2px; min-width: 0; text-align: start; padding: 14px;
+  border-radius: 10px; background: oklch(var(--background-50));
+  border: 1px solid oklch(var(--background-200)); color: inherit;
+  transition: border-color .16s ease, background .16s ease;
+}
+.portal-root .admission-status-card span { font-size: 11.5px; color: oklch(var(--foreground-700)); }
+.portal-root .admission-status-card strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.portal-root .admission-status-card small { font-size: 10px; color: oklch(var(--foreground-600)); line-height: 1.6; }
+.portal-root .admission-status-card:hover { border-color: oklch(var(--primary-300)); }
+.portal-root .admission-status-card.active { border-color: oklch(var(--primary-500)); background: oklch(var(--primary-50)); }
+.portal-root .admission-status-card.status-new { background: oklch(var(--accent-50)); border-color: oklch(var(--accent-200)); }
+.portal-root .admission-status-card.status-contacted { background: oklch(var(--secondary-50)); border-color: oklch(var(--secondary-200)); }
+.portal-root .admission-status-card.status-enrolled { background: oklch(var(--background-100)); }
+.portal-root .admission-status-card.status-rejected { background: oklch(var(--primary-50)); border-color: oklch(var(--primary-200)); }
+.portal-root .admission-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.portal-root .admission-pill {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  border-radius: 999px; padding: 6px 14px; font-size: 11.5px; font-weight: 700;
+  border: 1px solid oklch(var(--background-300) / .7); background: oklch(var(--background-50));
+  color: oklch(var(--foreground-700));
+}
+.portal-root .admission-pill b { font-size: 10.5px; color: oklch(var(--primary-700)); font-variant-numeric: tabular-nums; }
+.portal-root .admission-pill.active { background: oklch(var(--primary-500)); border-color: oklch(var(--primary-500)); color: oklch(var(--background-50)); }
+.portal-root .admission-pill.active b { color: oklch(var(--background-50)); }
+.portal-root .table-select { min-width: 130px; max-width: 190px; padding: 7px 9px; font-size: 11.5px; }
+.portal-root .quick-action { min-height: 34px; padding: 6px 12px; font-size: 11px; }
+@media (max-width: 1100px) {
+  .portal-root .home-split { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .portal-root .admission-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portal-root .home-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .portal-root .admission-board { grid-template-columns: minmax(0, 1fr); }
 }

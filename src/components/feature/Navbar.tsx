@@ -41,8 +41,8 @@ export default function Navbar() {
           <button type="button" onClick={toggle} className={`whitespace-nowrap cursor-pointer text-sm px-3 py-1.5 rounded-full border ${light ? 'border-background-300 text-foreground-800' : 'border-background-50/40 text-background-50'}`}>
             {isAr ? 'English' : 'العربية'}
           </button>
-          <Link to="/portal/login" className={`hidden md:inline-flex whitespace-nowrap cursor-pointer text-sm px-3 py-2 rounded-md border ${light ? 'border-background-300 text-foreground-800 hover:bg-background-100' : 'border-background-50/50 text-background-50 hover:bg-background-50/10'}`}>
-            {isAr ? 'بوابة الكلية' : 'College portal'}
+          <Link to="/auth" className={`hidden md:inline-flex whitespace-nowrap cursor-pointer text-sm px-3 py-2 rounded-md border ${light ? 'border-background-300 text-foreground-800 hover:bg-background-100' : 'border-background-50/50 text-background-50 hover:bg-background-50/10'}`}>
+            {isAr ? 'تسجيل الدخول' : 'Sign in'}
           </Link>
           <a href="#admissions" className="hidden md:inline-flex whitespace-nowrap cursor-pointer text-sm px-4 py-2 rounded-md bg-primary-500 hover:bg-primary-600 text-background-50">
             {isAr ? 'قدّم الآن' : 'Apply now'}
@@ -60,7 +60,7 @@ export default function Navbar() {
             </li>
           ))}
           <li>
-            <Link to="/portal/login" onClick={() => setOpen(false)} className="block py-2 text-sm text-primary-700 cursor-pointer">{isAr ? 'بوابة الكلية' : 'College portal'}</Link>
+            <Link to="/auth" onClick={() => setOpen(false)} className="block py-2 text-sm text-primary-700 cursor-pointer">{isAr ? 'تسجيل الدخول / حساب جديد' : 'Sign in / create account'}</Link>
           </li>
         </ul>
       )}

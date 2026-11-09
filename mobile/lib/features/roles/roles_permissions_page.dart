@@ -347,6 +347,31 @@ class _UserTile extends StatelessWidget {
                         TintChip(label: '+${user.roles.length - 3}', color: SaiColors.muted, tint: SaiColors.creamDeep),
                     ],
                   ),
+                  if (user.hasConflict) ...[
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: SaiColors.warningTint,
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(color: SaiColors.warning.withOpacity(0.28)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 12, color: SaiColors.warning),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'خلط بين دور موظف ودور طالب/ولي أمر — راجع الصلاحيات',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: SaiColors.warning, height: 1.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

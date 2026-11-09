@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { loadManagementBranches, loadManagementOptions, type Option } from "../lib/management";
 import {
   attendancePageSize, attendanceStatuses, attendanceToday, canCorrectAttendance, canManageAttendance,
@@ -15,11 +16,12 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : S
 export function Attendance({ roles, userId }: { roles: readonly string[]; userId: string | null }) {
   const allowed = roles.some((role) => ["super_admin", "admin", "teacher", "receptionist", "student", "parent"].includes(role));
   const staff = roles.some((role) => ["super_admin", "admin", "teacher", "receptionist"].includes(role));
+  const [searchParams] = useSearchParams();
   const [classes, setClasses] = useState<AttendanceClass[]>([]);
   const [branches, setBranches] = useState<Option[]>([]);
   const [sessions, setSessions] = useState<Option[]>([]);
   const [scope, setScope] = useState<string[]>([]);
-  const [filters, setFilters] = useState(initialFilters);
+  const [filters, setFilters] = useState<AttendanceFilters>(() => ({ ...initialFilters, classId: searchParams.get("class") ?? "" }));
   const [rows, setRows] = useState<AttendanceSession[]>([]);
   const [count, setCount] = useState(0);
   const [selected, setSelected] = useState<AttendanceSession | null>(null);

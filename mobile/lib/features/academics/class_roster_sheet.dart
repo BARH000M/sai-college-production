@@ -23,6 +23,7 @@ class ClassRosterSheetPage extends StatefulWidget {
 class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
   late Future<List<RosterStudent>> _future;
   final DateTime _issuedAt = DateTime.now();
+  bool _attendanceUnavailable = false;
 
   @override
   void initState() {
@@ -31,19 +32,65 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
   }
 
   Future<List<RosterStudent>> _load() async {
-    final rows = await Supabase.instance.client
+    final client = Supabase.instance.client;
+    final rows = await client
         .from('students')
-        .select('admission_no,full_name')
+        .select('id,admission_no,full_name')
         .eq('class_id', widget.cls.id)
         .eq('status', 'active')
         .order('full_name', ascending: true);
+
+    // Real totals for the current month, read from attendance_records through
+    // the sessions of this class only.
+    final now = DateTime.now();
+    final monthStart = '${now.year}-${_two(now.month)}-01';
+    final monthEnd =
+        '${now.year}-${_two(now.month)}-${_two(DateTime(now.year, now.month + 1, 0).day)}';
+    final stats = <String, Map<String, int>>;
+    _attendanceUnavailable = false;
+
+    try {
+      final sessions = await client
+          .from('attendance_sessions')
+          .select('id')
+          .eq('class_id', widget.cls.id)
+          .gte('attendance_date', monthStart)
+          .lte('attendance_date', monthEnd);
+      final sessionIds = (sessions as List)
+          .whereType<Map<String, dynamic>>()
+          .map((row) => row['id'] as String?)
+          .whereType<String>()
+          .toList();
+
+      if (sessionIds.isNotEmpty) {
+        final records = await client
+            .from('attendance_records')
+            .select('student_id,status')
+            .inFilter('attendance_session_id', sessionIds);
+        for (final record in (records as List).whereType<Map<String, dynamic>>()) {
+          final studentId = record['student_id'] as String?;
+          final status = record['status'] as String?;
+          if (studentId == null || status == null) continue;
+          final bucket = stats.putIfAbsent(studentId, () => <String, int>);
+          bucket[status] = (bucket[status] ?? 0) + 1;
+        }
+      }
+    } catch (_) {
+      _attendanceUnavailable = true;
+    }
+
     return (rows as List).whereType<Map<String, dynamic>>().map((row) {
       final name = (row['full_name'] as String?)?.trim() ?? '';
+      final bucket = stats[row['id'] as String? ?? ''] ?? const <String, int>;
       return RosterStudent(
         admissionNo: (row['admission_no'] as String?)?.trim().isNotEmpty == true
             ? (row['admission_no'] as String).trim()
             : '—',
         fullName: name.isEmpty ? 'طالب' : name,
+        presentDays: bucket['present'] ?? 0,
+        absentDays: bucket['absent'] ?? 0,
+        lateDays: bucket['late'] ?? 0,
+        excusedDays: bucket['excused'] ?? 0,
       );
     }).toList();
   }
@@ -130,7 +177,23 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                             const SizedBox(height: 12),
                             _MetaGrid(cls: widget.cls, issuedAt: _issuedAt, count: students.length),
                             const SizedBox(height: 14),
+                            if (_attendanceUnavailable)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: NoteBanner(
+                                  message:
+                                      'تعذّر قراءة سجلات الحضور لهذا الشهر بحسابك، لذلك يظهر عمود الحضور فارغاً. أعد المحاولة بحساب معلم الصف أو الإدارة.',
+                                  color: SaiColors.warning,
+                                  tint: SaiColors.warningTint,
+                                  icon: Icons.info_outline,
+                                ),
+                              ),
                             _RosterTable(students: students),
+                            const SizedBox(height: 6),
+                            Text(
+                              'حضور الشهر = أيام الحضور (حاضر + متأخر) من إجمالي الأيام المسجّلة في ${monthLabel(_issuedAt)}.',
+                              style: const TextStyle(fontSize: 8.5, height: 1.6, color: SaiColors.muted),
+                            ),
                             const SizedBox(height: 12),
                             _Tally(students: students, cls: widget.cls),
                             const SizedBox(height: 14),
@@ -179,7 +242,7 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                           SizedBox(width: 7),
                           Expanded(
                             child: Text(
-                              'زر المشاركة ينسخ الكشف كاملاً بترويسة الكلية وأعمدة التوقيع، جاهزاً للصق في واتساب أو البريد أو برنامج الطباعة.',
+                              'يعرض عمود «حضور الشهر» أيام الحضور مقابل الأيام المسجّلة فعلياً من سجل الحضور، وزر المشاركة ينسخ الكشف كاملاً بترويسة الكلية وأعمدة التوقيع، جاهزاً للصق في واتساب أو البريد أو برنامج الطباعة.',
                               style: TextStyle(fontSize: 10, height: 1.7, color: SaiColors.muted),
                             ),
                           ),
@@ -365,7 +428,10 @@ class _RosterTable extends StatelessWidget {
                 SizedBox(width: 22, child: Text('م', style: _headStyle, textAlign: TextAlign.center)),
                 Expanded(flex: 3, child: Text('اسم الطالب', style: _headStyle)),
                 Expanded(flex: 2, child: Text('رقم القيد', style: _headStyle)),
-                Expanded(flex: 2, child: Text('الحضور', style: _headStyle, textAlign: TextAlign.center)),
+                Expanded(
+                  flex: 2,
+                  child: Text('حضور الشهر', style: _headStyle, textAlign: TextAlign.center),
+                ),
               ],
             ),
           ),
@@ -410,14 +476,7 @@ class _RosterTable extends StatelessWidget {
                     ),
                     Expanded(
                       flex: 2,
-                      child: Container(
-                        height: 16,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: SaiColors.border),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
+                      child: _AttendanceCell(student: student),
                     ),
                   ],
                 ),
@@ -430,6 +489,40 @@ class _RosterTable extends StatelessWidget {
 }
 
 const _headStyle = TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: SaiColors.ink, height: 1.4);
+
+/// Compact monthly attendance figure printed in the roster table.
+class _AttendanceCell extends StatelessWidget {
+  const _AttendanceCell({required this.student});
+
+  final RosterStudent student;
+
+  @override
+  Widget build(BuildContext context) {
+    if (student.recordedDays == 0) {
+      return const Text('—',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 9, color: SaiColors.muted));
+    }
+    final percent = student.attendancePercent;
+    final color = percent >= 85
+        ? SaiColors.success
+        : (percent >= 70 ? SaiColors.warning : SaiColors.danger);
+    return Column(
+      children: [
+        Text(
+          student.attendanceShort,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: SaiColors.ink),
+        ),
+        Text(
+          '$percent%',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: color),
+        ),
+      ],
+    );
+  }
+}
 
 class _Tally extends StatelessWidget {
   const _Tally({required this.students, required this.cls});
@@ -444,6 +537,7 @@ class _Tally extends StatelessWidget {
       'السعة: ${cls.capacity}',
       'المقاعد المتاحة: ${cls.available}',
       'نسبة الإشغال: ${cls.percent}%',
+      'حضور الشهر: ${classAttendancePercent(students) == null ? 'لا سجلات' : '${classAttendancePercent(students)}%'}',
     ];
     return Wrap(
       spacing: 6,
