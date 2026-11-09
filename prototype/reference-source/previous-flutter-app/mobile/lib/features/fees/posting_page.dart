@@ -121,7 +121,7 @@ class _PostingPageState extends State<PostingPage> {
                         style: TextStyle(fontSize: 12.5, height: 1.6))))
           else ...[
             DropdownButtonFormField<FinanceAccount>(
-                initialValue: _account,
+                value: _account,
                 decoration: const InputDecoration(
                     labelText: 'الحساب المستلم', border: OutlineInputBorder()),
                 items: _accounts

@@ -1,13 +1,3 @@
-<<<<<<< HEAD
-import 'dart:async';import 'package:flutter/material.dart';import 'package:supabase_flutter/supabase_flutter.dart';import 'core/theme.dart';import 'models/roles.dart';import 'data/sai_repository.dart';import 'screens/login.dart';import 'screens/shell.dart';
-const projectUrl='https://aeryusbrulqdxjdynwfh.supabase.co';
-Future<void> main()async{WidgetsFlutterBinding.ensureInitialized();const key=String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY',defaultValue:String.fromEnvironment('SUPABASE_ANON_KEY'));if(key.isEmpty){runApp(MaterialApp(theme:saiTheme(),home:const Scaffold(body:Center(child:Padding(padding:EdgeInsets.all(24),child:Text('أضف مفتاح Supabase publishable عبر --dart-define=SUPABASE_PUBLISHABLE_KEY=...'))))));return;}await Supabase.initialize(url:projectUrl,anonKey:key);runApp(const SaiApp());}
-class SaiApp extends StatelessWidget{const SaiApp({super.key});@override Widget build(BuildContext context)=>MaterialApp(title:'كلية ساي التعليمية اليمنية الصينية',debugShowCheckedModeBanner:false,theme:saiTheme(),locale:const Locale('ar'),builder:(context,child)=>Directionality(textDirection:TextDirection.rtl,child:child!),home:const AuthGate());}
-class AuthGate extends StatefulWidget{const AuthGate({super.key});@override State<AuthGate> createState()=>_AuthGateState();}
-class _AuthGateState extends State<AuthGate>{StreamSubscription<AuthState>? sub;User? user;@override void initState(){super.initState();final auth=Supabase.instance.client.auth;user=auth.currentUser;sub=auth.onAuthStateChange.listen((event){if(mounted)setState(()=>user=event.session?.user);},onError:(Object e,StackTrace st){if(mounted)ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(content:Text('حدث خطأ في اتصال المصادقة')));});}@override void dispose(){sub?.cancel();super.dispose();}@override Widget build(BuildContext context)=>user==null?const LoginScreen():RoleGate(key:ValueKey(user!.id),userId:user!.id);}
-class RoleGate extends StatefulWidget{const RoleGate({super.key,required this.userId});final String userId;@override State<RoleGate> createState()=>_RoleGateState();}
-class _RoleGateState extends State<RoleGate>{late final repo=SaiRepository(Supabase.instance.client);late Future<Set<AppRole>> future;@override void initState(){super.initState();reload();}void reload()=>future=repo.roles(widget.userId);@override Widget build(BuildContext context)=>FutureBuilder<Set<AppRole>>(future:future,builder:(context,s){if(!s.hasData){if(s.hasError)return Scaffold(body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[const Text('تعذّر تحميل الأدوار. تحقق من صلاحيات RLS.'),TextButton(onPressed:()=>setState(reload),child:const Text('إعادة المحاولة')),TextButton(onPressed:()=>repo.db.auth.signOut(),child:const Text('خروج'))])));return const Scaffold(body:Center(child:CircularProgressIndicator()));}if(s.data!.isEmpty)return Scaffold(body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[const Text('ليس لهذا الحساب دور معتمد'),TextButton(onPressed:()=>setState(reload),child:const Text('تحديث')),TextButton(onPressed:()=>repo.db.auth.signOut(),child:const Text('خروج'))])));return AppShell(roles:s.data!,repo:repo);});}
-=======
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -117,4 +107,3 @@ class ConfigurationRequiredPage extends StatelessWidget {
     );
   }
 }
->>>>>>> bc640511466543cbefcb2dd07ee62ea075188efe

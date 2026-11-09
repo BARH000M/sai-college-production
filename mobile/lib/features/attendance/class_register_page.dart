@@ -13,35 +13,21 @@ const _statuses = <String, String>{
 };
 
 String _two(int value) => value.toString().padLeft(2, '0');
-String _dateKey(DateTime value) =>
-    '${value.year}-${_two(value.month)}-${_two(value.day)}';
+String _dateKey(DateTime value) => '${value.year}-${_two(value.month)}-${_two(value.day)}';
 String _arabicDate(DateTime value) {
-  const weekdays = [
-    'الاثنين',
-    'الثلاثاء',
-    'الأربعاء',
-    'الخميس',
-    'الجمعة',
-    'السبت',
-    'الأحد'
-  ];
+  const weekdays = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
   return '${weekdays[value.weekday - 1]} ${value.day}/${value.month}/${value.year}';
 }
 
 class _RegisterRow {
-  _RegisterRow(
-      {required this.studentId,
-      required this.fullName,
-      this.status,
-      this.note});
+  _RegisterRow({required this.studentId, required this.fullName, this.status, this.note});
 
   final String studentId;
   final String fullName;
   String? status;
   String? note;
 
-  String get label =>
-      status == null ? 'لم يُسجَّل' : (_statuses[status] ?? status!);
+  String get label => status == null ? 'لم يُسجَّل' : (_statuses[status] ?? status!);
 }
 
 /// Mobile attendance register: marks a whole class with one tap and saves the
@@ -142,8 +128,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
 
       final roster = _sessionId == null
           ? null
-          : await client.rpc('sai_attendance_roster',
-              params: {'wanted_session': _sessionId});
+          : await client.rpc('sai_attendance_roster', params: {'wanted_session': _sessionId});
       final students = _sessionId != null
           ? const []
           : await client
@@ -165,7 +150,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
           );
         }).toList();
       } else {
-        rows = (students).whereType<Map<String, dynamic>>().map((row) {
+        rows = (students as List).whereType<Map<String, dynamic>>().map((row) {
           final name = (row['full_name'] as String?)?.trim() ?? '';
           return _RegisterRow(
             studentId: row['id'] as String,
@@ -180,8 +165,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
             .select('student_id,status,note')
             .eq('attendance_session_id', _sessionId!);
         final byStudent = <String, Map<String, dynamic>>{};
-        for (final record
-            in (records as List).whereType<Map<String, dynamic>>()) {
+        for (final record in (records as List).whereType<Map<String, dynamic>>()) {
           byStudent[record['student_id'] as String] = record;
         }
         for (final row in rows) {
@@ -202,8 +186,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error =
-            'تعذّر تحميل سجل الحضور. تحقق من صلاحيتك على هذا الصف.\n$error';
+        _error = 'تعذّر تحميل سجل الحضور. تحقق من صلاحيتك على هذا الصف.\n$error';
       });
     }
   }
@@ -219,14 +202,12 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
   }
 
   int get _markedCount => _rows.where((row) => row.status != null).length;
-  int _count(String status) =>
-      _rows.where((row) => row.status == status).length;
+  int _count(String status) => _rows.where((row) => row.status == status).length;
 
   Future<void> _saveAll() async {
     if (_rows.isEmpty) return;
     if (_markedCount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لم تحدد حالة أي طالب بعد.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم تحدد حالة أي طالب بعد.')));
       return;
     }
     setState(() => _saving = true);
@@ -259,8 +240,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
           : 'حُفظ $saved سجلاً، وتعذّر حفظ ${failures.length}. أول سبب: ${failures.first}';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(message),
-        backgroundColor:
-            failures.isEmpty ? SaiColors.success : SaiColors.danger,
+        backgroundColor: failures.isEmpty ? SaiColors.success : SaiColors.danger,
       ));
       if (failures.isEmpty) await _load();
     } catch (error) {
@@ -279,35 +259,24 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('إغلاق جلسة الحضور',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-        content: const Text(
-            'بعد الإغلاق يصبح سجل اليوم للقراءة فقط ولا يمكن تعديله من التطبيق.',
+        title: const Text('إغلاق جلسة الحضور', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        content: const Text('بعد الإغلاق يصبح سجل اليوم للقراءة فقط ولا يمكن تعديله من التطبيق.',
             style: TextStyle(fontSize: 12, height: 1.7)),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('إلغاء')),
-          FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('إغلاق الجلسة')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('إغلاق الجلسة')),
         ],
       ),
     );
     if (confirmed != true) return;
     try {
-      await Supabase.instance.client
-          .from('attendance_sessions')
-          .update({'status': 'closed'}).eq('id', id);
+      await Supabase.instance.client.from('attendance_sessions').update({'status': 'closed'}).eq('id', id);
       if (!mounted) return;
       setState(() => _sessionStatus = 'closed');
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم إغلاق جلسة الحضور.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إغلاق جلسة الحضور.')));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('تعذّر إغلاق الجلسة: $error'),
-          backgroundColor: SaiColors.danger));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذّر إغلاق الجلسة: $error'), backgroundColor: SaiColors.danger));
     }
   }
 
@@ -320,13 +289,8 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.cls.name,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: SaiColors.ink)),
-            Text(_arabicDate(_date),
-                style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
+            Text(widget.cls.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+            Text(_arabicDate(_date), style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
           ],
         ),
         leading: IconButton(
@@ -348,8 +312,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
               child: NoteBanner(
-                message:
-                    'تعذّر فتح جلسة حضور لهذا اليوم: $_sessionError\nيمكنك الاطلاع على القائمة فقط. يفتح الجلسة معلم الصف أو الإدارة.',
+                message: 'تعذّر فتح جلسة حضور لهذا اليوم: $_sessionError\nيمكنك الاطلاع على القائمة فقط. يفتح الجلسة معلم الصف أو الإدارة.',
                 color: SaiColors.danger,
                 tint: SaiColors.dangerTint,
                 icon: Icons.info_outline,
@@ -359,8 +322,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
             const Padding(
               padding: EdgeInsets.fromLTRB(14, 0, 14, 8),
               child: NoteBanner(
-                message:
-                    'جلسة هذا اليوم مغلقة. يمكنك الاطلاع على السجل فقط؛ لتصحيح الحضور راجع إدارة الكلية.',
+                message: 'جلسة هذا اليوم مغلقة. يمكنك الاطلاع على السجل فقط؛ لتصحيح الحضور راجع إدارة الكلية.',
                 color: SaiColors.warning,
                 tint: SaiColors.warningTint,
                 icon: Icons.lock_outline,
@@ -375,8 +337,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
                         ? const EmptyState(
                             icon: Icons.people_outline,
                             title: 'لا يوجد طلاب في هذا الصف',
-                            message:
-                                'أضف الطلاب إلى الصف من شاشة الاستيراد أو من سجل الطالب ثم عد لتسجيل الحضور.',
+                            message: 'أضف الطلاب إلى الصف من شاشة الاستيراد أو من سجل الطالب ثم عد لتسجيل الحضور.',
                           )
                         : ListView(
                             padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
@@ -426,8 +387,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
                                     child: _StudentRow(
                                       row: row,
                                       locked: locked,
-                                      onChanged: (status) =>
-                                          setState(() => row.status = status),
+                                      onChanged: (status) => setState(() => row.status = status),
                                       onNote: () => _editNote(row),
                                     ),
                                   )),
@@ -435,8 +395,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
                               if (!locked)
                                 TextButton.icon(
                                   onPressed: _closeSession,
-                                  icon:
-                                      const Icon(Icons.lock_outline, size: 16),
+                                  icon: const Icon(Icons.lock_outline, size: 16),
                                   label: const Text('إغلاق جلسة اليوم'),
                                 ),
                             ],
@@ -455,17 +414,11 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
               child: SafeArea(
                 top: false,
                 child: FilledButton.icon(
-                  onPressed:
-                      _saving || locked || _rows.isEmpty ? null : _saveAll,
+                  onPressed: _saving || locked || _rows.isEmpty ? null : _saveAll,
                   icon: _saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.save_outlined, size: 18),
-                  label: Text(
-                      _saving ? 'جارٍ الحفظ...' : 'حفظ الكل ($_markedCount)'),
+                  label: Text(_saving ? 'جارٍ الحفظ...' : 'حفظ الكل ($_markedCount)'),
                 ),
               ),
             ),
@@ -477,23 +430,17 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('ملاحظة — ${row.fullName}',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        title: Text('ملاحظة — ${row.fullName}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         content: TextField(
           controller: controller,
           maxLines: 3,
           maxLength: 200,
           style: const TextStyle(fontSize: 12.5),
-          decoration: const InputDecoration(
-              hintText: 'سبب الغياب أو ملاحظة المعلم (اختياري)'),
+          decoration: const InputDecoration(hintText: 'سبب الغياب أو ملاحظة المعلم (اختياري)'),
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(null),
-              child: const Text('إلغاء')),
-          FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-              child: const Text('حفظ')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(null), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(controller.text), child: const Text('حفظ')),
         ],
       ),
     );
@@ -502,8 +449,7 @@ class _ClassRegisterPageState extends State<ClassRegisterPage> {
 }
 
 class _DateStrip extends StatelessWidget {
-  const _DateStrip(
-      {required this.days, required this.selected, required this.onSelect});
+  const _DateStrip({required this.days, required this.selected, required this.onSelect});
 
   final List<DateTime> days;
   final DateTime selected;
@@ -530,25 +476,16 @@ class _DateStrip extends StatelessWidget {
               decoration: BoxDecoration(
                 color: active ? SaiColors.maroon : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: active ? SaiColors.maroon : SaiColors.border),
+                border: Border.all(color: active ? SaiColors.maroon : SaiColors.border),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                      index == 0
-                          ? 'اليوم'
-                          : (index == 1 ? 'أمس' : _two(day.day)),
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: active ? Colors.white : SaiColors.ink)),
+                  Text(index == 0 ? 'اليوم' : (index == 1 ? 'أمس' : _two(day.day)),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: active ? Colors.white : SaiColors.ink)),
                   const SizedBox(height: 2),
                   Text('${_two(day.day)}/${_two(day.month)}',
-                      style: TextStyle(
-                          fontSize: 9,
-                          color: active ? Colors.white70 : SaiColors.muted)),
+                      style: TextStyle(fontSize: 9, color: active ? Colors.white70 : SaiColors.muted)),
                 ],
               ),
             ),
@@ -581,7 +518,7 @@ class _SummaryBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: SaiColors.goldTint,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: SaiColors.gold.withValues(alpha: 0.28)),
+        border: Border.all(color: SaiColors.gold.withOpacity(0.28)),
       ),
       child: Row(
         children: [
@@ -598,11 +535,8 @@ class _SummaryBar extends StatelessWidget {
   Widget _cell(String value, String label, Color color) => Expanded(
         child: Column(
           children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-            Text(label,
-                style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
+            Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+            Text(label, style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
           ],
         ),
       );
@@ -636,7 +570,7 @@ class _BulkButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: danger ? SaiColors.dangerTint : SaiColors.maroonTint,
             borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: color.withValues(alpha: 0.22)),
+            border: Border.all(color: color.withOpacity(0.22)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -647,10 +581,7 @@ class _BulkButton extends StatelessWidget {
                 child: Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: color)),
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
               ),
             ],
           ),
@@ -689,11 +620,8 @@ class _StudentRow extends StatelessWidget {
               Container(
                 width: 30,
                 height: 30,
-                decoration: BoxDecoration(
-                    color: SaiColors.creamDeep,
-                    borderRadius: BorderRadius.circular(9)),
-                child: const Icon(Icons.person_outline,
-                    size: 16, color: SaiColors.maroon),
+                decoration: BoxDecoration(color: SaiColors.creamDeep, borderRadius: BorderRadius.circular(9)),
+                child: const Icon(Icons.person_outline, size: 16, color: SaiColors.maroon),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -703,18 +631,12 @@ class _StudentRow extends StatelessWidget {
                     Text(row.fullName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: SaiColors.ink)),
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
                     Text(
-                      row.note == null || row.note!.isEmpty
-                          ? row.label
-                          : '${row.label} · ${row.note}',
+                      row.note == null || row.note!.isEmpty ? row.label : '${row.label} · ${row.note}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 9.5, color: SaiColors.muted),
+                      style: const TextStyle(fontSize: 9.5, color: SaiColors.muted),
                     ),
                   ],
                 ),
@@ -724,8 +646,7 @@ class _StudentRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 child: const Padding(
                   padding: EdgeInsets.all(5),
-                  child: Icon(Icons.sticky_note_2_outlined,
-                      size: 16, color: SaiColors.muted),
+                  child: Icon(Icons.sticky_note_2_outlined, size: 16, color: SaiColors.muted),
                 ),
               ),
             ],
@@ -746,8 +667,7 @@ class _StudentRow extends StatelessWidget {
                             'late' => SaiColors.warning,
                             _ => SaiColors.muted,
                           },
-                          onTap: () => onChanged(
-                              row.status == entry.key ? null : entry.key),
+                          onTap: () => onChanged(row.status == entry.key ? null : entry.key),
                         ),
                       ),
                     ))
@@ -791,10 +711,7 @@ class _StatusPill extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: active ? Colors.white : SaiColors.muted),
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: active ? Colors.white : SaiColors.muted),
         ),
       ),
     );

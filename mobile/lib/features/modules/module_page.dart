@@ -28,8 +28,7 @@ class ModulePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (module.id == 'students' &&
-        (role == AppRole.student || role == AppRole.parent)) {
+    if (module.id == 'students' && (role == AppRole.student || role == AppRole.parent)) {
       return StudentRecordsPage(identity: identity, role: role);
     }
     if (module.id == 'vocabulary') {
@@ -53,9 +52,7 @@ class ModulePage extends StatelessWidget {
               Container(
                 width: 42,
                 height: 42,
-                decoration: BoxDecoration(
-                    color: SaiColors.maroonTint,
-                    borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: SaiColors.maroonTint, borderRadius: BorderRadius.circular(12)),
                 child: Icon(module.icon, size: 21, color: SaiColors.maroon),
               ),
               const SizedBox(width: 11),
@@ -63,15 +60,9 @@ class ModulePage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(module.label,
-                        style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: SaiColors.ink)),
+                    Text(module.label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
                     const SizedBox(height: 1),
-                    Text(module.pillar,
-                        style: const TextStyle(
-                            fontSize: 10.5, color: SaiColors.muted)),
+                    Text(module.pillar, style: const TextStyle(fontSize: 10.5, color: SaiColors.muted)),
                   ],
                 ),
               ),
@@ -81,17 +72,12 @@ class ModulePage extends StatelessWidget {
         const SizedBox(height: 14),
         const Padding(
           padding: EdgeInsetsDirectional.only(start: 4, bottom: 7),
-          child: Text('أقسام الوحدة',
-              style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: SaiColors.muted)),
+          child: Text('أقسام الوحدة', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: SaiColors.muted)),
         ),
         ...module.tabs.map((tab) => Padding(
               padding: const EdgeInsets.only(bottom: 7),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -99,17 +85,10 @@ class ModulePage extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.article_outlined,
-                        size: 17, color: SaiColors.gold),
+                    const Icon(Icons.article_outlined, size: 17, color: SaiColors.gold),
                     const SizedBox(width: 9),
-                    Expanded(
-                        child: Text(tab,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: SaiColors.ink))),
-                    const Icon(Icons.chevron_left,
-                        size: 17, color: SaiColors.muted),
+                    Expanded(child: Text(tab, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: SaiColors.ink))),
+                    const Icon(Icons.chevron_left, size: 17, color: SaiColors.muted),
                   ],
                 ),
               ),
@@ -120,15 +99,11 @@ class ModulePage extends StatelessWidget {
           decoration: BoxDecoration(
             color: SaiColors.goldTint,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: SaiColors.gold.withValues(alpha: 0.28)),
+            border: Border.all(color: SaiColors.gold.withOpacity(0.28)),
           ),
           child: const Text(
             'هذه شاشة تأسيسية للوحدة داخل التطبيق. العمليات الكاملة متاحة في بوابة الويب، وتبقى صلاحيات قاعدة البيانات هي المرجع النهائي.',
-            style: TextStyle(
-                fontSize: 11,
-                height: 1.8,
-                color: SaiColors.warning,
-                fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 11, height: 1.8, color: SaiColors.warning, fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -137,8 +112,7 @@ class ModulePage extends StatelessWidget {
     if (embedded) return content;
 
     return Scaffold(
-      appBar: saiAppBar(context,
-          showBack: true, onMenu: () {}, showBell: false, title: module.label),
+      appBar: saiAppBar(context, showBack: true, onMenu: () {}, showBell: false, title: module.label),
       body: content,
     );
   }
