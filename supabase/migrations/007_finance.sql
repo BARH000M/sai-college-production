@@ -15,6 +15,11 @@ end;
 $$;
 
 create role sai_finance_owner nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
+do $$
+begin
+  execute format('grant sai_finance_owner to %I with set true, inherit true', current_user);
+end;
+$$;
 create schema sai_finance authorization sai_finance_owner;
 revoke all on schema sai_finance from public, anon, authenticated;
 grant usage on schema public, auth to sai_finance_owner;
@@ -539,3 +544,9 @@ grant execute on function public.sai_finance_groups(),
   public.sai_finance_waive(uuid,text), public.sai_finance_cancel(uuid,text),
   public.sai_finance_refund(uuid,numeric,text,text,text,uuid), public.sai_finance_payments(uuid),
   public.sai_finance_refunds(uuid), public.sai_finance_audit(uuid) to authenticated;
+
+do $$
+begin
+  execute format('revoke sai_finance_owner from %I', current_user);
+end;
+$$;
