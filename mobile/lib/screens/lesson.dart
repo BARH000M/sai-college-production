@@ -1,45 +1,44 @@
 import 'package:flutter/material.dart';
-import '../widgets/ui.dart';
-import '../core/theme.dart';
+
+import 'package:sai_college_mobile/design_system/design_system.dart';
 
 class LessonScreen extends StatelessWidget {
   const LessonScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => SaiPage(
+  Widget build(BuildContext context) => SaiPageScaffold(
         title: 'تفاصيل الدرس',
         subtitle: 'المحتوى التعليمي',
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(25),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.play_circle_outline,
-                      color: SaiColors.red, size: 54),
-                  const SizedBox(height: 12),
-                  const Text('مشغل الدروس',
-                      style:
-                          TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
-                  const Text(
-                      'ستظهر المواد والفيديوهات والتدريبات بعد ربط مصدر المحتوى المعتمد.',
-                      style: TextStyle(color: SaiColors.muted)),
-                  const SizedBox(height: 20),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      for (final s in [
-                        'الدرس',
-                        'المفردات',
-                        'التدريبات',
-                        'المصادر'
-                      ])
-                        Chip(label: Text(s)),
-                    ],
-                  ),
-                ],
-              ),
+          SaiCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.play_circle_outline,
+                    color: SaiColors.maroon, size: 48),
+                const SizedBox(height: 10),
+                Text('مشغل الدروس', style: SaiTextStyles.screenTitle),
+                const SizedBox(height: 4),
+                const Text(
+                  'ستظهر المواد والفيديوهات والتدريبات بعد ربط مصدر المحتوى المعتمد.',
+                  style: SaiTextStyles.body,
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final section in const [
+                      'الدرس',
+                      'المفردات',
+                      'التدريبات',
+                      'المصادر',
+                    ])
+                      Chip(label: Text(section)),
+                  ],
+                ),
+              ],
             ),
           ),
         ],

@@ -4,15 +4,21 @@ import 'package:sai_college_mobile/core/sai_theme.dart';
 
 /// Small maroon-ticked group title used above a list of cards.
 class SaiSectionTitle extends StatelessWidget {
-  const SaiSectionTitle({super.key, required this.title, this.trailing});
+  const SaiSectionTitle({
+    super.key,
+    required this.title,
+    this.trailing,
+    this.padding = const EdgeInsetsDirectional.only(start: 2, bottom: 8),
+  });
 
   final String title;
   final Widget? trailing;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 2, bottom: 8),
+      padding: padding,
       child: Row(
         children: [
           Container(

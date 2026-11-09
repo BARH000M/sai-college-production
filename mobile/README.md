@@ -38,6 +38,28 @@ flutter build apk --debug `
   --dart-define=SUPABASE_PUBLISHABLE_KEY=PASTE_PUBLIC_KEY_HERE
 ```
 
+## الجودة والتحقق المستمر
+
+سير عمل `Mobile CI` في `.github/workflows/mobile-ci.yml` يعمل عند كل دفعة أو طلب دمج يمس مجلد `mobile`، وينفّذ:
+
+```powershell
+flutter pub get
+flutter analyze --fatal-infos --fatal-warnings
+flutter test
+```
+
+`--fatal-infos` مقصود: تحذيرات الإهلاك (deprecations) تُصنَّف معلومات، وبهذا الخيار تفشل البناء فور استخدام واجهة مهجورة قبل أن تتراكم.
+
+## الشاشات ونظام التصميم
+
+كل الشاشات تستخدم حزمة `lib/design_system`:
+
+- `SaiPageScaffold` و`SaiPageBody` للصفحات والهوامش.
+- `SaiSectionTitle` و`SaiCard` و`SaiListTile` و`SaiMetricCard` للعناوين والبطاقات والقوائم والأرقام.
+- `SaiAsyncState` و`SaiLoadingState` و`SaiErrorState` و`SaiEmptyState` لحالات التحميل والخطأ والفراغ.
+
+لا تُكتب بطاقات أو مؤشرات تحميل محلية جديدة؛ أضف ما تحتاجه إلى نظام التصميم أولًا ليبقى الشكل موحدًا.
+
 ## إعدادات الدخول
 
 أضف عنوان إعادة التوجيه التالي إلى قائمة Supabase Auth المسموحة عند استخدام استعادة كلمة المرور:

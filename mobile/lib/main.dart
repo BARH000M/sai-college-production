@@ -7,7 +7,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/auth_gate.dart' as modular;
 import 'core/config/app_config.dart';
 import 'core/sai_theme.dart';
-import 'core/theme.dart' as alternate_theme;
 import 'data/sai_repository.dart';
 import 'models/roles.dart' as alternate;
 import 'screens/login.dart';
@@ -47,7 +46,7 @@ class SaiCollegeApp extends StatelessWidget {
     return MaterialApp(
       title: 'كلية ساي',
       debugShowCheckedModeBanner: false,
-      theme: _useAlternateShell ? alternate_theme.saiTheme() : saiTheme,
+      theme: saiTheme,
       locale: const Locale('ar'),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: const [
