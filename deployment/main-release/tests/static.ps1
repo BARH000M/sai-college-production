@@ -85,6 +85,18 @@ foreach ($mode in @('setup', 'preflight', 'verify', 'rehearsal')) {
         throw "Unsafe psql input stream in mode $mode"
     }
     $setup = New-DisposableInput -Connection $connection -Mode setup
+    $overlay = Read-ReviewedSql 'deployment\main-release\fixtures\020_main_admissions_overlay.sql'
+    $security = Read-ReviewedSql 'deployment\main-release\tests\fixture_security.sql'
+    if ($overlay -notmatch '(?im)^\s*grant\s+usage\s+on\s+sequence\s+public\.admissions_application_no_seq\s+to\s+authenticated\s*;' -or
+        $overlay -match '(?im)^\s*grant\s+[^;]*\bon\s+sequence\s+public\.admissions_application_no_seq\s+to\s+(public|anon)\b') {
+        throw 'Admission sequence fixture grant is not the reviewed authenticated-only USAGE grant.'
+    }
+    foreach ($assertion in @('Unexpected effective admission sequence privileges',
+        'Authenticated role can reset admission sequence', 'Inactive session was accepted',
+        'Unexpected generated application number', 'Anonymous role can advance admission sequence directly',
+        'Student inserted admission with public bypass flag')) {
+        if (-not $security.Contains($assertion)) { throw "Missing fixture assertion: $assertion" }
+    }
     $embedded = [regex]::Matches($setup, "decode\('([A-Za-z0-9+/=]+)','base64'\)")
     if ($embedded.Count -ne 4) { throw 'Fixture must embed exactly four saved MAIN functions.' }
     $functions = @('sai_admissions_prepare', 'sai_admissions_audit',

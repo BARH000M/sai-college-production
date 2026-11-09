@@ -7,6 +7,9 @@ alter table public.admissions_enquiries alter column application_no
   set default ('SAI-APP-'::text || nextval('public.admissions_application_no_seq'::regclass));
 
 -- The source dump excludes ACLs; these are test assumptions, not MAIN evidence.
+-- Direct staff inserts run as authenticated, so their default needs nextval.
+revoke all on sequence public.admissions_application_no_seq from public, anon, authenticated;
+grant usage on sequence public.admissions_application_no_seq to authenticated;
 revoke all on function public.sai_public_admission_submit(text,text,text,text,text) from public, anon, authenticated;
 grant execute on function public.sai_public_admission_submit(text,text,text,text,text) to anon, authenticated;
 revoke all on function public.sai_submit_application(text,text,text,text,text,text,text) from public, anon, authenticated;

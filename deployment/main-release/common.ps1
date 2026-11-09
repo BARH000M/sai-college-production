@@ -7,9 +7,9 @@ $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 # actual bytes read into the input stream, not a later file lookup by psql.
 $script:SqlManifest = [ordered]@{
     'deployment\main-release\fixtures\010_bootstrap.sql' = 'A0919CFB11528B504DB817F06A1E46D39C3412989556612273E403F43791C579'
-    'deployment\main-release\fixtures\020_main_admissions_overlay.sql' = '36265C5112E1D0B63DE3A69B70A86424859118DC0549ECB1F5F2545F1D7906AF'
+    'deployment\main-release\fixtures\020_main_admissions_overlay.sql' = '641D7B6FE8CC8CDAD1B38A28AA0564AB4359D7C7B414905F10672CD509454B3B'
     'deployment\main-release\fixtures\030_synthetic_data.sql' = '4D50F1A094063EF4B19359C65D2D0746BFC9EF110B772B86A3408D19FB397180'
-    'deployment\main-release\tests\fixture_security.sql' = '6BB356CD8D9588606838E57C45E28F8E1CCE0FAAC4D26C5F0B51643AC4DACFB1'
+    'deployment\main-release\tests\fixture_security.sql' = '44CDF3350AC47CB4BEF085E04569F593F384E78449B749887CC7CB52DAB8DA3E'
     'supabase\migrations\001_initial_schema.sql' = 'F88DA7F1B53DA4CE0EDEDDFA91FF002B5501FB644BC07E068DB2E50DAA5F7BCB'
     'supabase\migrations\002_security_policies.sql' = 'B3A99C954D76AE102422BEA4754F1B0FA180DABE3EEEE123C83FA6A2939B776C'
     'supabase\migrations\003_staff_management_policies.sql' = '7663AF295A84AD266DC592F9C5FE869E77EEEF96519BE36CE111A10BEDE74744'
