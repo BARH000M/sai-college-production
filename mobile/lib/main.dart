@@ -3,21 +3,22 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/auth_gate.dart';
+import 'core/config/app_config.dart';
 import 'core/sai_theme.dart';
-
-const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (_supabaseUrl.isEmpty || _supabaseAnonKey.isEmpty) {
+  if (!AppConfig.isConfigured) {
     runApp(const SaiCollegeApp(configurationReady: false));
     return;
   }
 
   try {
-    await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey);
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
+    );
     runApp(const SaiCollegeApp(configurationReady: true));
   } catch (error) {
     runApp(SaiCollegeApp(configurationReady: false, startupError: error));
@@ -85,8 +86,13 @@ class ConfigurationRequiredPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   const SelectableText(
-                    'flutter run --dart-define=SUPABASE_URL=https://PROJECT.supabase.co --dart-define=SUPABASE_ANON_KEY=PUBLIC_ANON_KEY',
+                    'flutter run --dart-define=SUPABASE_ANON_KEY=PUBLIC_ANON_KEY',
                     style: TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.7),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'الرابط الافتراضي: https://aeryusbrulqdxjdynwfh.supabase.co',
+                    style: TextStyle(fontFamily: 'monospace', fontSize: 11, height: 1.7, color: SaiColors.muted),
                   ),
                   if (error != null) ...[
                     const SizedBox(height: 14),
