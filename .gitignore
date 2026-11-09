@@ -32,3 +32,5 @@ supabase/.temp/
 
 # Logs
 *.log
+
+/database-backups/
