@@ -13,8 +13,18 @@ function json(body: unknown, status = 200) {
   });
 }
 
-const ASSIGNABLE = ["teacher", "parent", "student"] as const;
+// Every role the super administrator may grant from the portal.
+const ASSIGNABLE = [
+  "super_admin", "admin", "teacher", "receptionist",
+  "accountant", "librarian", "content_editor", "parent", "student",
+] as const;
 type AssignableRole = (typeof ASSIGNABLE)[number];
+
+// Staff roles are placed in the campus team so they become selectable in the
+// admissions assignment dropdown. Parents and students never get a campus.
+const STAFF_ROLES = new Set<string>([
+  "super_admin", "admin", "teacher", "receptionist", "accountant", "librarian", "content_editor",
+]);
 
 type AccountRow = {
   id: string;
@@ -22,6 +32,7 @@ type AccountRow = {
   email: string;
   roles: string[];
   createdAt: string;
+  emailConfirmed: boolean;
   profileMissing: boolean;
 };
 
@@ -65,7 +76,7 @@ Deno.serve(async (req) => {
   const action = typeof body.action === "string" ? body.action : "list";
 
   if (action === "list") {
-    const accounts: { id: string; email: string; createdAt: string; fullName: string }[] = [];
+    const accounts: { id: string; email: string; createdAt: string; fullName: string; emailConfirmed: boolean }[] = [];
     for (let page = 1; page <= 10; page += 1) {
       const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
       if (error) return json({ ok: false, message: error.message }, 500);
@@ -77,6 +88,7 @@ Deno.serve(async (req) => {
           email: user.email ?? "",
           createdAt: user.created_at ?? new Date().toISOString(),
           fullName: typeof metadata.full_name === "string" ? metadata.full_name : "",
+          emailConfirmed: !!user.email_confirmed_at,
         });
       });
       if (batch.length < 200) break;
@@ -111,6 +123,7 @@ Deno.serve(async (req) => {
       email: account.email,
       roles: rolesByUser.get(account.id) ?? [],
       createdAt: account.createdAt,
+      emailConfirmed: account.emailConfirmed,
       profileMissing: !namesByUser.has(account.id),
     }));
 
@@ -123,8 +136,8 @@ Deno.serve(async (req) => {
     if (!userId || !ASSIGNABLE.includes(role as AssignableRole)) {
       return json({ ok: false, message: "بيانات الطلب غير صالحة." }, 400);
     }
-    if (userId === caller.id && action === "revoke") {
-      return json({ ok: false, message: "لا يمكنك سحب صلاحية من حسابك الحالي." }, 400);
+    if (userId === caller.id && action === "revoke" && role === "super_admin") {
+      return json({ ok: false, message: "لا يمكنك سحب صلاحية المسؤول العام من حسابك." }, 400);
     }
 
     const { data: target, error: targetError } = await admin.auth.admin.getUserById(userId);
@@ -156,6 +169,24 @@ Deno.serve(async (req) => {
         { onConflict: "user_id,role", ignoreDuplicates: true },
       );
       if (grantError) return json({ ok: false, message: grantError.message }, 500);
+
+      // A staff role joins the campus team so the person can be assigned work.
+      if (STAFF_ROLES.has(role)) {
+        const { data: branches, error: branchError } = await admin
+          .from("branches")
+          .select("id")
+          .eq("is_active", true);
+        if (branchError) return json({ ok: false, message: branchError.message }, 500);
+        const rows = (branches ?? []).map((branch: { id: string }) => ({
+          user_id: userId, branch_id: branch.id, is_active: true,
+        }));
+        if (rows.length) {
+          const { error: membershipError } = await admin
+            .from("branch_memberships")
+            .upsert(rows, { onConflict: "user_id,branch_id", ignoreDuplicates: true });
+          if (membershipError) return json({ ok: false, message: membershipError.message }, 500);
+        }
+      }
     } else {
       const { error: revokeError } = await admin
         .from("user_roles")
@@ -163,6 +194,23 @@ Deno.serve(async (req) => {
         .eq("user_id", userId)
         .eq("role", role);
       if (revokeError) return json({ ok: false, message: revokeError.message }, 500);
+
+      // If no staff role remains, remove the person from the campus team.
+      if (STAFF_ROLES.has(role)) {
+        const { data: remaining, error: remainingError } = await admin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId);
+        if (remainingError) return json({ ok: false, message: remainingError.message }, 500);
+        const stillStaff = (remaining ?? []).some((row: { role: string }) => STAFF_ROLES.has(row.role));
+        if (!stillStaff) {
+          const { error: membershipError } = await admin
+            .from("branch_memberships")
+            .delete()
+            .eq("user_id", userId);
+          if (membershipError) return json({ ok: false, message: membershipError.message }, 500);
+        }
+      }
     }
 
     await admin.from("audit_logs").insert({

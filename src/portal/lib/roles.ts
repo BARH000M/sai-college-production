@@ -1,12 +1,25 @@
 import { supabase } from "./supabase";
 
+// Every role the super administrator can grant, with its Arabic label and
+// whether it joins the campus team (staff) or not (families).
 export const assignableRoles = [
-  { id: "teacher", label: "معلم" },
-  { id: "parent", label: "ولي أمر" },
-  { id: "student", label: "طالب" },
+  { id: "admin", label: "مدير / مسجّل", staff: true },
+  { id: "teacher", label: "معلم", staff: true },
+  { id: "receptionist", label: "استقبال", staff: true },
+  { id: "accountant", label: "محاسب", staff: true },
+  { id: "librarian", label: "أمين مكتبة", staff: true },
+  { id: "content_editor", label: "محرر محتوى", staff: true },
+  { id: "student", label: "طالب", staff: false },
+  { id: "parent", label: "ولي أمر", staff: false },
+  { id: "super_admin", label: "مسؤول عام", staff: true },
 ] as const;
 
 export type AssignableRole = (typeof assignableRoles)[number]["id"];
+
+const assignableIds = new Set<string>(assignableRoles.map((role) => role.id));
+export function isAssignableRole(value: string): value is AssignableRole {
+  return assignableIds.has(value);
+}
 
 export type DirectoryUser = {
   id: string;
@@ -14,6 +27,7 @@ export type DirectoryUser = {
   email: string;
   roles: string[];
   createdAt: string;
+  emailConfirmed: boolean;
   profileMissing: boolean;
 };
 
@@ -37,7 +51,7 @@ async function call(body: Record<string, unknown>): Promise<FunctionResponse> {
 export async function loadDirectoryUsers(): Promise<DirectoryUser[]> {
   try {
     const data = await call({ action: "list" });
-    return data.users ?? [];
+    return (data.users ?? []).map((user) => ({ ...user, roles: [...user.roles] }));
   } catch (error) {
     throw new Error(failureMessage(error));
   }

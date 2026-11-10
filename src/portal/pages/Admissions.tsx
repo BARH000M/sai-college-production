@@ -6,10 +6,11 @@ import { AdmissionPrintSheet, type AdmissionPrintKind } from "./admissions/Admis
 import { AdmissionApplicationSheet } from "./admissions/AdmissionApplicationSheet";
 import { exportAdmissionHistoryCsv, exportAdmissionRosterCsv } from "../lib/admissionExport";
 import {
-  admissionDraft, admissionStatuses, admissionsPageSize, applicationStatusUrl, canManageAdmissions, isAdmissionStatus,
+  admissionDraft, admissionStatuses, admissionsPageSize, applicationStatusUrl, assignAdmission, canManageAdmissions, isAdmissionStatus,
   loadAdmissionByReference, loadAdmissions, loadAdmissionHistory, loadAdmissionSessions, loadAdmissionStaff,
+  loadAdmissionStatusCounts, setAdmissionStatus, trackedStatuses,
   notifyAdmissionStatusChange, saveAdmission, validateAdmission,
-  type Admission, type AdmissionDraft, type AdmissionFilters, type AdmissionHistoryEntry, type StaffOption,
+  type Admission, type AdmissionDraft, type AdmissionFilters, type AdmissionHistoryEntry, type AdmissionStatusCounts, type StaffOption, type TrackedStatus,
 } from "../lib/admissions";
 
 const initialFilters: AdmissionFilters = { branch: "", session: "", status: "", assignee: "", search: "", page: 0, stale: false };
@@ -92,6 +93,9 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
   const [rosterNote, setRosterNote] = useState<string | null>(null);
   const [enquiryError, setEnquiryError] = useState<string | null>(null);
   const [enquiryNote, setEnquiryNote] = useState<string | null>(null);
+  const [counts, setCounts] = useState<AdmissionStatusCounts>({ new: 0, contacted: 0, enrolled: 0, rejected: 0 });
+  const [countsError, setCountsError] = useState<string | null>(null);
+  const [quickBusy, setQuickBusy] = useState<string | null>(null);
   const [history, setHistory] = useState<AdmissionHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -167,6 +171,20 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
       .finally(() => { if (active) setHistoryLoading(false); });
     return () => { active = false; };
   }, [selected?.id, retry]);
+
+  useEffect(() => {
+    if (!filters.branch) {
+      setCounts({ new: 0, contacted: 0, enrolled: 0, rejected: 0 });
+      setCountsError(null);
+      return;
+    }
+    let active = true;
+    setCountsError(null);
+    void loadAdmissionStatusCounts(filters.branch, filters.session)
+      .then((value) => { if (active) setCounts(value); })
+      .catch((failure: unknown) => { if (active) setCountsError(errorText(failure)); });
+    return () => { active = false; };
+  }, [filters.branch, filters.session, retry]);
 
   useEffect(() => {
     const wanted = (searchParams.get("ref") ?? "").trim();
@@ -245,6 +263,40 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
     setSelected(null);
     setFilters((current) => ({ ...current, stale: next, status: next ? "new" : current.status, page: 0 }));
   }
+  const statusLabel = (status: string) => admissionStatuses[status as keyof typeof admissionStatuses] ?? status;
+  const nextStatus = (status: string): "contacted" | "enrolled" | null => {
+    if (status === "new") return "contacted";
+    if (["contacted", "assessment", "accepted"].includes(status)) return "enrolled";
+    return null;
+  };
+  async function quickStatus(row: Admission, status: "contacted" | "enrolled") {
+    if (quickBusy) return;
+    setQuickBusy(`${row.id}:${status}`);
+    setError(null); setSuccess(null);
+    try {
+      await setAdmissionStatus(row.id, status);
+      setSuccess(`تم تحديث الطلب ${row.application_no} إلى «${statusLabel(status)}».`);
+      setRetry((value) => value + 1);
+    } catch (failure) {
+      setError(`تعذر تحديث الحالة: ${errorText(failure)}`);
+    } finally {
+      setQuickBusy(null);
+    }
+  }
+  async function quickAssign(row: Admission, userId: string) {
+    if (quickBusy) return;
+    setQuickBusy(`${row.id}:assign`);
+    setError(null); setSuccess(null);
+    try {
+      await assignAdmission(row.id, userId || null);
+      setSuccess(userId ? `تم إسناد الطلب ${row.application_no} إلى موظف.` : `أُلغي إسناد الطلب ${row.application_no}.`);
+      setRetry((value) => value + 1);
+    } catch (failure) {
+      setError(`تعذر تحديث الإسناد: ${errorText(failure)}`);
+    } finally {
+      setQuickBusy(null);
+    }
+  }
   function openForm(row: Admission | null) {
     const branch = row?.branch_id ?? filters.branch;
     if (saving || editing !== undefined || !canEditBranch(branch)) return;
@@ -303,6 +355,42 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
       </div>
     </div>
     <p className="data-note">تظهر الطلبات التي تسمح بها قاعدة البيانات فقط. اختيار الجلسة يخضع للصلاحيات الحالية.</p>
+    <section className="admission-board" aria-label="لوحة حالة الطلبات">
+      {trackedStatuses.map((status) => {
+        const active = filters.status === status;
+        const hints: Record<TrackedStatus, string> = {
+          new: "بانتظار أول تواصل",
+          contacted: "تواصلنا مع المتقدم",
+          enrolled: "أكمل إجراءات التسجيل",
+          rejected: "طلب مغلق بالرفض",
+        };
+        return <button
+          key={status}
+          type="button"
+          aria-pressed={active}
+          className={`admission-status-card status-${status}${active ? " active" : ""}`}
+          onClick={() => filter("status", active ? "" : status)}
+        >
+          <span>{statusLabel(status)}</span>
+          <strong>{counts[status]}</strong>
+          <small>{hints[status]}</small>
+        </button>;
+      })}
+    </section>
+    <div className="admission-pills" role="group" aria-label="تصفية سريعة بالحالة">
+      <button type="button" className={`admission-pill${filters.status ? "" : " active"}`} onClick={() => filter("status", "")}>
+        الكل
+      </button>
+      {trackedStatuses.map((status) => <button
+        key={status}
+        type="button"
+        className={`admission-pill${filters.status === status ? " active" : ""}`}
+        onClick={() => filter("status", filters.status === status ? "" : status)}
+      >
+        {statusLabel(status)} <b>{counts[status]}</b>
+      </button>)}
+    </div>
+    {countsError && <p className="error-box" role="alert">تعذر تحميل أعداد الحالات: {countsError} <button className="text-button" onClick={() => setRetry((v) => v + 1)}>إعادة المحاولة</button></p>}
     {!manager && <p className="notice">يمكنك عرض الطلبات المسندة إليك فقط؛ لا تتوفر صلاحية التعديل.</p>}
     {scopeLoading && <p role="status">جارٍ التحقق من نطاق الفروع...</p>}
     {scopeError && <p className="error-box" role="alert">تعذر التحقق من نطاق الفروع: {scopeError} <button className="text-button" onClick={() => setRetry((v) => v + 1)}>إعادة المحاولة</button></p>}
@@ -329,8 +417,39 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
     {success && <p className="success-box" role="status">{success}</p>}
     <section className="panel">
       {loading ? <p role="status">جارٍ تحميل الطلبات...</p> : error ? null : !filters.branch ? <p className="notice">اختر فرعاً لعرض الطلبات أو إضافتها.</p> : !rows.length ? <><p className="muted">لا توجد طلبات متاحة تطابق التصفية؛ قد تحد سياسات الوصول من النتائج.</p>{filters.page > 0 && <button className="button secondary" onClick={() => setFilters((v) => ({ ...v, page: v.page - 1 }))}>السابق</button>}</> :
-        <><div className="table-scroll"><table className="management-table"><thead><tr><th>رقم الطلب</th><th>المتقدم</th><th>ولي الأمر</th><th>الهاتف</th><th>الحالة</th><th><span className="sr-only">التفاصيل</span></th></tr></thead><tbody>
-          {rows.map((row) => <tr key={row.id}><td>{row.application_no}</td><td>{row.applicant_full_name}</td><td>{row.guardian_name ?? "—"}</td><td>{row.phone ?? "—"}</td><td>{admissionStatuses[row.status] ?? row.status}</td><td><button className="button secondary" disabled={saving || editing !== undefined} onClick={() => setSelected(row)}>التفاصيل</button></td></tr>)}
+        <><div className="table-scroll"><table className="management-table"><thead><tr><th>رقم الطلب</th><th>المتقدم</th><th>الهاتف</th><th>الحالة</th><th>المسند إليه</th><th>إجراء</th><th><span className="sr-only">التفاصيل</span></th></tr></thead><tbody>
+          {rows.map((row) => {
+            const step = nextStatus(row.status);
+            const editable = canEditBranch(row.branch_id);
+            return <tr key={row.id}>
+              <td>{row.application_no}</td>
+              <td>{row.applicant_full_name}<small className="learn-meta">{row.guardian_name ?? "—"}</small></td>
+              <td>{row.phone ?? "—"}</td>
+              <td>{statusLabel(row.status)}</td>
+              <td>
+                {editable ? <select
+                  className="table-select"
+                  aria-label={`إسناد الطلب ${row.application_no}`}
+                  value={row.assigned_to ?? ""}
+                  disabled={!!quickBusy}
+                  onChange={(event) => void quickAssign(row, event.target.value)}
+                >
+                  <option value="">غير مسند</option>
+                  {staff.map((person) => <option key={person.user_id} value={person.user_id}>{person.full_name}</option>)}
+                  {row.assigned_to && !staff.some((person) => person.user_id === row.assigned_to) && <option value={row.assigned_to}>{assigneeName(row.assigned_to)}</option>}
+                </select> : assigneeName(row.assigned_to)}
+              </td>
+              <td>
+                {editable && step ? <button
+                  type="button"
+                  className="button primary quick-action"
+                  disabled={!!quickBusy}
+                  onClick={() => void quickStatus(row, step)}
+                >{step === "contacted" ? "تم التواصل" : "تسجيل"}</button> : <span className="muted">—</span>}
+              </td>
+              <td><button className="button secondary" disabled={saving || editing !== undefined} onClick={() => setSelected(row)}>التفاصيل</button></td>
+            </tr>;
+          })}
         </tbody></table></div><div className="pagination"><button className="button secondary" disabled={!filters.page || saving || editing !== undefined} onClick={() => { setSelected(null); setFilters((v) => ({ ...v, page: v.page - 1 })); }}>السابق</button><span>صفحة {filters.page + 1} · {count} طلب</span><button className="button secondary" disabled={(filters.page + 1) * admissionsPageSize >= count || saving || editing !== undefined} onClick={() => { setSelected(null); setFilters((v) => ({ ...v, page: v.page + 1 })); }}>التالي</button></div></>}
     </section>
     {selected && editing === undefined && <aside className="panel admissions-drawer management-detail" aria-label="تفاصيل الطلب"><div className="page-heading"><h2>تفاصيل الطلب</h2><button className="button secondary" onClick={() => setSelected(null)}>إغلاق</button></div>

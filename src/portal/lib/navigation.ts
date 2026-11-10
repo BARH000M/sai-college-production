@@ -23,6 +23,7 @@ const allRoles = Object.keys(roleLabels) as AppRole[];
 // Navigation follows the approved role/module map; the database enforces access.
 export const navigation: readonly NavigationItem[] = [
   { id: "home", label: "الرئيسية", icon: "ri-home-5-line", roles: allRoles },
+  { id: "profile", label: "ملفي الشخصي", icon: "ri-user-3-line", roles: allRoles },
   { id: "notifications", label: "مركز الإشعارات", icon: "ri-notification-3-line", roles: allRoles },
   { id: "admissions", label: "القبول والتسجيل", icon: "ri-user-add-line", roles: ["super_admin", "admin", "receptionist", "teacher"] },
   { id: "scanner", label: "ماسح إيصالات القبول", icon: "ri-qr-scan-2-line", roles: ["super_admin", "admin", "receptionist"] },
@@ -51,6 +52,7 @@ export const navigation: readonly NavigationItem[] = [
   { id: "staff", label: "شؤون الموظفين", icon: "ri-team-line", roles: ["super_admin", "admin", "teacher", "accountant", "receptionist", "librarian", "content_editor"] },
   { id: "reception", label: "الاستقبال", icon: "ri-customer-service-2-line", roles: ["super_admin", "admin", "receptionist"] },
   { id: "library", label: "المكتبة", icon: "ri-book-shelf-line", roles: ["super_admin", "admin", "librarian", "teacher", "parent", "student"] },
+  { id: "finance", label: "الرسوم والمالية", icon: "ri-money-dollar-circle-line", roles: ["super_admin", "admin", "accountant", "receptionist", "parent", "student"] },
   { id: "communications", label: "التواصل والإعلانات", icon: "ri-mail-line", roles: allRoles },
   { id: "branches", label: "الفروع والجلسات", icon: "ri-map-pin-2-line", roles: ["super_admin", "admin"] },
   { id: "sessions", label: "الجلسات الأكاديمية", icon: "ri-calendar-todo-line", roles: ["super_admin", "admin"] },
@@ -66,10 +68,10 @@ export const navigation: readonly NavigationItem[] = [
  * so a user can never land on a screen that pretends to be ready but is not.
  */
 const availableModuleIds: readonly string[] = [
-  "home", "notifications", "branches", "sessions", "classes", "students", "admissions", "scanner",
+  "home", "profile", "notifications", "branches", "sessions", "classes", "students", "admissions", "scanner",
   "courses", "homework", "progress", "attendance", "roles", "reports", "cms",
   "academics", "timetable", "qr", "listening", "speaking", "tones", "vocabulary",
-  "handwriting", "reading", "review",
+  "handwriting", "reading", "review", "library", "communications", "finance",
 ];
 
 export function isAppRole(value: string): value is AppRole {
@@ -81,7 +83,9 @@ export function isModuleAvailable(id: string): boolean {
 }
 
 export function modulePath(item: NavigationItem): string {
-  return item.id === "home" ? "/portal/dashboard" : `/portal/modules/${item.id}`;
+  if (item.id === "home") return "/portal/dashboard";
+  if (item.id === "profile") return "/portal/profile";
+  return `/portal/modules/${item.id}`;
 }
 
 export function visibleNavigation(roles: readonly string[]): NavigationItem[] {
@@ -94,11 +98,6 @@ export function visibleNavigation(roles: readonly string[]): NavigationItem[] {
  * staff can see what is still being prepared instead of clicking a dead button.
  */
 export const pendingModules: readonly { id: string; label: string; reason: string }[] = [
-  {
-    id: "finance",
-    label: "الرسوم والمالية",
-    reason: "لا توجد جداول رسوم أو فواتير أو مدفوعات في قاعدة البيانات بعد، لذلك لا يمكن تشغيلها.",
-  },
   { id: "quizzes", label: "الاختبارات القصيرة", reason: "تحتاج جداول أسئلة ومحاولات وحساب درجات." },
   { id: "exams", label: "الامتحانات", reason: "تحتاج جدولة امتحانات وربطها بالجلسات الأكاديمية." },
   { id: "certificates", label: "الشهادات والبطاقات", reason: "تحتاج قوالب شهادات وأرقام تحقق." },
@@ -107,8 +106,6 @@ export const pendingModules: readonly { id: string; label: string; reason: strin
   { id: "approvals", label: "المراجعة والنشر", reason: "تحتاج حالات مراجعة واعتماد للمحتوى." },
   { id: "staff", label: "شؤون الموظفين", reason: "تحتاج سجلات موظفين وعقوداً وحضوراً إدارياً." },
   { id: "reception", label: "الاستقبال", reason: "تحتاج مسار زوار ومواعيد مستقل عن القبول." },
-  { id: "library", label: "المكتبة", reason: "تحتاج فهرس كتب وإعارة وإرجاع." },
-  { id: "communications", label: "التواصل والإعلانات", reason: "تحتاج قوالب رسائل وقنوات إرسال معتمدة." },
   { id: "settings", label: "النظام والصلاحيات", reason: "إعدادات الحساب تُدار من صفحة الأدوار وإعدادات Supabase." },
 ] as const;
 

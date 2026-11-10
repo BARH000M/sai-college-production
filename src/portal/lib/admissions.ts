@@ -275,6 +275,37 @@ export async function saveAdmission(draft: AdmissionDraft, id: string | null): P
   }
 }
 
+export const trackedStatuses = ["new", "contacted", "enrolled", "rejected"] as const;
+export type TrackedStatus = (typeof trackedStatuses)[number];
+export type AdmissionStatusCounts = Record<TrackedStatus, number>;
+
+/** Live counts for the four workspace columns, scoped to the selected branch and session. */
+export async function loadAdmissionStatusCounts(branch: string, session: string): Promise<AdmissionStatusCounts> {
+  const empty: AdmissionStatusCounts = { new: 0, contacted: 0, enrolled: 0, rejected: 0 };
+  if (!branch) return empty;
+  const results = await Promise.all(trackedStatuses.map((status) => {
+    let query = supabase.from("admissions_enquiries")
+      .select("id", { count: "exact", head: true })
+      .eq("branch_id", branch)
+      .eq("status", status);
+    if (session) query = query.eq("academic_session_id", session);
+    return query;
+  }));
+  const counts = { ...empty };
+  results.forEach((result, index) => {
+    if (result.error) throw new Error(result.error.message);
+    counts[trackedStatuses[index]] = result.count ?? 0;
+  });
+  return counts;
+}
+
+export async function setAdmissionStatus(enquiryId: string, status: AdmissionStatus): Promise<void> {
+  const result = await supabase.from("admissions_enquiries")
+    .update({ status }).eq("id", enquiryId).select("id");
+  if (result.error) throw new Error(result.error.message);
+  if (!result.data?.length) throw new Error("لم تُحدّث الحالة؛ قد لا تملك الصلاحية أو لم يعد الطلب متاحاً.");
+}
+
 export async function assignAdmission(enquiryId: string, userId: string | null): Promise<void> {
   const result = await supabase.from("admissions_enquiries")
     .update({ assigned_to: userId }).eq("id", enquiryId).select("id");

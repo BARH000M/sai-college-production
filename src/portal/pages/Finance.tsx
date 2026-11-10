@@ -9,6 +9,9 @@ import {
   saveFeeGroup, voidFinancePayment, waiveFee,
   type FeeAssignment, type FeeGroup, type FinanceAudit, type FinancePayment, type FinanceRefund,
 } from "../lib/financeApi";
+import { loadReportBranches, loadReportSessions, type ReportOption } from "../lib/reports";
+import { supabase } from "../lib/supabase";
+import { PaymentReceipt } from "./finance/PaymentReceipt";
 
 const methods: { value: FinancePaymentMethod; label: string }[] = [
   { value: "cash", label: "نقداً" }, { value: "bank_transfer", label: "تحويل بنكي" },
@@ -18,6 +21,9 @@ const statuses: Record<string, string> = {
   unpaid: "غير مدفوع", partial: "مدفوع جزئياً", paid: "مدفوع", waived: "معفى", cancelled: "ملغى",
 };
 const emptyGroup = { id: "", branch: "", session: "", name: "", description: "", amount: "", due: "", active: true };
+type FinanceStudent = {
+  id: string; full_name: string; admission_no: string; branch_id: string; class_id: string | null;
+};
 function message(error: unknown) { return error instanceof Error ? error.message : String(error); }
 function amount(value: number) { return formatYER(String(value)); }
 
@@ -57,8 +63,34 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [branches, setBranches] = useState<ReportOption[]>([]);
+  const [sessions, setSessions] = useState<ReportOption[]>([]);
+  const [students, setStudents] = useState<FinanceStudent[]>([]);
+  const [receipt, setReceipt] = useState<{ payment: FinancePayment; assignment: FeeAssignment } | null>(null);
   const storageKey = `sai.finance.pending.${userId ?? ""}`;
   const refundStorageKey = `sai.finance.refund.pending.${userId ?? ""}`;
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([loadReportBranches(), loadReportSessions()])
+      .then(([branchRows, sessionRows]) => {
+        if (!active) return;
+        setBranches(branchRows);
+        setSessions(sessionRows);
+      })
+      .catch((failure: unknown) => {
+        if (active) setError(`تعذر تحميل الفروع والجلسات: ${message(failure)}`);
+      });
+    void supabase.from("students")
+      .select("id,full_name,admission_no,branch_id,class_id")
+      .order("full_name")
+      .then((result) => {
+        if (!active) return;
+        if (result.error) { setError(`تعذر تحميل الطلاب: ${result.error.message}`); return; }
+        setStudents((result.data ?? []) as FinanceStudent[]);
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     setRecoveryReady(false); setPendingPayment(null); setPendingRefund(null); setRecoveryError(null);
@@ -212,6 +244,11 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     event.preventDefault(); setAudit([]); setError(null);
     void loadFinanceAudit(auditBranch).then(setAudit).catch((failure: unknown) => setError(message(failure)));
   }
+  const selectedGroup = groups.find((row) => row.id === assignmentGroup) ?? null;
+  const eligibleStudents = selectedGroup
+    ? students.filter((row) => row.branch_id === selectedGroup.branch_id)
+    : [];
+  const studentById = (id: string) => students.find((row) => row.id === id) ?? null;
   const methodSelect = (value: FinancePaymentMethod, change: (value: FinancePaymentMethod) => void, disabled = false) =>
     <select disabled={disabled} value={value} onChange={(event) => {
       const method = methods.find((entry) => entry.value === event.target.value);
@@ -227,10 +264,16 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     {loading && <p role="status">جارٍ تحميل السجلات...</p>}
     {permissions.manageGroups && <section className="panel management-detail">
       <h2>{group.id ? "تعديل مجموعة الرسوم" : "مجموعة رسوم جديدة"}</h2>
-      <p className="muted">تغييرات المجموعة لا تعدل الرسوم المسندة سابقاً. أدخل معرّفي الفرع والجلسة من السجلات الإدارية.</p>
+      <p className="muted">اختر الفرع والجلسة الأكاديمية. تغييرات المجموعة لا تعدل الرسوم المسندة سابقاً.</p>
       <form className="management-form" onSubmit={submitGroup}>
-        <label>معرّف الفرع<input required value={group.branch} disabled={!!group.id || busy} onChange={(e) => setGroup({ ...group, branch: e.target.value })} /></label>
-        <label>معرّف الجلسة<input required value={group.session} disabled={!!group.id || busy} onChange={(e) => setGroup({ ...group, session: e.target.value })} /></label>
+        <label>الفرع<span className="vocab-required"> *</span><select required value={group.branch} disabled={!!group.id || busy} onChange={(e) => setGroup({ ...group, branch: e.target.value })}>
+          <option value="">{branches.length ? "اختر الفرع" : "لا توجد فروع متاحة"}</option>
+          {branches.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+        </select></label>
+        <label>الجلسة الأكاديمية<span className="vocab-required"> *</span><select required value={group.session} disabled={!!group.id || busy} onChange={(e) => setGroup({ ...group, session: e.target.value })}>
+          <option value="">{sessions.length ? "اختر الجلسة" : "لا توجد جلسات متاحة"}</option>
+          {sessions.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+        </select></label>
         <label>اسم المجموعة<input required value={group.name} onChange={(e) => setGroup({ ...group, name: e.target.value })} /></label>
         <label>الوصف<input value={group.description} onChange={(e) => setGroup({ ...group, description: e.target.value })} /></label>
         <label>المبلغ<input required inputMode="decimal" value={group.amount} onChange={(e) => setGroup({ ...group, amount: e.target.value })} /></label>
@@ -245,9 +288,12 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     {permissions.assignFees && <section className="panel management-detail"><h2>إسناد رسوم لطالب</h2>
       <form className="management-form" onSubmit={submitAssignment}>
         <label>مجموعة الرسوم<select required value={assignmentGroup} onChange={(e) => setAssignmentGroup(e.target.value)}>
-          <option value="">اختر المجموعة</option>{groups.filter((row) => row.is_active).map((row) => <option key={row.id} value={row.id}>{row.name} — {row.branch_id} — {row.academic_session_id}</option>)}
+          <option value="">اختر المجموعة</option>{groups.filter((row) => row.is_active).map((row) => <option key={row.id} value={row.id}>{row.name} — {branches.find((branch) => branch.id === row.branch_id)?.name ?? "فرع"}</option>)}
         </select></label>
-        <label>معرّف الطالب<input required value={student} onChange={(e) => setStudent(e.target.value)} /></label>
+        <label>الطالب<span className="vocab-required"> *</span><select required value={student} onChange={(e) => setStudent(e.target.value)}>
+          <option value="">{selectedGroup ? (eligibleStudents.length ? "اختر الطالب" : "لا يوجد طلاب في فرع المجموعة") : "اختر مجموعة الرسوم أولاً"}</option>
+          {eligibleStudents.map((row) => <option key={row.id} value={row.id}>{row.full_name} · {row.admission_no}</option>)}
+        </select></label>
         <label>الخصم الثابت<input required inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} /></label>
         <label>تاريخ استحقاق خاص (اختياري)<input type="date" value={assignmentDue} onChange={(e) => setAssignmentDue(e.target.value)} /></label>
         <div className="actions"><button className="button primary" disabled={busy}>إسناد الرسوم</button></div>
@@ -255,8 +301,8 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     </section>}
     <section className="panel management-detail"><h2>الأرصدة والرسوم المسندة</h2>
       {!loading && !error && assignments.length === 0 && <p>لا توجد رسوم متاحة.</p>}
-      <div className="table-scroll"><table className="management-table"><thead><tr><th>معرّف الطالب</th><th>المجموعة</th><th>الاستحقاق</th><th>الحالة</th><th>الرصيد</th><th>التفاصيل</th></tr></thead>
-        <tbody>{assignments.map((row) => <tr key={row.id}><td>{row.student_id}</td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? row.fee_group_id}</td>
+      <div className="table-scroll"><table className="management-table"><thead><tr><th>الطالب</th><th>المجموعة</th><th>الاستحقاق</th><th>الحالة</th><th>الرصيد</th><th>التفاصيل</th></tr></thead>
+        <tbody>{assignments.map((row) => <tr key={row.id}><td>{studentById(row.student_id)?.full_name ?? "طالب"}<span className="learn-meta">{studentById(row.student_id)?.admission_no ?? ""}</span></td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? row.fee_group_id}</td>
           <td>{row.due_date}</td><td>{statuses[row.status] ?? row.status}</td><td>{amount(row.balance)}</td>
           <td><button className="text-button" type="button" disabled={(!!pendingPayment && pendingPayment.assignment !== row.id) || (!!pendingRefund && pendingRefund.assignment !== row.id)} onClick={() => setSelected(row.id)}>عرض الدفعات</button></td></tr>)}</tbody></table></div>
     </section>
@@ -281,9 +327,15 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
       <div className="table-scroll"><table className="management-table"><thead><tr><th>الإيصال</th><th>المبلغ</th><th>الطريقة</th><th>المرجع</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
         <tbody>{payments.map((row) => <tr key={row.id}><td>{row.receipt_number}</td><td>{amount(row.amount)}</td><td>{methods.find((m) => m.value === row.method)?.label}</td>
           <td>{row.transaction_reference ?? "—"}</td><td>{row.voided_at ? `ملغاة: ${row.void_reason}` : "مرحلة"}</td>
-          <td>{permissions.void && !row.voided_at && <button className="text-button" disabled={busy || !!pendingPayment || !!pendingRefund || reason.trim().length < 10}
+          <td><div className="homework-admin">
+            <button className="button secondary quick-action" type="button" onClick={() => {
+              const assignment = assignments.find((entry) => entry.id === row.assignment_id);
+              if (assignment) setReceipt({ payment: row, assignment });
+            }}><i className="ri-printer-line" aria-hidden="true"></i> إيصال</button>
+            {permissions.void && !row.voided_at && <button className="text-button" disabled={busy || !!pendingPayment || !!pendingRefund || reason.trim().length < 10}
             onClick={() => void perform(() => voidFinancePayment(row.id, reason), "تم إلغاء الدفعة واستعادة الرصيد.")}>إلغاء الدفعة</button>}
-            {(permissions.refund || roles.includes("accountant")) && row.voided_at && <button className="text-button" disabled={!!pendingRefund && pendingRefund.payment !== row.id} onClick={() => showRefunds(row.id)}>الاستردادات</button>}</td></tr>)}</tbody></table></div>
+            {(permissions.refund || roles.includes("accountant")) && row.voided_at && <button className="text-button" disabled={!!pendingRefund && pendingRefund.payment !== row.id} onClick={() => showRefunds(row.id)}>الاستردادات</button>}
+          </div></td></tr>)}</tbody></table></div>
       {permissions.void && <p className="data-note">لإلغاء دفعة أدخل سبباً لا يقل عن 10 أحرف في حقل السبب أعلاه.</p>}
       {(selectedPayment || pendingRefund) && <div><h2>الاستردادات</h2>
         {refunds.map((row) => <p key={row.id}>{row.refund_number} — {amount(row.amount)} — {row.reason}</p>)}
@@ -301,9 +353,21 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     </section>}
     {(roles.includes("super_admin") || roles.includes("accountant")) && <section className="panel management-detail">
       <h2>سجل التدقيق المالي</h2><form className="management-form" onSubmit={showAudit}>
-        <label>معرّف الفرع<input required value={auditBranch} onChange={(e) => setAuditBranch(e.target.value)} /></label>
+        <label>الفرع<select required value={auditBranch} onChange={(e) => setAuditBranch(e.target.value)}>
+          <option value="">اختر الفرع</option>
+          {branches.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+        </select></label>
         <div className="actions"><button className="button secondary">عرض السجل</button></div></form>
       {audit.map((entry) => <p key={entry.id}>{entry.created_at} — {entry.action} — {entry.entity_id} — {entry.actor_id} — {JSON.stringify(entry.details)}</p>)}
     </section>}
+    {receipt && <PaymentReceipt
+      payment={receipt.payment}
+      assignment={receipt.assignment}
+      studentName={studentById(receipt.assignment.student_id)?.full_name ?? "—"}
+      admissionNo={studentById(receipt.assignment.student_id)?.admission_no ?? "—"}
+      group={groups.find((row) => row.id === receipt.assignment.fee_group_id) ?? null}
+      branchName={branches.find((row) => row.id === receipt.assignment.branch_id)?.name ?? ""}
+      onClose={() => setReceipt(null)}
+    />}
   </main>;
 }

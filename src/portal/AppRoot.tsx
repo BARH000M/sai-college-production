@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { Login } from "./components/Login";
 import { StatusCard } from "./components/StatusCard";
+import { WaitingForRole } from "./components/WaitingForRole";
 import { Dashboard } from "./pages/Dashboard";
-import { RoleDashboard } from "./pages/RoleDashboard";
-import { LearnerHome } from "./pages/LearnerHome";
+import { PortalHome } from "./pages/PortalHome";
+import { Profile } from "./pages/Profile";
 import { ModuleEntry } from "./pages/ModuleEntry";
 import { isAppRole } from "./lib/navigation";
 import {
@@ -22,6 +22,7 @@ export default function PortalApp() {
   const [busy, setBusy] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const version = useRef(0);
+  const location = useLocation();
 
   async function refresh() {
     const request = ++version.current;
@@ -67,6 +68,8 @@ export default function PortalApp() {
     }
   }
 
+  const signInPath = `/auth?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
+
   const signOutButton = (
     <>
       <button className="button secondary" onClick={handleSignOut} disabled={busy}>
@@ -80,17 +83,20 @@ export default function PortalApp() {
     return auth.status === "loading" ? (
       <StatusCard title="جارٍ التحقق من الحساب" message="يرجى الانتظار أثناء تحميل الجلسة والبيانات." />
     ) : auth.status === "signed-out" ? (
-      <Navigate to="/portal/login" replace />
+      <Navigate to={signInPath} replace />
     ) : auth.profileError || auth.rolesError ? (
       <StatusCard title="تعذر تحميل بيانات الحساب" message={[auth.profileError, auth.rolesError].filter(Boolean).join(" — ")} onRetry={refresh}>
         {signOutButton}
       </StatusCard>
+    ) : !auth.roles.some(isAppRole) ? (
+      <WaitingForRole
+        email={auth.email}
+        busy={busy}
+        onRefresh={() => void refresh()}
+        onSignOut={handleSignOut}
+      />
     ) : !auth.profile ? (
       <StatusCard title="الملف الشخصي غير متاح" message="لم يتم العثور على ملفك الشخصي أو لا تسمح سياسات الوصول بعرضه. تواصل مع مسؤول النظام." onRetry={refresh}>
-        {signOutButton}
-      </StatusCard>
-    ) : !auth.roles.some(isAppRole) ? (
-      <StatusCard title="الوصول غير متاح" message={auth.roles.length ? "لا يتضمن حسابك دوراً مدعوماً في هذا التطبيق. تواصل مع مسؤول النظام." : "لم تُعرض أدوار لهذا الحساب. قد يكون السبب عدم وجود دور أو سياسات الوصول؛ تواصل مع مسؤول النظام."} onRetry={refresh}>
         {signOutButton}
       </StatusCard>
     ) : (
@@ -100,30 +106,15 @@ export default function PortalApp() {
     );
   }
 
-  /**
-   * Picks the landing screen for the signed-in account. Staff keep the operational
-   * view; students and parents get the learning home, because an empty admin
-   * dashboard is not a useful first screen for a learner.
-   */
-  function renderHome(roles: readonly string[]) {
-    if (roles.includes("super_admin")) return <Dashboard />;
-    const staffRoles = ["admin", "teacher", "accountant", "receptionist", "librarian", "content_editor"];
-    const isStaff = roles.some((role) => staffRoles.includes(role));
-    const isLearner = roles.includes("student") || roles.includes("parent");
-    if (!isStaff && isLearner) return <LearnerHome roles={roles} />;
-    return <RoleDashboard roles={roles} />;
-  }
-
   return (
     <ErrorBoundary>
       <div className="portal-root">
         <Routes>
-          <Route path="login" element={auth.status === "signed-in"
-            ? <Navigate to={HOME} replace />
-            : auth.status === "loading"
-              ? <StatusCard title="جارٍ استعادة الجلسة" message="يرجى الانتظار." />
-              : <Login onSignIn={handleSignIn} error={auth.authError} busy={busy} />} />
-          <Route path="dashboard" element={protectedPage(renderHome(auth.roles))} />
+          {/* The old portal login keeps working, but the real screen lives at /auth. */}
+          <Route path="login" element={<Navigate to={HOME} replace />} />
+          <Route path="dashboard" element={protectedPage(<PortalHome roles={auth.roles} userId={auth.userId} />)} />
+          <Route path="profile" element={protectedPage(<Profile userId={auth.userId ?? ""} email={auth.email} roles={auth.roles} />)} />
+          <Route path="operations" element={protectedPage(<Dashboard />)} />
           <Route path="modules/:moduleId" element={protectedPage(<ModuleEntry roles={auth.roles} userId={auth.userId} />)} />
           <Route path="" element={<Navigate to={HOME} replace />} />
           <Route path="*" element={<StatusCard title="الصفحة غير موجودة" message="العنوان المطلوب غير متاح." link={HOME} />} />
