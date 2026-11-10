@@ -34,7 +34,7 @@ class SectionHeader extends StatelessWidget {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
+              color: Colors.white.withOpacity(0.16),
               borderRadius: BorderRadius.circular(9),
             ),
             child: Icon(icon, size: 16, color: Colors.white),
@@ -45,10 +45,7 @@ class SectionHeader extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700),
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
             ),
           ),
           if (actionLabel != null && onAction != null) ...[
@@ -57,11 +54,8 @@ class SectionHeader extends StatelessWidget {
               onTap: onAction,
               borderRadius: BorderRadius.circular(9),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(9)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -69,10 +63,7 @@ class SectionHeader extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       actionLabel!,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: SaiColors.maroon),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: SaiColors.maroon),
                     ),
                   ],
                 ),
@@ -87,12 +78,7 @@ class SectionHeader extends StatelessWidget {
 
 /// Small tinted status chip used on class cards and role rows.
 class TintChip extends StatelessWidget {
-  const TintChip(
-      {super.key,
-      required this.label,
-      required this.color,
-      required this.tint,
-      this.icon});
+  const TintChip({super.key, required this.label, required this.color, required this.tint, this.icon});
 
   final String label;
   final Color color;
@@ -103,8 +89,7 @@ class TintChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration:
-          BoxDecoration(color: tint, borderRadius: BorderRadius.circular(7)),
+      decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(7)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -116,8 +101,7 @@ class TintChip extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700, color: color),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color),
           ),
         ],
       ),

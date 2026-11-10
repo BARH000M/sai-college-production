@@ -63,29 +63,17 @@ class SaiDrawer extends StatelessWidget {
                         width: 44,
                         height: 44,
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12)),
-                        child: Image.asset('assets/images/sai-logo.png',
-                            fit: BoxFit.contain),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                        child: Image.asset('assets/images/sai-logo.png', fit: BoxFit.contain),
                       ),
                       const SizedBox(width: 10),
                       const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('كلية ساي التعليمية اليمنية الصينية',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.4)),
+                            Text('كلية ساي التعليمية اليمنية الصينية', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.4)),
                             SizedBox(height: 2),
-                            Text('世门赛艾教育学院',
-                                style: TextStyle(
-                                    color: Color(0xFFEBC98A),
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600)),
+                            Text('世门赛艾教育学院', style: TextStyle(color: Color(0xFFEBC98A), fontSize: 9, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -96,28 +84,16 @@ class SaiDrawer extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 18,
-                        backgroundColor: Colors.white.withValues(alpha: 0.18),
-                        child: Text(initials,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700)),
+                        backgroundColor: Colors.white.withOpacity(0.18),
+                        child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(identity.fullName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700)),
-                            Text(activeRole.label,
-                                style: const TextStyle(
-                                    color: Color(0xFFEBC98A), fontSize: 10.5)),
+                            Text(identity.fullName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                            Text(activeRole.label, style: const TextStyle(color: Color(0xFFEBC98A), fontSize: 10.5)),
                           ],
                         ),
                       ),
@@ -139,12 +115,9 @@ class SaiDrawer extends StatelessWidget {
                                   onRoleSelected!(role);
                                 },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: selected
-                                  ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.14),
+                              color: selected ? Colors.white : Colors.white.withOpacity(0.14),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -152,8 +125,7 @@ class SaiDrawer extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w700,
-                                color:
-                                    selected ? SaiColors.maroon : Colors.white,
+                                color: selected ? SaiColors.maroon : Colors.white,
                               ),
                             ),
                           ),
@@ -170,11 +142,7 @@ class SaiDrawer extends StatelessWidget {
                 children: [
                   const Padding(
                     padding: EdgeInsetsDirectional.only(start: 6, bottom: 8),
-                    child: Text('التنقل',
-                        style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: SaiColors.muted)),
+                    child: Text('التنقل', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: SaiColors.muted)),
                   ),
                   ...List.generate(slots.length, (index) {
                     final slot = slots[index];
@@ -188,86 +156,33 @@ class SaiDrawer extends StatelessWidget {
                           onSelect(index);
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                           decoration: BoxDecoration(
-                            color: selected
-                                ? SaiColors.maroonTint
-                                : Colors.transparent,
+                            color: selected ? SaiColors.maroonTint : Colors.transparent,
                             borderRadius: BorderRadius.circular(11),
                           ),
                           child: Row(
                             children: [
-                              Icon(selected ? slot.activeIcon : slot.icon,
-                                  size: 19,
-                                  color: selected
-                                      ? SaiColors.maroon
-                                      : SaiColors.muted),
+                              Icon(selected ? slot.activeIcon : slot.icon, size: 19, color: selected ? SaiColors.maroon : SaiColors.muted),
                               const SizedBox(width: 10),
-                              Expanded(
-                                  child: Text(slot.label,
-                                      style: TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: selected
-                                              ? FontWeight.w700
-                                              : FontWeight.w600,
-                                          color: selected
-                                              ? SaiColors.maroon
-                                              : SaiColors.ink))),
-                              Text(navSlotHint(slot.id),
-                                  style: const TextStyle(
-                                      fontSize: 9, color: SaiColors.muted)),
+                              Expanded(child: Text(slot.label, style: TextStyle(fontSize: 12.5, fontWeight: selected ? FontWeight.w700 : FontWeight.w600, color: selected ? SaiColors.maroon : SaiColors.ink))),
+                              Text(navSlotHint(slot.id), style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
                             ],
                           ),
                         ),
                       ),
                     );
                   }),
-                  if (onClasses != null ||
-                      onImportStudents != null ||
-                      onParentLink != null ||
-                      onRoles != null) ...[
+                  if (onClasses != null || onImportStudents != null || onParentLink != null || onRoles != null) ...[
                     const SizedBox(height: 12),
                     const Padding(
                       padding: EdgeInsetsDirectional.only(start: 6, bottom: 8),
-                      child: Text('أدوات الإدارة',
-                          style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: SaiColors.muted)),
+                      child: Text('أدوات الإدارة', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: SaiColors.muted)),
                     ),
-                    if (onClasses != null)
-                      _DrawerTool(
-                          icon: Icons.meeting_room_outlined,
-                          label: 'الصفوف والمقاعد',
-                          onTap: () {
-                            Navigator.of(context).maybePop();
-                            onClasses!();
-                          }),
-                    if (onImportStudents != null)
-                      _DrawerTool(
-                          icon: Icons.upload_file_outlined,
-                          label: 'استيراد الطلاب',
-                          onTap: () {
-                            Navigator.of(context).maybePop();
-                            onImportStudents!();
-                          }),
-                    if (onParentLink != null)
-                      _DrawerTool(
-                          icon: Icons.link,
-                          label: 'ربط ولي الأمر بالطلاب',
-                          onTap: () {
-                            Navigator.of(context).maybePop();
-                            onParentLink!();
-                          }),
-                    if (onRoles != null)
-                      _DrawerTool(
-                          icon: Icons.admin_panel_settings_outlined,
-                          label: 'الأدوار والصلاحيات',
-                          onTap: () {
-                            Navigator.of(context).maybePop();
-                            onRoles!();
-                          }),
+                    if (onClasses != null) _DrawerTool(icon: Icons.meeting_room_outlined, label: 'الصفوف والمقاعد', onTap: () { Navigator.of(context).maybePop(); onClasses!(); }),
+                    if (onImportStudents != null) _DrawerTool(icon: Icons.upload_file_outlined, label: 'استيراد الطلاب', onTap: () { Navigator.of(context).maybePop(); onImportStudents!(); }),
+                    if (onParentLink != null) _DrawerTool(icon: Icons.link, label: 'ربط ولي الأمر بالطلاب', onTap: () { Navigator.of(context).maybePop(); onParentLink!(); }),
+                    if (onRoles != null) _DrawerTool(icon: Icons.admin_panel_settings_outlined, label: 'الأدوار والصلاحيات', onTap: () { Navigator.of(context).maybePop(); onRoles!(); }),
                   ],
                 ],
               ),
@@ -287,11 +202,7 @@ class SaiDrawer extends StatelessWidget {
                     children: [
                       Icon(Icons.logout, size: 19, color: SaiColors.maroon),
                       SizedBox(width: 10),
-                      Text('تسجيل الخروج',
-                          style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: SaiColors.maroon)),
+                      Text('تسجيل الخروج', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.maroon)),
                     ],
                   ),
                 ),
@@ -305,8 +216,7 @@ class SaiDrawer extends StatelessWidget {
 }
 
 class _DrawerTool extends StatelessWidget {
-  const _DrawerTool(
-      {required this.icon, required this.label, required this.onTap});
+  const _DrawerTool({required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
   final String label;
@@ -330,12 +240,7 @@ class _DrawerTool extends StatelessWidget {
             children: [
               Icon(icon, size: 18, color: SaiColors.gold),
               const SizedBox(width: 10),
-              Expanded(
-                  child: Text(label,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: SaiColors.ink))),
+              Expanded(child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: SaiColors.ink))),
               const Icon(Icons.chevron_left, size: 17, color: SaiColors.muted),
             ],
           ),

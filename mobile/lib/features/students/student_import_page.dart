@@ -9,13 +9,7 @@ import '../../widgets/state_views.dart';
 enum _RowState { ready, duplicate, error }
 
 class _ImportRow {
-  _ImportRow(
-      {required this.line,
-      required this.name,
-      required this.admissionNo,
-      required this.className,
-      required this.state,
-      required this.note});
+  _ImportRow({required this.line, required this.name, required this.admissionNo, required this.className, required this.state, required this.note});
 
   final int line;
   final String name;
@@ -42,8 +36,7 @@ class StudentImportPage extends StatefulWidget {
 }
 
 class _StudentImportPageState extends State<StudentImportPage> {
-  static const _sample =
-      'أحمد محمد عبدالله | STU000125 | HSK 1\nسارة علي حسين | STU000126 | HSK 2';
+  static const _sample = 'أحمد محمد عبدالله | STU000125 | HSK 1\nسارة علي حسين | STU000126 | HSK 2';
 
   final _controller = TextEditingController();
   late Future<_ImportSource> _source;
@@ -78,19 +71,14 @@ class _StudentImportPageState extends State<StudentImportPage> {
     final existing = <String>{};
     for (final row in studentRows as List) {
       final value = (row as Map<String, dynamic>)['admission_no'];
-      if (value is String && value.trim().isNotEmpty) {
-        existing.add(value.trim().toLowerCase());
-      }
+      if (value is String && value.trim().isNotEmpty) existing.add(value.trim().toLowerCase());
     }
     return _ImportSource(classIds: classIds, existingNumbers: existing);
   }
 
-  int get _readyCount =>
-      _rows.where((row) => row.state == _RowState.ready).length;
-  int get _duplicateCount =>
-      _rows.where((row) => row.state == _RowState.duplicate).length;
-  int get _errorCount =>
-      _rows.where((row) => row.state == _RowState.error).length;
+  int get _readyCount => _rows.where((row) => row.state == _RowState.ready).length;
+  int get _duplicateCount => _rows.where((row) => row.state == _RowState.duplicate).length;
+  int get _errorCount => _rows.where((row) => row.state == _RowState.error).length;
 
   void _preview(_ImportSource source) {
     final text = _controller.text.trim();
@@ -113,70 +101,37 @@ class _StudentImportPageState extends State<StudentImportPage> {
       final line = raw.trim();
       if (line.isEmpty) continue;
       lineNumber++;
-      final parts =
-          line.split(RegExp(r'[|\t;,]+')).map((part) => part.trim()).toList();
+      final parts = line.split(RegExp(r'[|\t;,]+')).map((part) => part.trim()).toList();
       final name = parts.isNotEmpty ? parts[0] : '';
       final admissionNo = parts.length > 1 ? parts[1] : '';
       final className = parts.length > 2 ? parts[2] : '';
 
       if (name.isEmpty) {
-        parsed.add(_ImportRow(
-            line: lineNumber,
-            name: '—',
-            admissionNo: admissionNo,
-            className: className,
-            state: _RowState.error,
-            note: 'اسم الطالب مفقود'));
+        parsed.add(_ImportRow(line: lineNumber, name: '—', admissionNo: admissionNo, className: className, state: _RowState.error, note: 'اسم الطالب مفقود'));
         continue;
       }
       if (admissionNo.isEmpty) {
-        parsed.add(_ImportRow(
-            line: lineNumber,
-            name: name,
-            admissionNo: '—',
-            className: className,
-            state: _RowState.error,
-            note: 'رقم القيد مفقود'));
+        parsed.add(_ImportRow(line: lineNumber, name: name, admissionNo: '—', className: className, state: _RowState.error, note: 'رقم القيد مفقود'));
         continue;
       }
-      if (className.isEmpty ||
-          !source.classIds.containsKey(className.toLowerCase())) {
-        parsed.add(_ImportRow(
-            line: lineNumber,
-            name: name,
-            admissionNo: admissionNo,
-            className: className.isEmpty ? '—' : className,
-            state: _RowState.error,
-            note: 'الصف غير معروف في النظام'));
+      if (className.isEmpty || !source.classIds.containsKey(className.toLowerCase())) {
+        parsed.add(_ImportRow(line: lineNumber, name: name, admissionNo: admissionNo, className: className.isEmpty ? '—' : className, state: _RowState.error, note: 'الصف غير معروف في النظام'));
         continue;
       }
       final key = admissionNo.toLowerCase();
       if (source.existingNumbers.contains(key) || seen.contains(key)) {
         seen.add(key);
-        parsed.add(_ImportRow(
-            line: lineNumber,
-            name: name,
-            admissionNo: admissionNo,
-            className: className,
-            state: _RowState.duplicate,
-            note: 'موجود مسبقًا — سيُستبعد'));
+        parsed.add(_ImportRow(line: lineNumber, name: name, admissionNo: admissionNo, className: className, state: _RowState.duplicate, note: 'موجود مسبقًا — سيُستبعد'));
         continue;
       }
       seen.add(key);
-      parsed.add(_ImportRow(
-          line: lineNumber,
-          name: name,
-          admissionNo: admissionNo,
-          className: className,
-          state: _RowState.ready,
-          note: 'جاهز للاستيراد'));
+      parsed.add(_ImportRow(line: lineNumber, name: name, admissionNo: admissionNo, className: className, state: _RowState.ready, note: 'جاهز للاستيراد'));
     }
 
     setState(() {
       _rows = parsed;
       _step = parsed.isEmpty ? 0 : 1;
-      _message =
-          parsed.isEmpty ? 'لم يتم العثور على أسطر صالحة للمعاينة.' : null;
+      _message = parsed.isEmpty ? 'لم يتم العثور على أسطر صالحة للمعاينة.' : null;
       _messageIsError = parsed.isEmpty;
     });
   }
@@ -220,8 +175,7 @@ class _StudentImportPageState extends State<StudentImportPage> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _message =
-            'تعذّر الاستيراد: ${error is PostgrestException ? error.message : error}';
+        _message = 'تعذّر الاستيراد: ${error is PostgrestException ? error.message : error}';
         _messageIsError = true;
       });
     }
@@ -240,9 +194,7 @@ class _StudentImportPageState extends State<StudentImportPage> {
       body: FutureBuilder<_ImportSource>(
         future: _source,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const LoadingState();
-          }
+          if (snapshot.connectionState == ConnectionState.waiting) return const LoadingState();
           if (snapshot.hasError) {
             return ErrorState(
               message: '${snapshot.error}',
@@ -253,9 +205,7 @@ class _StudentImportPageState extends State<StudentImportPage> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 26),
             children: [
-              const SectionHeader(
-                  icon: Icons.upload_file_outlined,
-                  title: 'استيراد الطلاب ومعالجة البيانات'),
+              const SectionHeader(icon: Icons.upload_file_outlined, title: 'استيراد الطلاب ومعالجة البيانات'),
               const SizedBox(height: 12),
               _StepBar(step: _step),
               const SizedBox(height: 12),
@@ -269,14 +219,9 @@ class _StudentImportPageState extends State<StudentImportPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('بيانات الطلاب',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: SaiColors.ink)),
+                    const Text('بيانات الطلاب', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: SaiColors.ink)),
                     const SizedBox(height: 2),
-                    const Text('كل سطر: الاسم | رقم القيد | الصف',
-                        style: TextStyle(fontSize: 10, color: SaiColors.muted)),
+                    const Text('كل سطر: الاسم | رقم القيد | الصف', style: TextStyle(fontSize: 10, color: SaiColors.muted)),
                     const SizedBox(height: 9),
                     TextField(
                       controller: _controller,
@@ -284,10 +229,7 @@ class _StudentImportPageState extends State<StudentImportPage> {
                       style: const TextStyle(fontSize: 12, height: 1.8),
                       decoration: const InputDecoration(
                         hintText: _sample,
-                        hintStyle: TextStyle(
-                            fontSize: 11.5,
-                            color: SaiColors.muted,
-                            height: 1.8),
+                        hintStyle: TextStyle(fontSize: 11.5, color: SaiColors.muted, height: 1.8),
                       ),
                     ),
                     const SizedBox(height: 9),
@@ -296,8 +238,7 @@ class _StudentImportPageState extends State<StudentImportPage> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _controller.text = _sample,
-                            icon: const Icon(Icons.content_paste_outlined,
-                                size: 16),
+                            icon: const Icon(Icons.content_paste_outlined, size: 16),
                             label: const Text('نموذج'),
                           ),
                         ),
@@ -319,37 +260,13 @@ class _StudentImportPageState extends State<StudentImportPage> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                        child: _CountTile(
-                            label: 'أخطاء',
-                            value: '$_errorCount',
-                            color: SaiColors.danger,
-                            tint: SaiColors.dangerTint,
-                            icon: Icons.error_outline)),
+                    Expanded(child: _CountTile(label: 'أخطاء', value: '$_errorCount', color: SaiColors.danger, tint: SaiColors.dangerTint, icon: Icons.error_outline)),
                     const SizedBox(width: 7),
-                    Expanded(
-                        child: _CountTile(
-                            label: 'مكررة',
-                            value: '$_duplicateCount',
-                            color: SaiColors.warning,
-                            tint: SaiColors.warningTint,
-                            icon: Icons.copy_all_outlined)),
+                    Expanded(child: _CountTile(label: 'مكررة', value: '$_duplicateCount', color: SaiColors.warning, tint: SaiColors.warningTint, icon: Icons.copy_all_outlined)),
                     const SizedBox(width: 7),
-                    Expanded(
-                        child: _CountTile(
-                            label: 'جاهزة',
-                            value: '$_readyCount',
-                            color: SaiColors.success,
-                            tint: SaiColors.successTint,
-                            icon: Icons.check_circle_outline)),
+                    Expanded(child: _CountTile(label: 'جاهزة', value: '$_readyCount', color: SaiColors.success, tint: SaiColors.successTint, icon: Icons.check_circle_outline)),
                     const SizedBox(width: 7),
-                    Expanded(
-                        child: _CountTile(
-                            label: 'الإجمالي',
-                            value: '${_rows.length}',
-                            color: SaiColors.maroon,
-                            tint: SaiColors.maroonTint,
-                            icon: Icons.list_alt_outlined)),
+                    Expanded(child: _CountTile(label: 'الإجمالي', value: '${_rows.length}', color: SaiColors.maroon, tint: SaiColors.maroonTint, icon: Icons.list_alt_outlined)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -362,26 +279,17 @@ class _StudentImportPageState extends State<StudentImportPage> {
                   child: Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 9),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         decoration: const BoxDecoration(
                           color: SaiColors.creamDeep,
-                          borderRadius:
-                              BorderRadius.vertical(top: Radius.circular(14)),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
                         ),
                         child: const Row(
                           children: [
-                            SizedBox(
-                                width: 24, child: Text('#', style: _headStyle)),
-                            Expanded(
-                                flex: 4,
-                                child: Text('اسم الطالب', style: _headStyle)),
-                            Expanded(
-                                flex: 3,
-                                child: Text('الصف', style: _headStyle)),
-                            Expanded(
-                                flex: 3,
-                                child: Text('الحالة', style: _headStyle)),
+                            SizedBox(width: 24, child: Text('#', style: _headStyle)),
+                            Expanded(flex: 4, child: Text('اسم الطالب', style: _headStyle)),
+                            Expanded(flex: 3, child: Text('الصف', style: _headStyle)),
+                            Expanded(flex: 3, child: Text('الحالة', style: _headStyle)),
                           ],
                         ),
                       ),
@@ -389,10 +297,7 @@ class _StudentImportPageState extends State<StudentImportPage> {
                       if (_rows.length > 40)
                         Padding(
                           padding: const EdgeInsets.all(9),
-                          child: Text(
-                              '+ ${_rows.length - 40} سطرًا إضافيًا في المعاينة',
-                              style: const TextStyle(
-                                  fontSize: 10, color: SaiColors.muted)),
+                          child: Text('+ ${_rows.length - 40} سطرًا إضافيًا في المعاينة', style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
                         ),
                     ],
                   ),
@@ -402,13 +307,9 @@ class _StudentImportPageState extends State<StudentImportPage> {
                 const SizedBox(height: 12),
                 NoteBanner(
                   message: _message!,
-                  icon: _messageIsError
-                      ? Icons.error_outline
-                      : Icons.check_circle_outline,
+                  icon: _messageIsError ? Icons.error_outline : Icons.check_circle_outline,
                   color: _messageIsError ? SaiColors.danger : SaiColors.success,
-                  tint: _messageIsError
-                      ? SaiColors.dangerTint
-                      : SaiColors.successTint,
+                  tint: _messageIsError ? SaiColors.dangerTint : SaiColors.successTint,
                 ),
               ],
               const SizedBox(height: 12),
@@ -416,22 +317,15 @@ class _StudentImportPageState extends State<StudentImportPage> {
                 icon: Icons.info_outline,
                 color: SaiColors.warning,
                 tint: SaiColors.warningTint,
-                message:
-                    'تُستبعد الأسطر المكررة والأسطر التي تحتوي أخطاء تلقائيًا، ولا يتم تعديل أي سجل موجود.',
+                message: 'تُستبعد الأسطر المكررة والأسطر التي تحتوي أخطاء تلقائيًا، ولا يتم تعديل أي سجل موجود.',
               ),
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: _busy || _readyCount == 0 ? null : _confirm,
                 icon: _busy
-                    ? const SizedBox(
-                        width: 15,
-                        height: 15,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.save_alt, size: 17),
-                label: Text(_busy
-                    ? 'جارٍ الاستيراد...'
-                    : 'تأكيد الاستيراد ($_readyCount)'),
+                label: Text(_busy ? 'جارٍ الاستيراد...' : 'تأكيد الاستيراد (${_readyCount})'),
               ),
             ],
           );
@@ -441,8 +335,7 @@ class _StudentImportPageState extends State<StudentImportPage> {
   }
 }
 
-const _headStyle =
-    TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: SaiColors.ink);
+const _headStyle = TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: SaiColors.ink);
 
 class _StepBar extends StatelessWidget {
   const _StepBar({required this.step});
@@ -467,17 +360,11 @@ class _StepBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: active ? SaiColors.maroon : Colors.white,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: active ? SaiColors.maroon : SaiColors.border,
-                      width: 1.5),
+                  border: Border.all(color: active ? SaiColors.maroon : SaiColors.border, width: 1.5),
                 ),
                 child: done
                     ? const Icon(Icons.check, size: 12, color: Colors.white)
-                    : Text('${index + 1}',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: active ? Colors.white : SaiColors.muted)),
+                    : Text('${index + 1}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: active ? Colors.white : SaiColors.muted)),
               ),
               const SizedBox(width: 5),
               Flexible(
@@ -485,20 +372,14 @@ class _StepBar extends StatelessWidget {
                   _labels[index],
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w700,
-                      color: active ? SaiColors.ink : SaiColors.muted),
+                  style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: active ? SaiColors.ink : SaiColors.muted),
                 ),
               ),
               if (index < _labels.length - 1)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Container(
-                        height: 1.5,
-                        color:
-                            index < step ? SaiColors.maroon : SaiColors.border),
+                    child: Container(height: 1.5, color: index < step ? SaiColors.maroon : SaiColors.border),
                   ),
                 ),
             ],
@@ -510,12 +391,7 @@ class _StepBar extends StatelessWidget {
 }
 
 class _CountTile extends StatelessWidget {
-  const _CountTile(
-      {required this.label,
-      required this.value,
-      required this.color,
-      required this.tint,
-      required this.icon});
+  const _CountTile({required this.label, required this.value, required this.color, required this.tint, required this.icon});
 
   final String label;
   final String value;
@@ -527,24 +403,13 @@ class _CountTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
-      decoration: BoxDecoration(
-          color: tint,
-          borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: color.withValues(alpha: 0.2))),
+      decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11), border: Border.all(color: color.withOpacity(0.2))),
       child: Column(
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(height: 5),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-          Text(label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  color: color.withValues(alpha: 0.85))),
+          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: color.withOpacity(0.85))),
         ],
       ),
     );
@@ -571,35 +436,20 @@ class _PreviewRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-              width: 24,
-              child: Text('${row.line}',
-                  style:
-                      const TextStyle(fontSize: 9.5, color: SaiColors.muted))),
+          SizedBox(width: 24, child: Text('${row.line}', style: const TextStyle(fontSize: 9.5, color: SaiColors.muted))),
           Expanded(
             flex: 4,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(row.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: SaiColors.ink)),
-                Text(row.admissionNo,
-                    style:
-                        const TextStyle(fontSize: 8.5, color: SaiColors.muted)),
+                Text(row.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                Text(row.admissionNo, style: const TextStyle(fontSize: 8.5, color: SaiColors.muted)),
               ],
             ),
           ),
           Expanded(
             flex: 3,
-            child: Text(row.className,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 9.5, color: SaiColors.ink)),
+            child: Text(row.className, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9.5, color: SaiColors.ink)),
           ),
           Expanded(
             flex: 3,
@@ -611,11 +461,7 @@ class _PreviewRow extends StatelessWidget {
                   child: TintChip(label: label, color: color, tint: tint),
                 ),
                 const SizedBox(height: 2),
-                Text(row.note,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 8, color: SaiColors.muted, height: 1.4)),
+                Text(row.note, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 8, color: SaiColors.muted, height: 1.4)),
               ],
             ),
           ),
