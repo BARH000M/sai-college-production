@@ -81,7 +81,51 @@ function Add-SessionBackupExclusion([string]$Attribute, [string]$Resource, [stri
 # Preserve the session across normal restarts, but exclude it from reinstall restores.
 Add-SessionBackupExclusion 'fullBackupContent' 'sai_session_backup' 'full-backup-content' @()
 Add-SessionBackupExclusion 'dataExtractionRules' 'sai_session_transfer' 'data-extraction-rules' @('cloud-backup', 'device-transfer')
+# Branded, ASCII-only launcher label prevents the mojibake seen on Android.
+$app.SetAttribute('label', $android, 'Yemen SAI')
+$app.SetAttribute('icon', $android, '@mipmap/ic_launcher')
+$app.SetAttribute('roundIcon', $android, '@mipmap/ic_launcher_round')
 $manifest.Save($manifestPath)
+
+# Always refresh native launcher resources even if android/ already existed.
+$branding = Join-Path $PSScriptRoot 'branding\android'
+if (-not (Test-Path $branding)) { throw 'Missing mobile/branding/android assets.' }
+$res = Join-Path $native 'res'
+Get-ChildItem -LiteralPath $branding -Recurse -File | ForEach-Object {
+    $relative = $_.FullName.Substring($branding.Length + 1)
+    $dest = Join-Path $res $relative
+    New-Item -ItemType Directory -Path (Split-Path $dest) -Force | Out-Null
+    Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
+}
+$utf8 = [Text.UTF8Encoding]::new($false)
+$adaptive = '<?xml version="1.0" encoding="utf-8"?><adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/sai_icon_red"/><foreground android:drawable="@drawable/sai_icon_foreground"/></adaptive-icon>'
+$adaptiveDir = Join-Path $res 'mipmap-anydpi-v26'
+New-Item -ItemType Directory -Path $adaptiveDir -Force | Out-Null
+foreach ($name in @('ic_launcher.xml', 'ic_launcher_round.xml')) {
+    [IO.File]::WriteAllText((Join-Path $adaptiveDir $name), $adaptive, $utf8)
+}
+$values = Join-Path $res 'values'
+New-Item -ItemType Directory -Path $values -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $values 'sai_icon_colors.xml'), '<?xml version="1.0" encoding="utf-8"?><resources><color name="sai_icon_red">#B6000B</color></resources>', $utf8)
+
+# iOS: same display name and opaque icon from the identical SAI artwork.
+$iosInfo = Join-Path $PSScriptRoot 'ios\Runner\Info.plist'
+if (Test-Path -LiteralPath $iosInfo) {
+    $plist = [IO.File]::ReadAllText($iosInfo)
+    $pattern = '(<key>CFBundleDisplayName</key>\s*<string>).*?(</string>)'
+    if ($plist -match $pattern) {
+        $plist = [regex]::Replace($plist, $pattern, '${1}Yemen SAI${2}')
+    } else {
+        $plist = $plist.Replace('<dict>', "<dict>`n    <key>CFBundleDisplayName</key>`n    <string>Yemen SAI</string>")
+    }
+    [IO.File]::WriteAllText($iosInfo, $plist, $utf8)
+    $iconSrc = Join-Path $PSScriptRoot 'branding\ios\AppIcon.appiconset'
+    $iconDst = Join-Path $PSScriptRoot 'ios\Runner\Assets.xcassets\AppIcon.appiconset'
+    if (Test-Path $iconSrc) {
+        New-Item -ItemType Directory -Path $iconDst -Force | Out-Null
+        Copy-Item -Path (Join-Path $iconSrc '*') -Destination $iconDst -Force
+    }
+}
 flutter pub get
 if ($LASTEXITCODE -ne 0) { throw 'Dependency download failed.' }
 Write-Host 'Setup complete. Run .\BUILD_PREVIEW.ps1' -ForegroundColor Green

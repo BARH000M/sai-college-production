@@ -143,7 +143,7 @@ export function VocabularyPage({ roles }: { roles: readonly string[] }) {
         </div>
       </div>
 
-      <LabTabs
+      <LabTabs<Tab>
         label="أقسام المفردات"
         value={tab}
         onChange={setTab}

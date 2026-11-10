@@ -35,6 +35,11 @@ class Repository {
     );
   }
 
+  /// Branches visible to this authenticated user under the server's RLS.
+  /// The user explicitly selects a branch for every new cross-platform record.
+  Future<List<Map<String, dynamic>>> branches() async =>
+      await client.from('branches').select('id,name').order('name');
+
   Future<List<Map<String, dynamic>>> classes() async => await client
       .from('classes')
       .select('id,name,program,capacity')

@@ -18,6 +18,7 @@ export default function Footer() {
             {navLinks.map((l) => <li key={l.id}><a href={`#${l.id}`} className="hover:text-primary-600 cursor-pointer whitespace-nowrap">{l[lang]}</a></li>)}
             <li><Link to="/auth" className="hover:text-primary-600 cursor-pointer whitespace-nowrap text-primary-700">{isAr ? 'تسجيل الدخول' : 'Sign in'}</Link></li>
             <li><Link to="/auth?mode=signup" className="hover:text-primary-600 cursor-pointer whitespace-nowrap">{isAr ? 'حساب جديد' : 'Create account'}</Link></li>
+            <li><Link to="/pages" className="hover:text-primary-600 cursor-pointer whitespace-nowrap">{isAr ? 'صفحات الكلية' : 'College pages'}</Link></li>
             <li><Link to="/application-status" className="hover:text-primary-600 cursor-pointer whitespace-nowrap">{isAr ? 'حالة طلب القبول' : 'Application status'}</Link></li>
           </ul>
         </div>

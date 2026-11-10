@@ -6,9 +6,12 @@ import '../data/curriculum.dart';
 import '../data/demo_school.dart';
 import '../data/demo_workspace.dart';
 import '../data/repository.dart';
+import '../data/module_registry.dart';
 import 'class_screens.dart';
 import 'components.dart';
 import 'learning_screens.dart';
+import 'live_modules.dart';
+import 'system_settings_screen.dart';
 import 'printing.dart';
 import 'records_screen.dart';
 
@@ -32,6 +35,15 @@ const features = <PageId, (String, IconData)>{
   PageId.assignments: ('الواجبات', Icons.assignment_outlined),
   PageId.content: ('استوديو المحتوى', Icons.edit_document),
   PageId.users: ('إدارة الحسابات', Icons.admin_panel_settings_outlined),
+  PageId.downloads: ('مركز التحميل', Icons.download_for_offline_outlined),
+  PageId.inventory: ('المخزون', Icons.inventory_2_outlined),
+  PageId.transport: ('إدارة النقل', Icons.directions_bus_outlined),
+  PageId.portfolio: ('ملف إنجاز الطالب', Icons.school_outlined),
+  PageId.housing: ('السكن الطلابي', Icons.apartment_outlined),
+  PageId.certificates: ('الشهادات', Icons.workspace_premium_outlined),
+  PageId.frontCms: ('Front CMS', Icons.language_outlined),
+  PageId.alumni: ('الخريجون', Icons.history_edu_outlined),
+  PageId.settings: ('إعدادات النظام', Icons.settings_suggest_outlined),
 };
 
 const _favoritePages = <Role, List<PageId>>{
@@ -40,8 +52,9 @@ const _favoritePages = <Role, List<PageId>>{
     PageId.classes,
     PageId.users,
     PageId.reports,
+    PageId.settings,
   ],
-  Role.admin: [PageId.courses, PageId.classes, PageId.staff, PageId.reports],
+  Role.admin: [PageId.courses, PageId.classes, PageId.staff, PageId.reports, PageId.settings],
   Role.teacher: [
     PageId.classes,
     PageId.attendance,
@@ -50,20 +63,22 @@ const _favoritePages = <Role, List<PageId>>{
   ],
   Role.accountant: [PageId.finance, PageId.reports],
   Role.receptionist: [PageId.admissions, PageId.classes],
-  Role.librarian: [PageId.library, PageId.systems],
+  Role.librarian: [PageId.library, PageId.downloads],
   Role.student: [
     PageId.courses,
     PageId.classes,
     PageId.assignments,
     PageId.schedule,
+    PageId.downloads,
   ],
   Role.parent: [
     PageId.schedule,
     PageId.attendance,
     PageId.exams,
     PageId.finance,
+    PageId.certificates,
   ],
-  Role.content_editor: [PageId.content, PageId.courses],
+  Role.content_editor: [PageId.content, PageId.frontCms, PageId.downloads],
 };
 
 class CollegeShell extends StatefulWidget {
@@ -413,6 +428,15 @@ class _CollegeShellState extends State<CollegeShell> {
         attendance: true,
       ),
       PageId.profile => profile(),
+      PageId.settings => demo == null
+          ? LiveSystemSettingsScreen(roles: roles)
+          : list([const EmptyPanel('إعدادات النظام ليست جزءاً من المعاينة المحلية. اربط الحساب الفعلي لإدارتها من النظام المشترك.')]),
+      PageId.reports when demo == null => const LiveReportsScreen(),
+      _ when demo == null && onlineModules.containsKey(page) => LiveModuleScreen(
+          key: ValueKey(page),
+          spec: onlineModules[page]!,
+          roles: roles,
+        ),
       _ =>
         demo == null
             ? list([

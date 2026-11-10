@@ -65,14 +65,17 @@ void main() {
     expect(find.text('المقررات'), findsNothing);
     await tester.tap(find.byTooltip('القائمة'));
     await tester.pumpAndSettle();
+    final logout = find.text('تسجيل الخروج');
     await tester.scrollUntilVisible(
-      find.text('تسجيل الخروج'),
+      logout,
       160,
       scrollable: find.descendant(
         of: find.byType(Drawer),
         matching: find.byType(Scrollable),
       ),
     );
+    await tester.ensureVisible(logout);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('تسجيل الخروج'));
     await tester.pumpAndSettle();
     expect(find.text('معاينة التطبيق'), findsOneWidget);

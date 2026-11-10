@@ -157,7 +157,7 @@ export function LearningAccountPanel() {
 
     {!!created.length && <div className="credential-box" role="status">
       <strong>{created.length > 1 ? "أُنشئ الحسابان بنجاح" : "أُنشئ الحساب بنجاح"}</strong>
-      {created.map((account) => <div key={account.userId}>
+      {created.map((account) => <div key={`${account.role}:${account.email}`}>
         <p className="data-note">
           {account.role === "parent" ? "ولي أمر" : "طالب"} — {account.fullName} · سجل {account.studentName}
         </p>

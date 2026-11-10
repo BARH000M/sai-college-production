@@ -46,7 +46,7 @@ class SaiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    title: 'SAI College',
+    title: 'Yemen SAI',
     theme: saiTheme(),
     locale: const Locale('ar'),
     supportedLocales: const [Locale('ar'), Locale('en')],
@@ -148,7 +148,29 @@ class AccountLoader extends StatefulWidget {
 
 class _AccountLoaderState extends State<AccountLoader> {
   late Future<Account> future = load();
+  StreamSubscription<List<Map<String, dynamic>>>? roleWatch;
   bool signingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = Supabase.instance.client.auth.currentUser?.id;
+    if (id != null) {
+      roleWatch = Supabase.instance.client
+          .from('user_roles')
+          .stream(primaryKey: ['user_id', 'role'])
+          .eq('user_id', id)
+          .listen((_) {
+            if (mounted) setState(() => future = load());
+          }, onError: (Object _, StackTrace _) {});
+    }
+  }
+
+  @override
+  void dispose() {
+    if (roleWatch != null) unawaited(roleWatch!.cancel());
+    super.dispose();
+  }
 
   Future<Account> load() async {
     final auth = Supabase.instance.client.auth;

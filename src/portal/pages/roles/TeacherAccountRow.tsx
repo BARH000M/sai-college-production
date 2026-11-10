@@ -75,7 +75,7 @@ export function TeacherAccountRow({
       setCredentials(result);
       setPassword("");
       setNotice("تم تحديث كلمة مرور المعلم؛ الحساب والبيانات لم تتغير.");
-      setEmailNote(teacherEmailNote(result));
+      setEmailNote(teacherEmailNote(result.emailSent === undefined && !result.emailReason ? undefined : { sent: result.emailSent === true, reason: result.emailReason }));
     } catch (failure) {
       setError(message(failure));
     } finally {
@@ -99,7 +99,7 @@ export function TeacherAccountRow({
         ? `أُزيل إسناد ${result.previousClassNames.join(" و ")} عنه. `
         : "";
       setNotice(`${movedFrom}أُسند ${result.fullName} إلى ${result.className} مع وصوله إلى مقرراته.`);
-      setEmailNote(teacherEmailNote(result));
+      setEmailNote(teacherEmailNote(result.emailSent === undefined && !result.emailReason ? undefined : { sent: result.emailSent === true, reason: result.emailReason }));
       setPanel("");
       setTargetClassId("");
       onChanged();

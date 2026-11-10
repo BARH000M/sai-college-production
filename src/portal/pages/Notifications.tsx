@@ -53,7 +53,7 @@ export function NotificationsPage({ roles }: { roles: readonly string[] }) {
       ]} />
 
       <div className="lab-toolbar">
-        <LabTabs
+        <LabTabs<Tab>
           label="تصفية الإشعارات"
           value={tab}
           onChange={setTab}

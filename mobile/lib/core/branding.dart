@@ -1,3 +1,4 @@
+const appDisplayName = 'Yemen SAI';
 const collegeArabic = 'كلية ساي التعليمية اليمنية الصينية';
 const collegeChinese = '也门赛艾教育学院';
 const collegeWebsite = 'www.sai-academic.com';

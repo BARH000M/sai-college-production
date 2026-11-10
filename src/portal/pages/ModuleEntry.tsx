@@ -22,6 +22,9 @@ import { NotificationsPage } from "./Notifications";
 import { Library } from "./Library";
 import { Communications } from "./Communications";
 import { Finance } from "./Finance";
+import { SystemSettings } from "./SystemSettings";
+import { UnifiedModulePage } from "./UnifiedModulePage";
+import { unifiedModules, type UnifiedId } from "../lib/unifiedModules";
 
 export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userId: string | null }) {
   const { moduleId } = useParams();
@@ -67,6 +70,10 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   if (item.id === "library") return <Library roles={roles} userId={userId} />;
   if (item.id === "communications") return <Communications roles={roles} userId={userId} />;
   if (item.id === "finance") return <Finance roles={roles} userId={userId} />;
+  if (item.id === "settings") return <SystemSettings roles={roles} />;
+  if (Object.prototype.hasOwnProperty.call(unifiedModules, item.id)) {
+    return <UnifiedModulePage key={item.id} roles={roles} spec={unifiedModules[item.id as UnifiedId]} />;
+  }
   return <main className="workspace"><section className="panel">
     <p className="eyebrow">كلية ساي</p><h1>{item.label}</h1>
     <p className="muted">هذا القسم غير متاح بعد. لم تُفعّل وظائفه في التطبيق.</p>

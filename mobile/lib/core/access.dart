@@ -32,6 +32,15 @@ enum PageId {
   assignments,
   content,
   users,
+  downloads,
+  inventory,
+  transport,
+  portfolio,
+  housing,
+  certificates,
+  frontCms,
+  alumni,
+  settings,
 }
 
 class Access {
@@ -61,6 +70,25 @@ class Access {
       PageId.admissions => {Role.receptionist},
       PageId.finance => {Role.accountant, Role.student, Role.parent},
       PageId.library => {Role.librarian, Role.student, Role.teacher},
+      PageId.downloads => {
+        Role.teacher,
+        Role.student,
+        Role.parent,
+        Role.content_editor,
+      },
+      PageId.inventory => {Role.accountant, Role.receptionist},
+      PageId.transport => {
+        Role.receptionist,
+        Role.teacher,
+        Role.student,
+        Role.parent,
+      },
+      PageId.portfolio => {Role.teacher, Role.student, Role.parent},
+      PageId.housing => {Role.receptionist, Role.student, Role.parent},
+      PageId.certificates => {Role.receptionist, Role.student, Role.parent},
+      PageId.frontCms => {Role.content_editor},
+      PageId.alumni => {Role.receptionist},
+      PageId.settings => <Role>{},
       PageId.exams => {Role.teacher, Role.student, Role.parent},
       PageId.reports => {Role.accountant},
       PageId.attendance ||
@@ -84,7 +112,14 @@ class Access {
       PageId.admissions => roles.contains(Role.receptionist),
       PageId.finance => roles.contains(Role.accountant),
       PageId.library => roles.contains(Role.librarian),
-      PageId.content => roles.contains(Role.content_editor),
+      PageId.content || PageId.frontCms => roles.contains(Role.content_editor),
+      PageId.downloads => roles.contains(Role.content_editor),
+      PageId.inventory => roles.contains(Role.accountant),
+      PageId.transport ||
+      PageId.housing ||
+      PageId.certificates ||
+      PageId.alumni => roles.contains(Role.receptionist),
+      PageId.portfolio => roles.contains(Role.teacher),
       _ => false,
     };
   }

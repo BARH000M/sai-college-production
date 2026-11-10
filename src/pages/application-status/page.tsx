@@ -108,36 +108,37 @@ export default function ApplicationStatusPage() {
     setHistory([]);
     setHistoryError('');
     setHistoryLoading(true);
-    supabase
-      .rpc('sai_public_admission_history', { p_reference: result.application_no })
-      .then(({ data, error }) => {
+    void (async () => {
+      try {
+        const { data, error } = await supabase.rpc('sai_public_admission_history', {
+          p_reference: result.application_no,
+        });
         if (!active) return;
         if (error) {
           setHistory([]);
           setHistoryError(isAr ? 'تعذر تحميل سجل التحديثات حاليًا.' : 'We could not load the update history right now.');
-          return;
+        } else {
+          const rows = Array.isArray(data) ? data : [];
+          setHistory(
+            rows
+              .filter((row): row is StatusHistoryRow =>
+                typeof row === 'object' && row !== null && 'new_status' in row && 'occurred_at' in row)
+              .map((row) => ({
+                action: typeof row.action === 'string' ? row.action : 'status_change',
+                new_status: String((row as StatusHistoryRow).new_status),
+                occurred_at: String((row as StatusHistoryRow).occurred_at),
+              })),
+          );
         }
-        const rows = Array.isArray(data) ? data : [];
-        setHistory(
-          rows
-            .filter((row): row is StatusHistoryRow =>
-              typeof row === 'object' && row !== null && 'new_status' in row && 'occurred_at' in row)
-            .map((row) => ({
-              action: typeof row.action === 'string' ? row.action : 'status_change',
-              new_status: String((row as StatusHistoryRow).new_status),
-              occurred_at: String((row as StatusHistoryRow).occurred_at),
-            })),
-        );
-      })
-      .catch(() => {
+      } catch {
         if (active) {
           setHistory([]);
           setHistoryError(isAr ? 'تعذر تحميل سجل التحديثات حاليًا.' : 'We could not load the update history right now.');
         }
-      })
-      .finally(() => {
+      } finally {
         if (active) setHistoryLoading(false);
-      });
+      }
+    })();
     return () => {
       active = false;
     };

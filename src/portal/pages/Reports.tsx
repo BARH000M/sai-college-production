@@ -120,8 +120,8 @@ export function Reports({ roles }: { roles: readonly string[] }) {
     if (!classId) { setStudents([]); setStudentId(""); return; }
     let active = true;
     setStudentsLoading(true);
-    void supabase.from("students").select("id,full_name,admission_no")
-      .eq("class_id", classId).eq("status", "active").order("full_name")
+    void Promise.resolve(supabase.from("students").select("id,full_name,admission_no")
+      .eq("class_id", classId).eq("status", "active").order("full_name"))
       .then((result) => {
         if (!active) return;
         if (result.error) { setOptionsError(result.error.message); setStudents([]); return; }
@@ -129,6 +129,7 @@ export function Reports({ roles }: { roles: readonly string[] }) {
         setStudents(rows);
         setStudentId((current) => (current && rows.some((row) => row.id === current) ? current : rows[0]?.id ?? ""));
       })
+      .catch((failure: unknown) => { if (active) setOptionsError(message(failure)); })
       .finally(() => { if (active) setStudentsLoading(false); });
     return () => { active = false; };
   }, [classId]);

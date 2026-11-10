@@ -44,7 +44,6 @@ export const navigation: readonly NavigationItem[] = [
   { id: "homework", label: "الواجبات", icon: "ri-task-line", roles: ["super_admin", "admin", "teacher", "student", "parent"] },
   { id: "quizzes", label: "الاختبارات القصيرة", icon: "ri-question-line", roles: ["super_admin", "admin", "teacher", "student", "content_editor"] },
   { id: "exams", label: "الامتحانات", icon: "ri-file-paper-2-line", roles: ["super_admin", "admin", "teacher", "student", "parent", "content_editor"] },
-  { id: "certificates", label: "الشهادات والبطاقات", icon: "ri-award-line", roles: ["super_admin", "admin", "teacher", "student", "parent", "receptionist"] },
   { id: "progress", label: "التقدم التعليمي", icon: "ri-line-chart-line", roles: ["super_admin", "admin", "teacher", "student", "parent"] },
   { id: "authoring", label: "تأليف الدروس", icon: "ri-edit-2-line", roles: ["super_admin", "admin", "content_editor", "teacher"] },
   { id: "media", label: "مكتبة الوسائط", icon: "ri-image-line", roles: ["super_admin", "admin", "content_editor", "teacher"] },
@@ -59,7 +58,15 @@ export const navigation: readonly NavigationItem[] = [
   { id: "reports", label: "التقارير والطباعة", icon: "ri-printer-line", roles: ["super_admin", "admin", "teacher", "accountant", "receptionist", "librarian", "content_editor"] },
   { id: "cms", label: "الموقع التعريفي CMS", icon: "ri-layout-4-line", roles: ["super_admin", "admin", "content_editor"] },
   { id: "roles", label: "إدارة الأدوار والصلاحيات", icon: "ri-shield-user-line", roles: ["super_admin"] },
-  { id: "settings", label: "النظام والصلاحيات", icon: "ri-settings-3-line", roles: allRoles },
+  { id: "downloads", label: "مركز التحميل", icon: "ri-download-cloud-line", roles: ["super_admin","admin","teacher","student","parent","librarian","content_editor"] },
+  { id: "inventory", label: "المخزون", icon: "ri-archive-line", roles: ["super_admin","admin","accountant"] },
+  { id: "transport", label: "النقل", icon: "ri-bus-line", roles: ["super_admin","admin","receptionist","student","parent"] },
+  { id: "portfolio", label: "ملف الإنجاز", icon: "ri-file-user-line", roles: ["super_admin","admin","teacher","student","parent"] },
+  { id: "housing", label: "السكن الطلابي", icon: "ri-hotel-bed-line", roles: ["super_admin","admin","receptionist","student","parent"] },
+  { id: "certificates", label: "الشهادات", icon: "ri-award-line", roles: ["super_admin","admin","receptionist","student","parent"] },
+  { id: "frontCms", label: "صفحات Front CMS", icon: "ri-pages-line", roles: ["super_admin","admin","content_editor"] },
+  { id: "alumni", label: "الخريجون", icon: "ri-graduation-cap-line", roles: ["super_admin","admin","receptionist"] },
+  { id: "settings", label: "إعدادات النظام", icon: "ri-settings-3-line", roles: ["super_admin","admin"] },
 ];
 
 /**
@@ -72,6 +79,7 @@ const availableModuleIds: readonly string[] = [
   "courses", "homework", "progress", "attendance", "roles", "reports", "cms",
   "academics", "timetable", "qr", "listening", "speaking", "tones", "vocabulary",
   "handwriting", "reading", "review", "library", "communications", "finance",
+  "downloads", "inventory", "transport", "portfolio", "housing", "certificates", "frontCms", "alumni", "settings",
 ];
 
 export function isAppRole(value: string): value is AppRole {
@@ -100,13 +108,11 @@ export function visibleNavigation(roles: readonly string[]): NavigationItem[] {
 export const pendingModules: readonly { id: string; label: string; reason: string }[] = [
   { id: "quizzes", label: "الاختبارات القصيرة", reason: "تحتاج جداول أسئلة ومحاولات وحساب درجات." },
   { id: "exams", label: "الامتحانات", reason: "تحتاج جدولة امتحانات وربطها بالجلسات الأكاديمية." },
-  { id: "certificates", label: "الشهادات والبطاقات", reason: "تحتاج قوالب شهادات وأرقام تحقق." },
   { id: "authoring", label: "تأليف الدروس", reason: "المحرر الكامل للمحتوى غير مبني بعد؛ تُدار الدروس حالياً من المقررات." },
   { id: "media", label: "مكتبة الوسائط", reason: "تحتاج تخزين ملفات وربطه بمساحة Supabase Storage." },
   { id: "approvals", label: "المراجعة والنشر", reason: "تحتاج حالات مراجعة واعتماد للمحتوى." },
   { id: "staff", label: "شؤون الموظفين", reason: "تحتاج سجلات موظفين وعقوداً وحضوراً إدارياً." },
   { id: "reception", label: "الاستقبال", reason: "تحتاج مسار زوار ومواعيد مستقل عن القبول." },
-  { id: "settings", label: "النظام والصلاحيات", reason: "إعدادات الحساب تُدار من صفحة الأدوار وإعدادات Supabase." },
 ] as const;
 
 export function isModulePending(id: string): boolean {

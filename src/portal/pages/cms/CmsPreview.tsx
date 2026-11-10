@@ -124,7 +124,7 @@ export function CmsPreview({ open, onClose }: { open: boolean; onClose: () => vo
       : newsItems.map((item, index) => ({
         id: `static-${index}`,
         title: item.ar,
-        summary: item.den,
+        summary: item.en,
         tag: item.tag.ar,
         image: item.img,
       }));
