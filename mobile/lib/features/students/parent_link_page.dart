@@ -8,25 +8,36 @@ import '../../widgets/section_header.dart';
 import '../../widgets/state_views.dart';
 
 class _StudentOption {
-  const _StudentOption({required this.id, required this.name, required this.admissionNo, required this.className});
+  const _StudentOption(
+      {required this.id,
+      required this.name,
+      required this.admissionNo,
+      required this.className});
 
   final String id;
   final String name;
   final String admissionNo;
   final String className;
 
-  String get subtitle => [admissionNo, className].where((part) => part.trim().isNotEmpty).join(' · ');
+  String get subtitle => [admissionNo, className]
+      .where((part) => part.trim().isNotEmpty)
+      .join(' · ');
 }
 
 class _GuardianOption {
-  const _GuardianOption({required this.userId, required this.name, required this.email, required this.phone});
+  const _GuardianOption(
+      {required this.userId,
+      required this.name,
+      required this.email,
+      required this.phone});
 
   final String userId;
   final String name;
   final String email;
   final String phone;
 
-  String get subtitle => [phone.trim(), email.trim()].where((part) => part.isNotEmpty).join(' · ');
+  String get subtitle =>
+      [phone.trim(), email.trim()].where((part) => part.isNotEmpty).join(' · ');
 }
 
 class _LinkOptions {
@@ -70,19 +81,27 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
       if (id is String) classNames[id] = (map['name'] as String?) ?? '';
     }
 
-    final studentRows = await client.from('students').select('id,full_name,admission_no,class_id').order('full_name', ascending: true);
+    final studentRows = await client
+        .from('students')
+        .select('id,full_name,admission_no,class_id')
+        .order('full_name', ascending: true);
     final students = (studentRows as List).map((row) {
       final map = row as Map<String, dynamic>;
       final classId = map['class_id'] as String?;
       return _StudentOption(
         id: map['id'] as String,
-        name: (map['full_name'] as String?)?.trim().isNotEmpty == true ? (map['full_name'] as String).trim() : 'طالب',
+        name: (map['full_name'] as String?)?.trim().isNotEmpty == true
+            ? (map['full_name'] as String).trim()
+            : 'طالب',
         admissionNo: (map['admission_no'] as String?) ?? '',
         className: classId == null ? '' : (classNames[classId] ?? ''),
       );
     }).toList();
 
-    final roleRows = await client.from('user_roles').select('user_id,role').eq('role', 'parent');
+    final roleRows = await client
+        .from('user_roles')
+        .select('user_id,role')
+        .eq('role', 'parent');
     final guardianIds = <String>[];
     for (final row in roleRows as List) {
       final id = (row as Map<String, dynamic>)['user_id'];
@@ -91,12 +110,17 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
 
     final guardians = <_GuardianOption>[];
     if (guardianIds.isNotEmpty) {
-      final profileRows = await client.from('profiles').select('id,full_name,email,phone').inFilter('id', guardianIds);
+      final profileRows = await client
+          .from('profiles')
+          .select('id,full_name,email,phone')
+          .inFilter('id', guardianIds);
       for (final row in profileRows as List) {
         final map = row as Map<String, dynamic>;
         guardians.add(_GuardianOption(
           userId: map['id'] as String,
-          name: (map['full_name'] as String?)?.trim().isNotEmpty == true ? (map['full_name'] as String).trim() : 'ولي أمر',
+          name: (map['full_name'] as String?)?.trim().isNotEmpty == true
+              ? (map['full_name'] as String).trim()
+              : 'ولي أمر',
           email: (map['email'] as String?) ?? '',
           phone: (map['phone'] as String?) ?? '',
         ));
@@ -205,25 +229,41 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final filtered = options.where((item) => query.isEmpty || matches(item, query)).toList();
+            final filtered = options
+                .where((item) => query.isEmpty || matches(item, query))
+                .toList();
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom),
               child: SizedBox(
                 height: MediaQuery.of(context).size.height * 0.62,
                 child: Column(
                   children: [
                     const SizedBox(height: 10),
-                    Container(width: 38, height: 4, decoration: BoxDecoration(color: SaiColors.border, borderRadius: BorderRadius.circular(4))),
+                    Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: SaiColors.border,
+                            borderRadius: BorderRadius.circular(4))),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                       child: Row(
                         children: [
-                          Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: SaiColors.ink))),
-                          IconButton(onPressed: () => Navigator.of(sheetContext).pop(), icon: const Icon(Icons.close, size: 18)),
+                          Expanded(
+                              child: Text(title,
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: SaiColors.ink))),
+                          IconButton(
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                              icon: const Icon(Icons.close, size: 18)),
                         ],
                       ),
                     ),
@@ -231,30 +271,46 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: TextField(
                         autofocus: false,
-                        onChanged: (value) => setSheetState(() => query = value.trim().toLowerCase()),
+                        onChanged: (value) => setSheetState(
+                            () => query = value.trim().toLowerCase()),
                         style: const TextStyle(fontSize: 12.5),
                         decoration: InputDecoration(
                           hintText: hint,
-                          prefixIcon: const Icon(Icons.search, size: 18, color: SaiColors.muted),
-                          prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                          prefixIcon: const Icon(Icons.search,
+                              size: 18, color: SaiColors.muted),
+                          prefixIconConstraints:
+                              const BoxConstraints(minWidth: 38, minHeight: 38),
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Expanded(
                       child: filtered.isEmpty
-                          ? const Center(child: Text('لا نتائج مطابقة', style: TextStyle(fontSize: 12, color: SaiColors.muted)))
+                          ? const Center(
+                              child: Text('لا نتائج مطابقة',
+                                  style: TextStyle(
+                                      fontSize: 12, color: SaiColors.muted)))
                           : ListView.separated(
                               itemCount: filtered.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
+                              separatorBuilder: (_, __) => const Divider(
+                                  height: 1, indent: 16, endIndent: 16),
                               itemBuilder: (context, index) {
                                 final item = filtered[index];
                                 return ListTile(
-                                  onTap: () => Navigator.of(sheetContext).pop(item),
+                                  onTap: () =>
+                                      Navigator.of(sheetContext).pop(item),
                                   dense: true,
-                                  title: Text(labelOf(item), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
-                                  subtitle: Text(subtitleOf(item), style: const TextStyle(fontSize: 10.5, color: SaiColors.muted)),
-                                  trailing: const Icon(Icons.chevron_left, size: 17, color: SaiColors.muted),
+                                  title: Text(labelOf(item),
+                                      style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: SaiColors.ink)),
+                                  subtitle: Text(subtitleOf(item),
+                                      style: const TextStyle(
+                                          fontSize: 10.5,
+                                          color: SaiColors.muted)),
+                                  trailing: const Icon(Icons.chevron_left,
+                                      size: 17, color: SaiColors.muted),
                                 );
                               },
                             ),
@@ -282,31 +338,47 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
       body: FutureBuilder<_LinkOptions>(
         future: _future,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const LoadingState();
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const LoadingState();
+          }
           if (snapshot.hasError) {
             return ErrorState(message: '${snapshot.error}', onRetry: _retry);
           }
-          final options = snapshot.data ?? const _LinkOptions(students: [], guardians: []);
+          final options =
+              snapshot.data ?? const _LinkOptions(students: [], guardians: []);
           return ListView(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 26),
             children: [
-              const SectionHeader(icon: Icons.link, title: 'ربط حساب ولي الأمر بحساب الطالب'),
+              const SectionHeader(
+                  icon: Icons.link, title: 'ربط حساب ولي الأمر بحساب الطالب'),
               const SizedBox(height: 12),
               _FieldCard(
                 label: 'اختر الطالب',
                 isRequired: true,
-                value: _student == null ? null : '${_student!.name} — ${_student!.subtitle}',
-                onTap: options.students.isEmpty ? null : () => _pickStudent(options.students),
-                emptyHint: options.students.isEmpty ? 'لا توجد سجلات طلاب متاحة' : 'اضغط للاختيار من سجلات الطلاب',
+                value: _student == null
+                    ? null
+                    : '${_student!.name} — ${_student!.subtitle}',
+                onTap: options.students.isEmpty
+                    ? null
+                    : () => _pickStudent(options.students),
+                emptyHint: options.students.isEmpty
+                    ? 'لا توجد سجلات طلاب متاحة'
+                    : 'اضغط للاختيار من سجلات الطلاب',
                 icon: Icons.person_search_outlined,
               ),
               const SizedBox(height: 10),
               _FieldCard(
                 label: 'اختر ولي الأمر',
                 isRequired: true,
-                value: _guardian == null ? null : '${_guardian!.name} — ${_guardian!.subtitle}',
-                onTap: options.guardians.isEmpty ? null : () => _pickGuardian(options.guardians),
-                emptyHint: options.guardians.isEmpty ? 'لا توجد حسابات بأدوار ولي أمر بعد' : 'اضغط للاختيار من حسابات أولياء الأمور',
+                value: _guardian == null
+                    ? null
+                    : '${_guardian!.name} — ${_guardian!.subtitle}',
+                onTap: options.guardians.isEmpty
+                    ? null
+                    : () => _pickGuardian(options.guardians),
+                emptyHint: options.guardians.isEmpty
+                    ? 'لا توجد حسابات بأدوار ولي أمر بعد'
+                    : 'اضغط للاختيار من حسابات أولياء الأمور',
                 icon: Icons.family_restroom_outlined,
               ),
               if (_student != null && _guardian != null) ...[
@@ -321,45 +393,60 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: SaiColors.border),
                 ),
-                child: Column(
+                child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.verified_user_outlined, size: 16, color: SaiColors.maroon),
-                        const SizedBox(width: 6),
-                        const Text('الصلاحيات الممنوحة لولي الأمر', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                        Icon(Icons.verified_user_outlined,
+                            size: 16, color: SaiColors.maroon),
+                        SizedBox(width: 6),
+                        Text('الصلاحيات الممنوحة لولي الأمر',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: SaiColors.ink)),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    const _PermissionRow(label: 'الاطلاع على الحضور والغياب'),
-                    const _PermissionRow(label: 'الاطلاع على الدرجات والتقييم'),
-                    const _PermissionRow(label: 'الاطلاع على الرسوم والإيصالات'),
-                    const _PermissionRow(label: 'الاطلاع على الإعلانات والرسائل'),
-                    const NoteBanner(
+                    SizedBox(height: 8),
+                    _PermissionRow(label: 'الاطلاع على الحضور والغياب'),
+                    _PermissionRow(label: 'الاطلاع على الدرجات والتقييم'),
+                    _PermissionRow(label: 'الاطلاع على الرسوم والإيصالات'),
+                    _PermissionRow(label: 'الاطلاع على الإعلانات والرسائل'),
+                    NoteBanner(
                       icon: Icons.lock_outline,
                       color: SaiColors.warning,
                       tint: SaiColors.warningTint,
-                      message: 'تُطبّق هذه الصلاحيات من سياسات الحماية في قاعدة البيانات، ولا يمكن تجاوزها من التطبيق.',
+                      message:
+                          'تُطبّق هذه الصلاحيات من سياسات الحماية في قاعدة البيانات، ولا يمكن تجاوزها من التطبيق.',
                     ),
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                   ],
                 ),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                NoteBanner(icon: Icons.error_outline, color: SaiColors.danger, tint: SaiColors.dangerTint, message: _error!),
+                NoteBanner(
+                    icon: Icons.error_outline,
+                    color: SaiColors.danger,
+                    tint: SaiColors.dangerTint,
+                    message: _error!),
               ],
               if (_success != null) ...[
                 const SizedBox(height: 10),
-                NoteBanner(icon: Icons.check_circle_outline, color: SaiColors.success, tint: SaiColors.successTint, message: _success!),
+                NoteBanner(
+                    icon: Icons.check_circle_outline,
+                    color: SaiColors.success,
+                    tint: SaiColors.successTint,
+                    message: _success!),
               ],
               const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
+                      onPressed:
+                          _busy ? null : () => Navigator.of(context).maybePop(),
                       child: const Text('إلغاء'),
                     ),
                   ),
@@ -369,7 +456,11 @@ class _ParentLinkPageState extends State<ParentLinkPage> {
                     child: FilledButton.icon(
                       onPressed: _busy ? null : _confirm,
                       icon: _busy
-                          ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              width: 15,
+                              height: 15,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.link, size: 17),
                       label: Text(_busy ? 'جارٍ الحفظ...' : 'تأكيد الربط'),
                     ),
@@ -412,11 +503,15 @@ class _FieldCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: filled ? SaiColors.maroon.withOpacity(0.4) : SaiColors.border),
+          border: Border.all(
+              color: filled
+                  ? SaiColors.maroon.withValues(alpha: 0.4)
+                  : SaiColors.border),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: filled ? SaiColors.maroon : SaiColors.muted),
+            Icon(icon,
+                size: 18, color: filled ? SaiColors.maroon : SaiColors.muted),
             const SizedBox(width: 9),
             Expanded(
               child: Column(
@@ -424,8 +519,17 @@ class _FieldCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: SaiColors.muted)),
-                      if (isRequired) const Text(' *', style: TextStyle(fontSize: 10, color: SaiColors.danger, fontWeight: FontWeight.w700)),
+                      Text(label,
+                          style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: SaiColors.muted)),
+                      if (isRequired)
+                        const Text(' *',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: SaiColors.danger,
+                                fontWeight: FontWeight.w700)),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -433,7 +537,11 @@ class _FieldCard extends StatelessWidget {
                     filled ? value! : emptyHint,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, fontWeight: filled ? FontWeight.w700 : FontWeight.w400, color: filled ? SaiColors.ink : SaiColors.muted, height: 1.5),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: filled ? FontWeight.w700 : FontWeight.w400,
+                        color: filled ? SaiColors.ink : SaiColors.muted,
+                        height: 1.5),
                   ),
                 ],
               ),
@@ -459,13 +567,24 @@ class _SelectedPreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: SaiColors.goldTint,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: SaiColors.gold.withOpacity(0.3)),
+        border: Border.all(color: SaiColors.gold.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Expanded(child: _PreviewPerson(name: student.name, meta: student.subtitle, icon: Icons.school_outlined)),
-          Container(width: 1, height: 34, color: SaiColors.gold.withOpacity(0.35)),
-          Expanded(child: _PreviewPerson(name: guardian.name, meta: guardian.subtitle, icon: Icons.person_outline)),
+          Expanded(
+              child: _PreviewPerson(
+                  name: student.name,
+                  meta: student.subtitle,
+                  icon: Icons.school_outlined)),
+          Container(
+              width: 1,
+              height: 34,
+              color: SaiColors.gold.withValues(alpha: 0.35)),
+          Expanded(
+              child: _PreviewPerson(
+                  name: guardian.name,
+                  meta: guardian.subtitle,
+                  icon: Icons.person_outline)),
         ],
       ),
     );
@@ -473,7 +592,8 @@ class _SelectedPreview extends StatelessWidget {
 }
 
 class _PreviewPerson extends StatelessWidget {
-  const _PreviewPerson({required this.name, required this.meta, required this.icon});
+  const _PreviewPerson(
+      {required this.name, required this.meta, required this.icon});
 
   final String name;
   final String meta;
@@ -491,8 +611,18 @@ class _PreviewPerson extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
-                Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: SaiColors.ink)),
+                Text(meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        const TextStyle(fontSize: 9, color: SaiColors.muted)),
               ],
             ),
           ),
@@ -516,11 +646,15 @@ class _PermissionRow extends StatelessWidget {
           Container(
             width: 18,
             height: 18,
-            decoration: const BoxDecoration(color: SaiColors.successTint, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: SaiColors.successTint, shape: BoxShape.circle),
             child: const Icon(Icons.check, size: 12, color: SaiColors.success),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 11.5, color: SaiColors.ink))),
+          Expanded(
+              child: Text(label,
+                  style:
+                      const TextStyle(fontSize: 11.5, color: SaiColors.ink))),
         ],
       ),
     );

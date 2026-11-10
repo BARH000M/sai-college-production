@@ -26,7 +26,8 @@ class _Notice {
 }
 
 class _NoticeGroup {
-  const _NoticeGroup({required this.label, required this.hint, required this.items});
+  const _NoticeGroup(
+      {required this.label, required this.hint, required this.items});
   final String label;
   final String hint;
   final List<_Notice> items;
@@ -35,7 +36,8 @@ class _NoticeGroup {
 /// Mobile notifications centre, grouped by day exactly like the web centre so a
 /// teacher can scan yesterday's items without reading the whole list.
 class NotificationsPage extends StatefulWidget {
-  const NotificationsPage({super.key, required this.identity, required this.role});
+  const NotificationsPage(
+      {super.key, required this.identity, required this.role});
 
   final AppIdentity identity;
   final AppRole role;
@@ -54,7 +56,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         AppRole.receptionist,
       }.contains(widget.role);
 
-  bool get _isLearner => widget.role == AppRole.student || widget.role == AppRole.parent;
+  bool get _isLearner =>
+      widget.role == AppRole.student || widget.role == AppRole.parent;
 
   @override
   void initState() {
@@ -77,10 +80,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
         final map = row as Map<String, dynamic>;
         items.add(_Notice(
           id: 'admissions-${map['id']}',
-          title: 'طلب قبول جديد: ${(map['applicant_full_name'] as String?) ?? 'متقدم'}',
-          detail: (map['preferred_program'] as String?)?.trim().isNotEmpty == true
-              ? 'البرنامج: ${map['preferred_program']}'
-              : 'بانتظار أول تواصل من فريق القبول',
+          title:
+              'طلب قبول جديد: ${(map['applicant_full_name'] as String?) ?? 'متقدم'}',
+          detail:
+              (map['preferred_program'] as String?)?.trim().isNotEmpty == true
+                  ? 'البرنامج: ${map['preferred_program']}'
+                  : 'بانتظار أول تواصل من فريق القبول',
           at: _parseDate(map['created_at']),
           icon: Icons.person_add_alt_1_outlined,
           tint: SaiColors.red,
@@ -132,7 +137,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
         items.add(_Notice(
           id: 'grade-${map['id']}',
           title: 'صُحّح واجب: $homeworkTitle',
-          detail: score == null ? 'صدرت ملاحظات المعلم على تسليمك.' : 'الدرجة $score',
+          detail: score == null
+              ? 'صدرت ملاحظات المعلم على تسليمك.'
+              : 'الدرجة $score',
           at: _parseDate(map['graded_at']),
           icon: Icons.rate_review_outlined,
           tint: SaiColors.success,
@@ -153,7 +160,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
         items.add(_Notice(
           id: 'attendance-${map['id']}',
           title: late ? 'تأخر مسجل' : 'غياب مسجل',
-          detail: late ? 'سُجّل تأخر طالب في إحدى الحصص.' : 'سُجّل غياب طالب في إحدى الحصص.',
+          detail: late
+              ? 'سُجّل تأخر طالب في إحدى الحصص.'
+              : 'سُجّل غياب طالب في إحدى الحصص.',
           at: _parseDate(map['marked_at']),
           icon: Icons.event_busy_outlined,
           tint: SaiColors.warning,
@@ -196,10 +205,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
 
     return [
-      if (today.isNotEmpty) _NoticeGroup(label: 'اليوم', hint: 'أحدث التحديثات', items: today),
-      if (yesterday.isNotEmpty) _NoticeGroup(label: 'أمس', hint: 'خلال آخر ٢٤ ساعة', items: yesterday),
-      if (week.isNotEmpty) _NoticeGroup(label: 'هذا الأسبوع', hint: 'آخر ٧ أيام', items: week),
-      if (older.isNotEmpty) _NoticeGroup(label: 'أقدم من ذلك', hint: 'أرشيف الإشعارات', items: older),
+      if (today.isNotEmpty)
+        _NoticeGroup(label: 'اليوم', hint: 'أحدث التحديثات', items: today),
+      if (yesterday.isNotEmpty)
+        _NoticeGroup(label: 'أمس', hint: 'خلال آخر ٢٤ ساعة', items: yesterday),
+      if (week.isNotEmpty)
+        _NoticeGroup(label: 'هذا الأسبوع', hint: 'آخر ٧ أيام', items: week),
+      if (older.isNotEmpty)
+        _NoticeGroup(
+            label: 'أقدم من ذلك', hint: 'أرشيف الإشعارات', items: older),
     ];
   }
 
@@ -232,7 +246,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('تعذر تحميل الإشعارات\n${snapshot.error}', textAlign: TextAlign.center, style: const TextStyle(color: SaiColors.muted, height: 1.7)),
+                child: Text('تعذر تحميل الإشعارات\n${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(color: SaiColors.muted, height: 1.7)),
               ),
             );
           }
@@ -241,7 +258,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(26),
-                child: Text('لا توجد إشعارات حالياً.', style: TextStyle(color: SaiColors.muted)),
+                child: Text('لا توجد إشعارات حالياً.',
+                    style: TextStyle(color: SaiColors.muted)),
               ),
             );
           }
@@ -264,11 +282,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       children: [
                         Row(
                           children: [
-                            Text(group.label, style: const TextStyle(fontWeight: FontWeight.w700, color: SaiColors.navy, fontSize: 13)),
+                            Text(group.label,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: SaiColors.navy,
+                                    fontSize: 13)),
                             const SizedBox(width: 8),
-                            const Expanded(child: Divider(color: SaiColors.border, height: 1)),
+                            const Expanded(
+                                child: Divider(
+                                    color: SaiColors.border, height: 1)),
                             const SizedBox(width: 8),
-                            Text('${group.items.length} · ${group.hint}', style: const TextStyle(fontSize: 10.5, color: SaiColors.muted)),
+                            Text('${group.items.length} · ${group.hint}',
+                                style: const TextStyle(
+                                    fontSize: 10.5, color: SaiColors.muted)),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -281,23 +307,36 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     children: [
                                       CircleAvatar(
                                         radius: 19,
-                                        backgroundColor: item.tint.withOpacity(0.12),
+                                        backgroundColor:
+                                            item.tint.withValues(alpha: 0.12),
                                         foregroundColor: item.tint,
                                         child: Icon(item.icon, size: 19),
                                       ),
                                       const SizedBox(width: 11),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Text(item.title, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.navy)),
+                                            Text(item.title,
+                                                style: const TextStyle(
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: SaiColors.navy)),
                                             const SizedBox(height: 2),
-                                            Text(item.detail, style: const TextStyle(fontSize: 11.5, color: SaiColors.muted, height: 1.6)),
+                                            Text(item.detail,
+                                                style: const TextStyle(
+                                                    fontSize: 11.5,
+                                                    color: SaiColors.muted,
+                                                    height: 1.6)),
                                           ],
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(_timeLabel(item.at), style: const TextStyle(fontSize: 10.5, color: SaiColors.muted)),
+                                      Text(_timeLabel(item.at),
+                                          style: const TextStyle(
+                                              fontSize: 10.5,
+                                              color: SaiColors.muted)),
                                     ],
                                   ),
                                 ),

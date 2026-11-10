@@ -1,0 +1,1829 @@
+diff --git "a/D:\\SAI-College-Production\\database-backups\\main_schema.sql" "b/D:\\SAI-College-Production\\database-backups\\staging_schema.sql"
+index b7cc8fc..3503024 100644
+--- "a/D:\\SAI-College-Production\\database-backups\\main_schema.sql"
++++ "b/D:\\SAI-College-Production\\database-backups\\staging_schema.sql"
+@@ -2,7 +2,7 @@
+ -- PostgreSQL database dump
+ --
+ 
+-\restrict XwtrCe5WBcfVAHY6UE2XcgynDJPNm9ba8ep7fl8K6TomhXW9KueQ2Fo8Ig0APJA
++\restrict o3byLYEzT84pYdIPyoRTDWZs9jNv4uEWpYltK3FiF2ZkqERb5bbwtgYR4JAqsWo
+ 
+ -- Dumped from database version 17.11
+ -- Dumped by pg_dump version 17.11
+@@ -51,430 +51,626 @@ CREATE TYPE public.app_role AS ENUM (
+ 
+ 
+ --
+--- Name: rls_auto_enable(); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_admissions_audit(); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.rls_auto_enable() RETURNS event_trigger
++CREATE FUNCTION public.sai_admissions_audit() RETURNS trigger
+     LANGUAGE plpgsql SECURITY DEFINER
+-    SET search_path TO 'pg_catalog'
++    SET search_path TO 'public'
+     AS $$
+-DECLARE
+-  cmd record;
+-  tbl name;
+-BEGIN
+-  FOR cmd IN
+-    SELECT *
+-    FROM pg_event_trigger_ddl_commands()
+-    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
+-      AND object_type IN ('table','partitioned table')
+-  LOOP
+-     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN
+-      BEGIN
+-        SELECT c.relname INTO tbl FROM pg_catalog.pg_class c WHERE c.oid = cmd.objid;
+-        EXECUTE format('alter table if exists %I.%I enable row level security', cmd.schema_name, tbl);
+-        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;
+-      EXCEPTION
+-        WHEN OTHERS THEN
+-          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;
+-      END;
+-     ELSE
+-        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;
+-     END IF;
+-  END LOOP;
+-END;
++declare
++  changed jsonb := '[]'::jsonb;
++  old_status text;
++begin
++  if tg_op = 'UPDATE' then
++    old_status := old.status;
++    select coalesce(jsonb_agg(k.key order by k.key), '[]'::jsonb)
++      into changed from jsonb_each(to_jsonb(new)) k
++      where k.value is distinct from to_jsonb(old) -> k.key;
++  end if;
++  insert into public.audit_logs (actor_user_id, action, entity_type, entity_id, metadata)
++  values (auth.uid(), case when tg_op = 'UPDATE' and old.status is distinct from new.status
++      then 'status_change' else lower(tg_op) end,
++    'admissions_enquiries', new.id,
++    jsonb_build_object('source', 'sai_admissions_trigger', 'branch_id', new.branch_id,
++      'changed_columns', changed, 'old_status', old_status, 'new_status', new.status));
++  return new;
++end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_admission_history(uuid); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_admissions_prepare(); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admission_history(p_enquiry_id uuid) RETURNS TABLE(entry_id uuid, action text, old_status text, new_status text, changed_columns jsonb, actor_id uuid, actor_name text, occurred_at timestamp with time zone)
+-    LANGUAGE plpgsql STABLE SECURITY DEFINER
++CREATE FUNCTION public.sai_admissions_prepare() RETURNS trigger
++    LANGUAGE plpgsql SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+-declare
+-  v_branch uuid;
+ begin
+-  select e.branch_id into v_branch from public.admissions_enquiries e where e.id = p_enquiry_id;
+-  if v_branch is null then
+-    raise exception 'Enquiry not found' using errcode = 'P0002';
+-  end if;
+   if not (public.sai_security_has_role('super_admin')
+-    or (public.sai_security_branch_member(v_branch)
++    or (public.sai_security_branch_member(new.branch_id)
+       and (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist')))) then
+     raise exception 'Not authorized for this branch' using errcode = '42501';
+   end if;
+-
+-  return query
+-    select a.id,
+-           a.action,
+-           nullif(a.metadata ->> 'old_status', ''),
+-           nullif(a.metadata ->> 'new_status', ''),
+-           coalesce(a.metadata -> 'changed_columns', '[]'::jsonb),
+-           a.actor_user_id,
+-           coalesce(nullif(btrim(p.full_name), ''), 'النظام'),
+-           a.created_at
+-    from public.audit_logs a
+-    left join public.profiles p on p.id = a.actor_user_id
+-    where a.entity_type = 'admissions_enquiries'
+-      and a.entity_id = p_enquiry_id
+-    order by a.created_at, a.id;
++  if tg_op = 'INSERT' or new.academic_session_id is distinct from old.academic_session_id then
++    if not exists (select 1 from public.academic_sessions s
++      where s.id = new.academic_session_id and s.is_active) then
++      raise exception 'Active session is required' using errcode = '23514';
++    end if;
++  end if;
++  if new.assigned_to is not null and (tg_op = 'INSERT' or new.assigned_to is distinct from old.assigned_to) then
++    if not exists (
++      select 1 from public.branch_memberships m
++      where m.user_id = new.assigned_to and m.branch_id = new.branch_id and m.is_active
++        and exists (select 1 from public.user_roles r where r.user_id = m.user_id
++          and r.role in ('super_admin','admin','teacher','accountant','receptionist','librarian','content_editor'))
++    ) then
++      raise exception 'Assignee is not active staff in this branch';
++    end if;
++  end if;
++  new.updated_at := now();
++  if new.status in ('enrolled','rejected','withdrawn') then
++    if tg_op = 'INSERT' then new.closed_at := now();
++    elsif old.status not in ('enrolled','rejected','withdrawn') then new.closed_at := now();
++    else new.closed_at := old.closed_at;
++    end if;
++  else
++    new.closed_at := null;
++  end if;
++  return new;
+ end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_admission_history_export(uuid, timestamp with time zone, timestamp with time zone, uuid); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_admissions_sessions(uuid); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admission_history_export(p_branch uuid DEFAULT NULL::uuid, p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_enquiry_id uuid DEFAULT NULL::uuid) RETURNS TABLE(application_no text, applicant_full_name text, branch_name text, action text, old_status text, new_status text, changed_columns text, actor_name text, occurred_at timestamp with time zone)
++CREATE FUNCTION public.sai_admissions_sessions(wanted_branch uuid) RETURNS TABLE(id uuid, name text)
+     LANGUAGE plpgsql STABLE SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+-declare
+-  v_super boolean := public.sai_security_has_role('super_admin');
+ begin
+-  if p_enquiry_id is not null then
+-    if not (v_super or (public.sai_security_branch_member(
+-        (select e.branch_id from public.admissions_enquiries e where e.id = p_enquiry_id))
+-      and (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist')))) then
+-      raise exception 'Not authorized for this enquiry' using errcode = '42501';
+-    end if;
+-  elsif not v_super then
+-    if p_branch is null then
+-      raise exception 'Branch is required' using errcode = '22023';
+-    end if;
+-    if not (public.sai_security_branch_member(p_branch)
+-      and (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist'))) then
+-      raise exception 'Not authorized for this branch' using errcode = '42501';
+-    end if;
++  if wanted_branch is null or not exists (select 1 from public.branches b where b.id = wanted_branch)
++    or not (public.sai_security_has_role('super_admin')
++      or (public.sai_security_branch_member(wanted_branch)
++        and (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist')))) then
++    raise exception 'Not authorized for this branch' using errcode = '42501';
+   end if;
+-
+-  return query
+-    select e.application_no,
+-           e.applicant_full_name,
+-           b.name,
+-           a.action,
+-           nullif(a.metadata ->> 'old_status', ''),
+-           nullif(a.metadata ->> 'new_status', ''),
+-           (select string_agg(t.item, ', ')
+-              from jsonb_array_elements_text(coalesce(a.metadata -> 'changed_columns', '[]'::jsonb)) as t(item)),
+-           coalesce(nullif(btrim(p.full_name), ''), 'النظام'),
+-           a.created_at
+-      from public.audit_logs a
+-      join public.admissions_enquiries e on e.id = a.entity_id
+-      left join public.profiles p on p.id = a.actor_user_id
+-      left join public.branches b on b.id = e.branch_id
+-     where a.entity_type = 'admissions_enquiries'
+-       and (p_enquiry_id is null or e.id = p_enquiry_id)
+-       and (p_branch is null or e.branch_id = p_branch)
+-       and (p_from is null or a.created_at >= p_from)
+-       and (p_to is null or a.created_at <= p_to)
+-     order by a.created_at, a.id;
++  return query select s.id, s.name from public.academic_sessions s
++    where s.is_active order by s.name, s.id;
+ end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_admission_reminder_candidates(); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_admissions_staff(uuid); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admission_reminder_candidates() RETURNS TABLE(enquiry_id uuid, application_no text, applicant_full_name text, email text, phone text, preferred_program text, preferred_level text, branch_name text, session_name text, status text, created_at timestamp with time zone, days_open integer)
++CREATE FUNCTION public.sai_admissions_staff(wanted_branch uuid) RETURNS TABLE(user_id uuid, full_name text)
+     LANGUAGE plpgsql STABLE SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+-declare
+-  v_claim_role text := current_setting('request.jwt.claim.role', true);
+ begin
+-  -- Only the server (service role) or a direct database session may read applicant contacts.
+-  if coalesce(v_claim_role, '') not in ('', 'service_role') then
+-    raise exception 'Not authorized' using errcode = '42501';
++  if not (public.sai_security_has_role('super_admin')
++    or (public.sai_security_branch_member(wanted_branch)
++      and (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist')))) then
++    raise exception 'Not authorized for this branch' using errcode = '42501';
+   end if;
+-
+   return query
+-    select e.id,
+-           e.application_no,
+-           e.applicant_full_name,
+-           e.email,
+-           e.phone,
+-           e.preferred_program,
+-           e.preferred_level,
+-           b.name,
+-           s.name,
+-           e.status,
+-           e.created_at,
+-           (now()::date - e.created_at::date)
+-      from public.admissions_enquiries e
+-      left join public.branches b on b.id = e.branch_id
+-      left join public.academic_sessions s on s.id = e.academic_session_id
+-     where e.status = 'new'
+-       and e.created_at <= now() - interval '3 days'
+-       and not exists (
+-         select 1 from public.admission_reminder_log l
+-          where l.enquiry_id = e.id and l.reminder_kind = 'stale_new'
+-       )
+-     order by e.created_at;
++    select m.user_id, p.full_name
++    from public.branch_memberships m
++    join public.profiles p on p.id = m.user_id
++    where m.branch_id = wanted_branch and m.is_active
++      and exists (select 1 from public.user_roles r where r.user_id = m.user_id
++        and r.role in ('super_admin','admin','teacher','accountant','receptionist','librarian','content_editor'))
++    order by p.full_name, m.user_id;
+ end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_admission_roster_export(uuid, uuid, text, timestamp with time zone, timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_attendance_audit(); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admission_roster_export(p_branch uuid DEFAULT NULL::uuid, p_session uuid DEFAULT NULL::uuid, p_status text DEFAULT NULL::text, p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone) RETURNS TABLE(application_no text, applicant_full_name text, guardian_name text, phone text, email text, preferred_program text, preferred_level text, branch_name text, session_name text, status text, assigned_name text, source text, notes text, created_at timestamp with time zone, updated_at timestamp with time zone)
+-    LANGUAGE plpgsql STABLE SECURITY DEFINER
++CREATE FUNCTION public.sai_attendance_audit() RETURNS trigger
++    LANGUAGE plpgsql SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+-declare
+-  v_super boolean := public.sai_security_has_role('super_admin');
++declare audit_action text;
+ begin
+-  if not v_super then
+-    if not (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist')) then
+-      raise exception 'Not authorized to export admissions' using errcode = '42501';
+-    end if;
+-    if p_branch is null then
+-      raise exception 'Branch is required' using errcode = '22023';
+-    end if;
+-    if not public.sai_security_branch_member(p_branch) then
+-      raise exception 'Not authorized for this branch' using errcode = '42501';
+-    end if;
+-  end if;
+-
+-  return query
+-    select e.application_no,
+-           e.applicant_full_name,
+-           e.guardian_name,
+-           e.phone,
+-           e.email,
+-           e.preferred_program,
+-           e.preferred_level,
+-           b.name,
+-           s.name,
+-           e.status,
+-           coalesce(nullif(btrim(p.full_name), ''), 'غير مسند'),
+-           e.source,
+-           e.notes,
+-           e.created_at,
+-           e.updated_at
+-      from public.admissions_enquiries e
+-      left join public.branches b on b.id = e.branch_id
+-      left join public.academic_sessions s on s.id = e.academic_session_id
+-      left join public.profiles p on p.id = e.assigned_to
+-     where (p_branch is null or e.branch_id = p_branch)
+-       and (p_session is null or e.academic_session_id = p_session)
+-       and (p_status is null or e.status = p_status)
+-       and (p_from is null or e.created_at >= p_from)
+-       and (p_to is null or e.created_at <= p_to)
+-     order by e.created_at, e.id;
++  if tg_table_name = 'attendance_sessions' then
++    if tg_op = 'INSERT' then audit_action := 'create';
++    elsif new.status = 'closed' then audit_action := 'close';
++    elsif new.status = 'cancelled' then audit_action := 'cancel';
++    else audit_action := 'update'; end if;
++  elsif tg_op = 'INSERT' then audit_action := 'mark';
++  else audit_action := 'correct'; end if;
++  insert into public.audit_logs (actor_user_id, action, entity_type, entity_id, metadata)
++    values (auth.uid(), audit_action, tg_table_name, new.id,
++      jsonb_build_object('source', 'sai_attendance_trigger'));
++  return new;
+ end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_admission_status_email_context(uuid); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_attendance_classes(); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admission_status_email_context(p_enquiry_id uuid) RETURNS TABLE(application_no text, applicant_full_name text, email text, status text, previous_status text, preferred_program text, preferred_level text, branch_name text, session_name text, occurrence timestamp with time zone)
+-    LANGUAGE plpgsql STABLE SECURITY DEFINER
++CREATE FUNCTION public.sai_attendance_classes() RETURNS TABLE(id uuid, name text, branch_id uuid, academic_session_id uuid, teacher_id uuid)
++    LANGUAGE sql STABLE SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+-declare
+-  v_branch uuid;
+-begin
+-  select e.branch_id into v_branch from public.admissions_enquiries e where e.id = p_enquiry_id;
+-  if v_branch is null then
+-    raise exception 'Enquiry not found' using errcode = 'P0002';
+-  end if;
+-  if not (public.sai_security_has_role('super_admin')
+-    or (public.sai_security_branch_member(v_branch)
+-      and (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist')))) then
+-    raise exception 'Not authorized for this branch' using errcode = '42501';
+-  end if;
++  select c.id, c.name, c.branch_id, c.session_id, c.teacher_id
++  from public.classes c where public.sai_attendance_manage_class(c.id)
++    or (public.sai_security_has_role('receptionist') and public.sai_security_branch_member(c.branch_id))
++    or public.sai_security_can_read_class(c.id)
++  order by c.name, c.id;
++$$;
+ 
+-  return query
+-    select e.application_no,
+-           e.applicant_full_name,
+-           e.email,
+-           e.status,
+-           (select nullif(a.metadata ->> 'old_status', '')
+-              from public.audit_logs a
+-             where a.entity_type = 'admissions_enquiries'
+-               and a.entity_id = e.id
+-               and a.action = 'status_change'
+-             order by a.created_at desc, a.id desc
+-             limit 1),
+-           e.preferred_program,
+-           e.preferred_level,
+-           (select b.name from public.branches b where b.id = e.branch_id),
+-           (select s.name from public.academic_sessions s where s.id = e.academic_session_id),
+-           e.updated_at
+-      from public.admissions_enquiries e
+-     where e.id = p_enquiry_id;
+-end;
++
++--
++-- Name: sai_attendance_manage_class(uuid); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_attendance_manage_class(wanted_class uuid) RETURNS boolean
++    LANGUAGE sql STABLE SECURITY DEFINER
++    SET search_path TO 'public'
++    AS $$
++  select exists (
++    select 1 from public.classes c where c.id = wanted_class and (
++      public.sai_security_has_role('super_admin')
++      or (public.sai_security_branch_member(c.branch_id) and (
++        public.sai_security_has_role('admin')
++        or (public.sai_security_has_role('teacher') and c.teacher_id = (select auth.uid()))
++      ))
++    )
++  );
+ $$;
+ 
+ 
+ --
+--- Name: sai_admissions_audit(); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_attendance_prepare_record(); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admissions_audit() RETURNS trigger
++CREATE FUNCTION public.sai_attendance_prepare_record() RETURNS trigger
+     LANGUAGE plpgsql SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+-declare
+-  changed jsonb := '[]'::jsonb;
+-  old_status text;
++declare session_row public.attendance_sessions%rowtype;
+ begin
+-  if tg_op = 'UPDATE' then
+-    old_status := old.status;
+-    select coalesce(jsonb_agg(k.key order by k.key), '[]'::jsonb)
+-      into changed from jsonb_each(to_jsonb(new)) k
+-      where k.value is distinct from to_jsonb(old) -> k.key;
++  select * into session_row from public.attendance_sessions a
++    where a.id = new.attendance_session_id for update;
++  if not found then raise exception 'Attendance session not found' using errcode = '23503'; end if;
++  if not (public.sai_attendance_manage_class(session_row.class_id)
++    or (tg_op = 'UPDATE' and public.sai_security_has_role('receptionist')
++      and public.sai_security_branch_member(session_row.branch_id))) then
++    raise exception 'Not authorized for this attendance' using errcode = '42501';
+   end if;
+-  insert into public.audit_logs (actor_user_id, action, entity_type, entity_id, metadata)
+-  values (auth.uid(), case when tg_op = 'UPDATE' and old.status is distinct from new.status
+-      then 'status_change' else lower(tg_op) end,
+-    'admissions_enquiries', new.id,
+-    jsonb_build_object('source', 'sai_admissions_trigger', 'branch_id', new.branch_id,
+-      'changed_columns', changed, 'old_status', old_status, 'new_status', new.status));
++  if session_row.status <> 'open' then
++    raise exception 'Attendance session is read-only' using errcode = '23514';
++  end if;
++  if tg_op = 'INSERT' then
++    perform 1 from public.students s where s.id = new.student_id
++      and s.class_id = session_row.class_id and s.branch_id = session_row.branch_id for share;
++    if not found then
++      raise exception 'Student does not belong to this class' using errcode = '23514';
++    end if;
++  end if;
++  new.marked_by := auth.uid();
++  new.marked_at := now();
++  new.updated_at := now();
+   return new;
+ end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_admissions_prepare(); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_attendance_prepare_session(); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admissions_prepare() RETURNS trigger
++CREATE FUNCTION public.sai_attendance_prepare_session() RETURNS trigger
+     LANGUAGE plpgsql SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+ begin
+-  if coalesce(current_setting('sai.public_web_enquiry', true), '') <> 'on' then
+-    if not (public.sai_security_has_role('super_admin')
+-      or (public.sai_security_branch_member(new.branch_id)
+-        and (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist')))) then
+-      raise exception 'Not authorized for this branch' using errcode = '42501';
+-    end if;
+-    if new.assigned_to is not null and (tg_op = 'INSERT' or new.assigned_to is distinct from old.assigned_to) then
+-      if not exists (
+-        select 1 from public.branch_memberships m
+-        where m.user_id = new.assigned_to and m.branch_id = new.branch_id and m.is_active
+-          and exists (select 1 from public.user_roles r where r.user_id = m.user_id
+-            and r.role in ('super_admin','admin','teacher','accountant','receptionist','librarian','content_editor'))
+-      ) then
+-        raise exception 'Assignee is not active staff in this branch';
+-      end if;
+-    end if;
++  if not public.sai_attendance_manage_class(new.class_id) then
++    raise exception 'Not authorized for this class' using errcode = '42501';
+   end if;
+-  if tg_op = 'INSERT' or new.academic_session_id is distinct from old.academic_session_id then
+-    if not exists (select 1 from public.academic_sessions s
+-      where s.id = new.academic_session_id and s.is_active) then
+-      raise exception 'Active session is required' using errcode = '23514';
+-    end if;
++  if tg_op = 'UPDATE' and old.status <> 'open' then
++    raise exception 'Attendance session is read-only' using errcode = '23514';
+   end if;
+-  new.updated_at := now();
+-  if new.status in ('enrolled','rejected','withdrawn') then
+-    if tg_op = 'INSERT' then new.closed_at := now();
+-    elsif old.status not in ('enrolled','rejected','withdrawn') then new.closed_at := now();
+-    else new.closed_at := old.closed_at;
+-    end if;
+-  else
+-    new.closed_at := null;
++  if new.attendance_date > (now() at time zone 'Asia/Aden')::date then
++    raise exception 'Future attendance date is not permitted' using errcode = '23514';
++  end if;
++  if not exists (select 1 from public.classes c where c.id = new.class_id
++    and c.branch_id = new.branch_id and c.session_id = new.academic_session_id) then
++    raise exception 'Class, branch and academic session do not match' using errcode = '23514';
+   end if;
++  new.updated_at := now();
+   return new;
+ end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_admissions_staff(uuid); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_attendance_roster(uuid); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admissions_staff(wanted_branch uuid) RETURNS TABLE(user_id uuid, full_name text)
++CREATE FUNCTION public.sai_attendance_roster(wanted_session uuid) RETURNS TABLE(student_id uuid, full_name text, record_id uuid, attendance_status text, note text)
+     LANGUAGE plpgsql STABLE SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
++declare session_row public.attendance_sessions%rowtype; manager boolean;
+ begin
+-  if not (public.sai_security_has_role('super_admin')
+-    or (public.sai_security_branch_member(wanted_branch)
+-      and (public.sai_security_has_role('admin') or public.sai_security_has_role('receptionist')))) then
+-    raise exception 'Not authorized for this branch' using errcode = '42501';
++  select * into session_row from public.attendance_sessions where id = wanted_session;
++  if not found then raise exception 'Attendance session not found' using errcode = '42501'; end if;
++  manager := public.sai_attendance_manage_class(session_row.class_id);
++  if not (manager or (public.sai_security_has_role('receptionist')
++    and public.sai_security_branch_member(session_row.branch_id))) then
++    raise exception 'Not authorized for roster' using errcode = '42501';
+   end if;
+-  return query
+-    select m.user_id, p.full_name
+-    from public.branch_memberships m
+-    join public.profiles p on p.id = m.user_id
+-    where m.branch_id = wanted_branch and m.is_active
+-      and exists (select 1 from public.user_roles r where r.user_id = m.user_id
+-        and r.role in ('super_admin','admin','teacher','accountant','receptionist','librarian','content_editor'))
+-    order by p.full_name, m.user_id;
++  return query select s.id, s.full_name, r.id, r.status, r.note
++    from public.students s
++    left join public.attendance_records r on r.student_id = s.id and r.attendance_session_id = wanted_session
++    where (manager and s.class_id = session_row.class_id and s.branch_id = session_row.branch_id)
++      or r.id is not null
++    order by s.full_name, s.id;
+ end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_admissions_stale_new_count(uuid); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_attendance_view_record(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_admissions_stale_new_count(p_branch uuid DEFAULT NULL::uuid) RETURNS integer
+-    LANGUAGE plpgsql STABLE SECURITY DEFINER
++CREATE FUNCTION public.sai_attendance_view_record(wanted_session uuid, wanted_student uuid) RETURNS boolean
++    LANGUAGE sql STABLE SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+-declare
+-  v_count integer;
++  select exists (
++    select 1 from public.attendance_sessions a
++    join public.students s on s.id = wanted_student
++    where a.id = wanted_session and (
++      public.sai_attendance_manage_class(a.class_id)
++      or (public.sai_security_has_role('receptionist') and public.sai_security_branch_member(a.branch_id))
++      or (public.sai_security_has_role('student') and s.user_id = (select auth.uid()))
++      or (public.sai_security_has_role('parent') and exists (
++        select 1 from public.parent_student_links l where l.student_id = s.id
++          and l.parent_user_id = (select auth.uid()) and l.verified_at is not null
++      ))
++    )
++  );
++$$;
++
++
++--
++-- Name: sai_attendance_view_session(uuid); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_attendance_view_session(wanted_session uuid) RETURNS boolean
++    LANGUAGE sql STABLE SECURITY DEFINER
++    SET search_path TO 'public'
++    AS $$
++  select exists (
++    select 1 from public.attendance_sessions a where a.id = wanted_session and (
++      public.sai_attendance_manage_class(a.class_id)
++      or (public.sai_security_has_role('receptionist') and public.sai_security_branch_member(a.branch_id))
++      or exists (select 1 from public.attendance_records r
++        where r.attendance_session_id = a.id and public.sai_attendance_view_record(a.id, r.student_id))
++    )
++  );
++$$;
++
++
++--
++-- Name: sai_finance_assign(uuid, uuid, numeric, date); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_assign(wanted_group uuid, wanted_student uuid, wanted_discount numeric, wanted_due date) RETURNS uuid
++    LANGUAGE plpgsql SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$
++declare g sai_finance.fee_groups%rowtype; student_class uuid; result uuid; discount numeric;
+ begin
+-  if p_branch is null then
+-    if not public.sai_security_has_role('super_admin'::app_role) then
+-      raise exception 'Not authorized' using errcode = '42501';
++  select * into g from sai_finance.fee_groups where id = wanted_group and is_active for share;
++  if not found or not sai_finance.can_staff(g.branch_id, array['admin','accountant']) then
++    raise exception 'Fee group unavailable or unauthorized' using errcode = '42501';
++  end if;
++  discount := round(wanted_discount, 2);
++  if wanted_discount is null or wanted_discount < 0 or wanted_discount = 'NaN'::numeric or discount > g.amount then
++    raise exception 'Invalid discount' using errcode = '23514';
++  end if;
++  select c.id into student_class from public.students s join public.classes c on c.id = s.class_id
++    where s.id = wanted_student and s.branch_id = g.branch_id and c.branch_id = g.branch_id
++      and c.session_id = g.academic_session_id for share of s, c;
++  if not found then raise exception 'Student class, branch and session do not match' using errcode = '23514'; end if;
++  insert into sai_finance.assignments(fee_group_id, student_id, branch_id, academic_session_id, class_id,
++    original_amount, discount_amount, due_date, created_by)
++    values (g.id, wanted_student, g.branch_id, g.academic_session_id, student_class, g.amount,
++      discount, coalesce(wanted_due, g.due_date), auth.uid()) returning id into result;
++  insert into sai_finance.audit_log(branch_id, actor_id, action, entity_id, details)
++    values (g.branch_id, auth.uid(), 'assign', result,
++      jsonb_build_object('group_id', g.id, 'original_amount', g.amount, 'discount', discount));
++  return result;
++end;
++$$;
++
++
++--
++-- Name: sai_finance_assignments(); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_assignments() RETURNS TABLE(id uuid, fee_group_id uuid, student_id uuid, branch_id uuid, academic_session_id uuid, class_id uuid, original_amount numeric, discount_amount numeric, final_amount numeric, due_date date, status text, balance numeric)
++    LANGUAGE sql STABLE SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$
++  select a.id, a.fee_group_id, a.student_id, a.branch_id, a.academic_session_id,
++    a.class_id, a.original_amount, a.discount_amount, a.final_amount, a.due_date,
++    case when a.cancelled_at is not null then 'cancelled'
++      when sai_finance.balance(a.id) = 0 and exists (select 1 from sai_finance.waivers w where w.assignment_id = a.id) then 'waived'
++      when sai_finance.balance(a.id) = 0 then 'paid'
++      when exists (select 1 from sai_finance.payments p where p.assignment_id = a.id and p.voided_at is null) then 'partial'
++      else 'unpaid' end,
++    case when a.cancelled_at is not null then 0 else sai_finance.balance(a.id) end
++  from sai_finance.assignments a order by a.created_at desc, a.id
++$$;
++
++
++--
++-- Name: sai_finance_audit(uuid); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_audit(wanted_branch uuid) RETURNS TABLE(id bigint, actor_id uuid, action text, entity_id uuid, details jsonb, created_at timestamp with time zone)
++    LANGUAGE sql STABLE SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$ select l.id, l.actor_id, l.action, l.entity_id, l.details, l.created_at
++  from sai_finance.audit_log l where l.branch_id = wanted_branch order by l.id desc $$;
++
++
++--
++-- Name: sai_finance_cancel(uuid, text); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_cancel(wanted_assignment uuid, wanted_reason text) RETURNS void
++    LANGUAGE plpgsql SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$
++declare a sai_finance.assignments%rowtype;
++begin
++  select * into a from sai_finance.assignments where id = wanted_assignment for update;
++  if not found or not sai_finance.can_staff(a.branch_id, array['admin','accountant']) then
++    raise exception 'Assignment unavailable or unauthorized' using errcode = '42501';
++  end if;
++  if a.cancelled_at is not null or wanted_reason is null or btrim(wanted_reason) = ''
++    or exists (select 1 from sai_finance.payments p where p.assignment_id = a.id and p.voided_at is null) then
++    raise exception 'Cancellation requires a reason and no posted payment' using errcode = '23514';
++  end if;
++  update sai_finance.assignments set cancelled_at = now(), cancelled_by = auth.uid(), cancellation_reason = btrim(wanted_reason)
++    where id = a.id;
++  insert into sai_finance.audit_log(branch_id, actor_id, action, entity_id, details)
++    values (a.branch_id, auth.uid(), 'cancel', a.id, jsonb_build_object('reason', btrim(wanted_reason)));
++end;
++$$;
++
++
++--
++-- Name: sai_finance_groups(); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_groups() RETURNS TABLE(id uuid, branch_id uuid, academic_session_id uuid, name text, description text, amount numeric, currency text, due_date date, is_active boolean, created_by uuid, created_at timestamp with time zone, updated_at timestamp with time zone)
++    LANGUAGE sql STABLE SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$ select g.id, g.branch_id, g.academic_session_id, g.name, g.description, g.amount,
++  g.currency, g.due_date, g.is_active, g.created_by, g.created_at, g.updated_at
++  from sai_finance.fee_groups g order by g.created_at desc, g.id $$;
++
++
++--
++-- Name: sai_finance_pay(uuid, numeric, text, text, uuid); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_pay(wanted_assignment uuid, wanted_amount numeric, wanted_method text, wanted_reference text, wanted_key uuid) RETURNS uuid
++    LANGUAGE plpgsql SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$
++declare a sai_finance.assignments%rowtype; p sai_finance.payments%rowtype; result uuid;
++  amount numeric; ref text := nullif(btrim(wanted_reference), '');
++begin
++  select * into a from sai_finance.assignments where id = wanted_assignment for update;
++  if not found or not sai_finance.can_staff(a.branch_id, array['admin','accountant','receptionist']) then
++    raise exception 'Assignment unavailable or unauthorized' using errcode = '42501';
++  end if;
++  if wanted_amount is null or wanted_amount <= 0 or wanted_amount = 'NaN'::numeric or wanted_method is null
++    or wanted_method not in ('cash','bank_transfer','wallet','card') or wanted_key is null
++    or (wanted_method <> 'cash' and ref is null) then
++    raise exception 'Invalid payment' using errcode = '23514';
++  end if;
++  amount := round(wanted_amount, 2);
++  if amount <= 0 then raise exception 'Invalid payment amount' using errcode = '23514'; end if;
++  select * into p from sai_finance.payments where idempotency_key = wanted_key;
++  if found then
++    if p.assignment_id <> wanted_assignment or p.amount <> amount or p.method <> wanted_method
++      or p.transaction_reference is distinct from ref then
++      raise exception 'Idempotency key conflict' using errcode = '23505';
+     end if;
+-  elsif not public.sai_security_can_read_branch(p_branch) then
+-    raise exception 'Not authorized' using errcode = '42501';
++    return p.id;
++  end if;
++  if a.cancelled_at is not null or amount > sai_finance.balance(a.id) then
++    raise exception 'Payment exceeds outstanding balance or assignment is cancelled' using errcode = '23514';
+   end if;
++  insert into sai_finance.payments(assignment_id, branch_id, amount, method, transaction_reference,
++    idempotency_key, receipt_number, posted_by)
++    values (a.id, a.branch_id, amount, wanted_method, ref, wanted_key,
++      'SAI-' || to_char(now() at time zone 'Asia/Aden', 'YYYY') || '-' ||
++        to_char(nextval('sai_finance.receipt_sequence'), 'FM00000000000000000000'), auth.uid()) returning id into result;
++  insert into sai_finance.audit_log(branch_id, actor_id, action, entity_id, details)
++    values (a.branch_id, auth.uid(), 'payment_post', result, jsonb_build_object('amount', amount, 'assignment_id', a.id));
++  return result;
++end;
++$$;
+ 
+-  select count(*)::integer into v_count
+-    from public.admissions_enquiries e
+-   where e.status = 'new'
+-     and e.created_at <= now() - interval '3 days'
+-     and (p_branch is null or e.branch_id = p_branch);
+ 
+-  return coalesce(v_count, 0);
++--
++-- Name: sai_finance_payments(uuid); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_payments(wanted_assignment uuid) RETURNS TABLE(id uuid, assignment_id uuid, amount numeric, currency text, method text, transaction_reference text, receipt_number text, posted_by uuid, posted_at timestamp with time zone, voided_at timestamp with time zone, voided_by uuid, void_reason text)
++    LANGUAGE sql STABLE SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$ select p.id, p.assignment_id, p.amount, p.currency, p.method, p.transaction_reference,
++  p.receipt_number, p.posted_by, p.posted_at, p.voided_at, p.voided_by, p.void_reason
++  from sai_finance.payments p where p.assignment_id = wanted_assignment order by p.posted_at desc, p.id $$;
++
++
++--
++-- Name: sai_finance_refund(uuid, numeric, text, text, text, uuid); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_refund(wanted_payment uuid, wanted_amount numeric, wanted_method text, wanted_reference text, wanted_reason text, wanted_key uuid) RETURNS uuid
++    LANGUAGE plpgsql SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$
++declare p sai_finance.payments%rowtype; a sai_finance.assignments%rowtype; r sai_finance.refunds%rowtype; amount numeric;
++  ref text := nullif(btrim(wanted_reference), ''); result uuid;
++begin
++  if not sai_finance.has_role(array['super_admin']) then
++    raise exception 'Only a super admin may issue refunds' using errcode = '42501';
++  end if;
++  select * into p from sai_finance.payments where id = wanted_payment;
++  if not found then raise exception 'Payment not found' using errcode = '23503'; end if;
++  select * into a from sai_finance.assignments where id = p.assignment_id for update;
++  select * into p from sai_finance.payments where id = wanted_payment;
++  amount := round(wanted_amount, 2);
++  if wanted_key is null then raise exception 'Refund key required' using errcode = '23514'; end if;
++  select * into r from sai_finance.refunds where idempotency_key = wanted_key;
++  if found then
++    if r.payment_id is distinct from wanted_payment or r.amount is distinct from amount
++      or r.method is distinct from wanted_method or r.reference is distinct from ref
++      or r.reason is distinct from btrim(wanted_reason) then
++      raise exception 'Refund idempotency key conflict' using errcode = '23505';
++    end if;
++    return r.id;
++  end if;
++  if p.voided_at is null or wanted_amount is null or wanted_amount <= 0 or wanted_amount = 'NaN'::numeric or amount <= 0
++    or wanted_method is null or wanted_method not in ('cash','bank_transfer','wallet','card')
++    or (wanted_method <> 'cash' and ref is null) or wanted_reason is null or btrim(wanted_reason) = ''
++    or amount > p.amount - coalesce((select sum(r.amount) from sai_finance.refunds r where r.payment_id = p.id), 0) then
++    raise exception 'Invalid refund or refund exceeds remaining amount' using errcode = '23514';
++  end if;
++  insert into sai_finance.refunds(payment_id, branch_id, amount, method, reference, refund_number, reason, issued_by, idempotency_key)
++    values (p.id, p.branch_id, amount, wanted_method, ref,
++      'SAI-R-' || to_char(now() at time zone 'Asia/Aden', 'YYYY') || '-' ||
++        to_char(nextval('sai_finance.refund_sequence'), 'FM00000000000000000000'), btrim(wanted_reason), auth.uid(), wanted_key)
++    returning id into result;
++  insert into sai_finance.audit_log(branch_id, actor_id, action, entity_id, details)
++    values (p.branch_id, auth.uid(), 'refund', result,
++      jsonb_build_object('payment_id', p.id, 'amount', amount, 'reason', btrim(wanted_reason)));
++  return result;
+ end;
+ $$;
+ 
+ 
+ --
+--- Name: sai_directory(); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_finance_refunds(uuid); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_directory() RETURNS TABLE(user_id uuid, full_name text, email text, preferred_locale text, has_profile boolean, signed_up_at timestamp with time zone, roles text[])
++CREATE FUNCTION public.sai_finance_refunds(wanted_payment uuid) RETURNS TABLE(id uuid, payment_id uuid, amount numeric, method text, reference text, refund_number text, reason text, issued_by uuid, issued_at timestamp with time zone)
++    LANGUAGE sql STABLE SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$ select r.id, r.payment_id, r.amount, r.method, r.reference, r.refund_number, r.reason, r.issued_by, r.issued_at
++  from sai_finance.refunds r where r.payment_id = wanted_payment order by r.issued_at desc, r.id $$;
++
++
++--
++-- Name: sai_finance_save_group(uuid, uuid, uuid, text, text, numeric, date, boolean); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_save_group(wanted_id uuid, wanted_branch uuid, wanted_session uuid, wanted_name text, wanted_description text, wanted_amount numeric, wanted_due date, wanted_active boolean) RETURNS uuid
+     LANGUAGE plpgsql SECURITY DEFINER
+-    SET search_path TO 'public'
++    SET search_path TO 'pg_catalog', 'public', 'auth'
+     AS $$
++declare group_row sai_finance.fee_groups%rowtype;
+ begin
+-  if not public.sai_security_has_role('super_admin') then
+-    raise exception 'forbidden' using errcode = '42501';
++  if auth.uid() is null or not sai_finance.can_staff(wanted_branch, array['admin','accountant']) then
++    raise exception 'Not authorized for this branch' using errcode = '42501';
++  end if;
++  if wanted_name is null or btrim(wanted_name) = '' or wanted_amount is null
++    or wanted_amount < 0 or wanted_amount = 'NaN'::numeric or wanted_due is null or wanted_active is null then
++    raise exception 'Invalid fee group' using errcode = '23514';
+   end if;
++  if wanted_id is null then
++    insert into sai_finance.fee_groups(branch_id, academic_session_id, name, description, amount, due_date, is_active, created_by)
++      values (wanted_branch, wanted_session, btrim(wanted_name), nullif(btrim(wanted_description), ''),
++        round(wanted_amount, 2), wanted_due, wanted_active, auth.uid()) returning * into group_row;
++  else
++    update sai_finance.fee_groups set name = btrim(wanted_name), description = nullif(btrim(wanted_description), ''),
++      amount = round(wanted_amount, 2), due_date = wanted_due, is_active = wanted_active, updated_at = now()
++      where id = wanted_id and branch_id = wanted_branch and academic_session_id = wanted_session
++      returning * into group_row;
++    if not found then raise exception 'Fee group not found or scope changed' using errcode = '42501'; end if;
++  end if;
++  insert into sai_finance.audit_log(branch_id, actor_id, action, entity_id, details)
++    values (group_row.branch_id, auth.uid(), case when wanted_id is null then 'group_create' else 'group_update' end,
++      group_row.id, jsonb_build_object('amount', group_row.amount, 'due_date', group_row.due_date, 'is_active', group_row.is_active));
++  return group_row.id;
++end;
++$$;
+ 
+-  return query
+-    select u.id,
+-           coalesce(nullif(p.full_name, ''),
+-                    nullif(u.raw_user_meta_data ->> 'full_name', ''),
+-                    u.email::text,
+-                    'Unnamed account')::text as full_name,
+-           coalesce(p.email, u.email)::text as email,
+-           coalesce(p.preferred_locale, 'ar')::text as preferred_locale,
+-           (p.id is not null) as has_profile,
+-           u.created_at as signed_up_at,
+-           coalesce((select array_agg(r.role::text) from public.user_roles r where r.user_id = u.id),
+-                    array[]::text[]) as roles
+-    from auth.users u
+-    left join public.profiles p on p.id = u.id
+-    order by 2;
++
++--
++-- Name: sai_finance_void(uuid, text); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_void(wanted_payment uuid, wanted_reason text) RETURNS void
++    LANGUAGE plpgsql SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$
++declare p sai_finance.payments%rowtype; a sai_finance.assignments%rowtype;
++begin
++  select * into p from sai_finance.payments where id = wanted_payment;
++  if not found or not sai_finance.can_staff(p.branch_id, array['accountant']) then
++    raise exception 'Payment unavailable or unauthorized' using errcode = '42501';
++  end if;
++  if wanted_reason is null or length(btrim(wanted_reason)) < 10 then
++    raise exception 'Void reason must have at least 10 characters' using errcode = '23514';
++  end if;
++  select * into a from sai_finance.assignments where id = p.assignment_id for update;
++  update sai_finance.payments set voided_at = now(), voided_by = auth.uid(), void_reason = btrim(wanted_reason)
++    where id = p.id and voided_at is null;
++  if not found then raise exception 'Payment already voided' using errcode = '23514'; end if;
++  insert into sai_finance.audit_log(branch_id, actor_id, action, entity_id, details)
++    values (p.branch_id, auth.uid(), 'payment_void', p.id, jsonb_build_object('reason', btrim(wanted_reason)));
++end;
++$$;
++
++
++--
++-- Name: sai_finance_waive(uuid, text); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.sai_finance_waive(wanted_assignment uuid, wanted_reason text) RETURNS uuid
++    LANGUAGE plpgsql SECURITY DEFINER
++    SET search_path TO 'pg_catalog', 'public', 'auth'
++    AS $$
++declare a sai_finance.assignments%rowtype; amount numeric; result uuid;
++begin
++  select * into a from sai_finance.assignments where id = wanted_assignment for update;
++  if not found or not sai_finance.can_staff(a.branch_id, array['accountant']) then
++    raise exception 'Assignment unavailable or unauthorized' using errcode = '42501';
++  end if;
++  amount := sai_finance.balance(a.id);
++  if a.cancelled_at is not null or amount <= 0 or wanted_reason is null or btrim(wanted_reason) = '' then
++    raise exception 'Waiver requires an outstanding balance and reason' using errcode = '23514';
++  end if;
++  insert into sai_finance.waivers(assignment_id, amount, reason, waived_by)
++    values (a.id, amount, btrim(wanted_reason), auth.uid()) returning id into result;
++  insert into sai_finance.audit_log(branch_id, actor_id, action, entity_id, details)
++    values (a.branch_id, auth.uid(), 'waive', result,
++      jsonb_build_object('assignment_id', a.id, 'amount', amount, 'reason', btrim(wanted_reason)));
++  return result;
+ end;
+ $$;
+ 
+@@ -543,138 +739,6 @@ end;
+ $$;
+ 
+ 
+---
+--- Name: sai_probe_fn(); Type: FUNCTION; Schema: public; Owner: -
+---
+-
+-CREATE FUNCTION public.sai_probe_fn() RETURNS integer
+-    LANGUAGE sql
+-    AS $$ SELECT 1 $$;
+-
+-
+---
+--- Name: sai_public_admission_history(text); Type: FUNCTION; Schema: public; Owner: -
+---
+-
+-CREATE FUNCTION public.sai_public_admission_history(p_reference text) RETURNS TABLE(action text, new_status text, occurred_at timestamp with time zone)
+-    LANGUAGE plpgsql STABLE SECURITY DEFINER
+-    SET search_path TO 'public'
+-    AS $$
+-declare
+-  v_id uuid;
+-begin
+-  if p_reference is null or length(btrim(p_reference)) < 6 then
+-    raise exception 'INVALID_REFERENCE' using errcode = '22023';
+-  end if;
+-
+-  select e.id into v_id
+-  from public.admissions_enquiries e
+-  where upper(e.application_no) = upper(btrim(p_reference))
+-  limit 1;
+-
+-  if v_id is null then
+-    return;
+-  end if;
+-
+-  return query
+-    select a.action,
+-           coalesce(nullif(a.metadata ->> 'new_status', ''), 'new'),
+-           a.created_at
+-    from public.audit_logs a
+-    where a.entity_type = 'admissions_enquiries'
+-      and a.entity_id = v_id
+-      and a.action in ('insert', 'status_change')
+-    order by a.created_at, a.id;
+-end;
+-$$;
+-
+-
+---
+--- Name: sai_public_admission_status(text); Type: FUNCTION; Schema: public; Owner: -
+---
+-
+-CREATE FUNCTION public.sai_public_admission_status(p_reference text) RETURNS TABLE(application_no text, applicant_name text, program text, level text, status text, branch_name text, session_name text, submitted_at timestamp with time zone, status_updated_at timestamp with time zone)
+-    LANGUAGE plpgsql STABLE SECURITY DEFINER
+-    SET search_path TO 'public'
+-    AS $$
+-begin
+-  if p_reference is null or length(btrim(p_reference)) < 6 then
+-    raise exception 'INVALID_REFERENCE' using errcode = '22023';
+-  end if;
+-  return query
+-    select e.application_no,
+-           e.applicant_full_name,
+-           e.preferred_program,
+-           e.preferred_level,
+-           e.status,
+-           b.name,
+-           s.name,
+-           e.created_at,
+-           e.updated_at
+-    from public.admissions_enquiries e
+-    join public.branches b on b.id = e.branch_id
+-    join public.academic_sessions s on s.id = e.academic_session_id
+-    where upper(e.application_no) = upper(btrim(p_reference))
+-    limit 1;
+-end;
+-$$;
+-
+-
+---
+--- Name: sai_public_admission_submit(text, text, text, text, text); Type: FUNCTION; Schema: public; Owner: -
+---
+-
+-CREATE FUNCTION public.sai_public_admission_submit(p_full_name text, p_phone text, p_email text, p_program text, p_message text) RETURNS text
+-    LANGUAGE plpgsql SECURITY DEFINER
+-    SET search_path TO 'public'
+-    AS $_$
+-declare
+-  v_branch uuid;
+-  v_session uuid;
+-  v_creator uuid;
+-  v_ref text;
+-begin
+-  if length(btrim(coalesce(p_full_name, ''))) < 2 then
+-    raise exception 'INVALID_NAME' using errcode = '22023';
+-  end if;
+-  if length(btrim(coalesce(p_phone, ''))) < 6 then
+-    raise exception 'INVALID_PHONE' using errcode = '22023';
+-  end if;
+-  if btrim(coalesce(p_email, '')) <> '' and p_email !~* '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+-    raise exception 'INVALID_EMAIL' using errcode = '22023';
+-  end if;
+-  if length(coalesce(p_message, '')) > 500 then
+-    raise exception 'MESSAGE_TOO_LONG' using errcode = '22023';
+-  end if;
+-
+-  select b.id into v_branch from public.branches b
+-    where b.is_active order by b.created_at, b.id limit 1;
+-  select s.id into v_session from public.academic_sessions s
+-    where s.is_active order by s.starts_on desc, s.id limit 1;
+-  if v_branch is null or v_session is null then
+-    raise exception 'NO_ACTIVE_TERM' using errcode = 'P0001';
+-  end if;
+-  select r.user_id into v_creator from public.user_roles r
+-    where r.role = 'super_admin' order by r.assigned_at, r.user_id limit 1;
+-  if v_creator is null then
+-    raise exception 'NO_ADMISSIONS_OWNER' using errcode = 'P0001';
+-  end if;
+-
+-  perform set_config('sai.public_web_enquiry', 'on', true);
+-  insert into public.admissions_enquiries (
+-    branch_id, academic_session_id, applicant_full_name, phone, email,
+-    preferred_program, source, notes, status, created_by
+-  ) values (
+-    v_branch, v_session, btrim(p_full_name), nullif(btrim(p_phone), ''), nullif(btrim(p_email), ''),
+-    nullif(btrim(p_program), ''), 'website', nullif(left(coalesce(p_message, ''), 500), ''), 'new', v_creator
+-  ) returning application_no into v_ref;
+-  perform set_config('sai.public_web_enquiry', 'off', true);
+-
+-  return v_ref;
+-end;
+-$_$;
+-
+-
+ --
+ -- Name: sai_security_branch_member(uuid); Type: FUNCTION; Schema: public; Owner: -
+ --
+@@ -811,229 +875,46 @@ CREATE FUNCTION public.sai_security_can_read_student(wanted_student uuid) RETURN
+           public.sai_security_has_role('admin')
+           and public.sai_security_branch_member(s.branch_id)
+         )
+-        or (
+-          public.sai_security_has_role('teacher')
+-          and public.sai_security_branch_member(s.branch_id)
+-          and exists (
+-            select 1 from public.classes c
+-            where c.id = s.class_id and c.branch_id = s.branch_id
+-              and c.teacher_id = (select auth.uid())
+-          )
+-        )
+-        or (
+-          public.sai_security_has_role('student')
+-          and s.user_id = (select auth.uid())
+-        )
+-        or (
+-          public.sai_security_has_role('parent')
+-          and exists (
+-            select 1 from public.parent_student_links l
+-            where l.student_id = s.id
+-              and l.parent_user_id = (select auth.uid())
+-              and l.verified_at is not null
+-          )
+-        )
+-      )
+-  );
+-$$;
+-
+-
+---
+--- Name: sai_security_has_role(public.app_role); Type: FUNCTION; Schema: public; Owner: -
+---
+-
+-CREATE FUNCTION public.sai_security_has_role(wanted_role public.app_role) RETURNS boolean
+-    LANGUAGE sql STABLE SECURITY DEFINER
+-    SET search_path TO 'public'
+-    AS $$
+-  select exists (
+-    select 1 from public.user_roles r
+-    where r.user_id = (select auth.uid()) and r.role = wanted_role
+-  );
+-$$;
+-
+-
+---
+--- Name: sai_set_role(uuid, public.app_role, boolean); Type: FUNCTION; Schema: public; Owner: -
+---
+-
+-CREATE FUNCTION public.sai_set_role(p_user_id uuid, p_role public.app_role, p_enabled boolean) RETURNS jsonb
+-    LANGUAGE plpgsql SECURITY DEFINER
+-    SET search_path TO 'public'
+-    AS $$
+-declare
+-  v_me uuid := auth.uid();
+-begin
+-  if not public.sai_security_has_role('super_admin') then
+-    raise exception 'forbidden' using errcode = '42501';
+-  end if;
+-  if p_user_id is null then
+-    raise exception 'invalid_user' using errcode = '22023';
+-  end if;
+-
+-  if p_enabled then
+-    if not exists (select 1 from auth.users u where u.id = p_user_id) then
+-      raise exception 'unknown_user' using errcode = '22023';
+-    end if;
+-    if not exists (select 1 from public.profiles p where p.id = p_user_id) then
+-      insert into public.profiles (id, full_name, email, preferred_locale)
+-      select u.id,
+-             coalesce(nullif(u.raw_user_meta_data ->> 'full_name', ''), u.email, 'New account'),
+-             u.email,
+-             'ar'
+-      from auth.users u
+-      where u.id = p_user_id;
+-    end if;
+-
+-    insert into public.user_roles (user_id, role, assigned_by)
+-    values (p_user_id, p_role, v_me)
+-    on conflict (user_id, role) do nothing;
+-
+-    if p_role in ('super_admin', 'admin', 'receptionist') then
+-      insert into public.branch_memberships (user_id, branch_id, is_active)
+-      select p_user_id, b.id, true
+-      from public.branches b
+-      where not exists (
+-        select 1 from public.branch_memberships m where m.user_id = p_user_id and m.branch_id = b.id
+-      );
+-    elsif p_role in ('teacher', 'accountant', 'librarian', 'content_editor') then
+-      insert into public.branch_memberships (user_id, branch_id, is_active)
+-      select p_user_id, b.id, true
+-      from public.branches b
+-      where b.is_active
+-        and not exists (
+-          select 1 from public.branch_memberships m where m.user_id = p_user_id and m.branch_id = b.id
+-        );
+-    end if;
+-  else
+-    if p_user_id = v_me and p_role = 'super_admin' then
+-      raise exception 'cannot_remove_own_super_admin' using errcode = '42501';
+-    end if;
+-    delete from public.user_roles where user_id = p_user_id and role = p_role;
+-  end if;
+-
+-  insert into public.audit_logs (actor_user_id, action, entity_type, entity_id, metadata)
+-  values (v_me,
+-          case when p_enabled then 'role.grant' else 'role.revoke' end,
+-          'user_role', p_user_id, jsonb_build_object('role', p_role::text));
+-
+-  return jsonb_build_object('user_id', p_user_id, 'role', p_role, 'enabled', p_enabled);
+-end;
++        or (
++          public.sai_security_has_role('teacher')
++          and public.sai_security_branch_member(s.branch_id)
++          and exists (
++            select 1 from public.classes c
++            where c.id = s.class_id and c.branch_id = s.branch_id
++              and c.teacher_id = (select auth.uid())
++          )
++        )
++        or (
++          public.sai_security_has_role('student')
++          and s.user_id = (select auth.uid())
++        )
++        or (
++          public.sai_security_has_role('parent')
++          and exists (
++            select 1 from public.parent_student_links l
++            where l.student_id = s.id
++              and l.parent_user_id = (select auth.uid())
++              and l.verified_at is not null
++          )
++        )
++      )
++  );
+ $$;
+ 
+ 
+ --
+--- Name: sai_staff_directory(); Type: FUNCTION; Schema: public; Owner: -
++-- Name: sai_security_has_role(public.app_role); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+-CREATE FUNCTION public.sai_staff_directory() RETURNS TABLE(user_id uuid, full_name text, email text, roles text[])
+-    LANGUAGE plpgsql SECURITY DEFINER
++CREATE FUNCTION public.sai_security_has_role(wanted_role public.app_role) RETURNS boolean
++    LANGUAGE sql STABLE SECURITY DEFINER
+     SET search_path TO 'public'
+     AS $$
+-begin
+-  if not (public.sai_security_has_role('super_admin')
+-          or public.sai_security_has_role('admin')
+-          or public.sai_security_has_role('receptionist')) then
+-    raise exception 'forbidden' using errcode = '42501';
+-  end if;
+-
+-  return query
+-    select ur.user_id,
+-           coalesce(p.full_name, 'Staff member')::text as full_name,
+-           p.email::text as email,
+-           array_agg(ur.role::text) as roles
+-    from public.user_roles ur
+-    left join public.profiles p on p.id = ur.user_id
+-    where ur.role in ('super_admin','admin','receptionist','teacher','accountant','librarian','content_editor')
+-    group by ur.user_id, p.full_name, p.email
+-    order by coalesce(p.full_name, 'Staff member');
+-end;
+-$$;
+-
+-
+---
+--- Name: sai_submit_application(text, text, text, text, text, text, text); Type: FUNCTION; Schema: public; Owner: -
+---
+-
+-CREATE FUNCTION public.sai_submit_application(p_full_name text, p_guardian_name text, p_phone text, p_email text, p_program text, p_level text, p_notes text) RETURNS jsonb
+-    LANGUAGE plpgsql SECURITY DEFINER
+-    SET search_path TO 'public'
+-    AS $_$
+-declare
+-  v_admin uuid;
+-  v_branch uuid;
+-  v_session uuid;
+-  v_year text := to_char(now(), 'YYYY');
+-  v_seq integer;
+-  v_no text;
+-  v_row public.admissions_enquiries;
+-  v_attempt integer;
+-begin
+-  if coalesce(length(btrim(p_full_name)), 0) < 2 then
+-    raise exception 'invalid_name' using errcode = '22023';
+-  end if;
+-  if coalesce(btrim(p_phone), '') = '' and coalesce(btrim(p_email), '') = '' then
+-    raise exception 'missing_contact' using errcode = '22023';
+-  end if;
+-  if coalesce(length(p_notes), 0) > 1000 then
+-    raise exception 'notes_too_long' using errcode = '22023';
+-  end if;
+-
+-  select r.user_id into v_admin from public.user_roles r where r.role = 'super_admin' limit 1;
+-  if v_admin is null then
+-    raise exception 'no_administrator' using errcode = '42501';
+-  end if;
+-
+-  select b.id into v_branch from public.branches b where b.is_active order by b.created_at limit 1;
+-  if v_branch is null then
+-    select b.id into v_branch from public.branches b order by b.created_at limit 1;
+-  end if;
+-  select s.id into v_session from public.academic_sessions s where s.is_active order by s.starts_on desc limit 1;
+-  if v_session is null then
+-    select s.id into v_session from public.academic_sessions s order by s.starts_on desc limit 1;
+-  end if;
+-  if v_branch is null or v_session is null then
+-    raise exception 'college_not_configured' using errcode = '42501';
+-  end if;
+-
+-  perform set_config(
+-    'request.jwt.claims',
+-    json_build_object('sub', v_admin::text, 'role', 'authenticated', 'aud', 'authenticated')::text,
+-    true
++  select exists (
++    select 1 from public.user_roles r
++    where r.user_id = (select auth.uid()) and r.role = wanted_role
+   );
+-
+-  select coalesce(max(substring(e.application_no from ('^SAI-' || v_year || '-(\d+)$'))::int), 0) + 1
+-    into v_seq
+-    from public.admissions_enquiries e
+-    where e.application_no ~ ('^SAI-' || v_year || '-\d+$');
+-
+-  for v_attempt in 0..5 loop
+-    v_no := 'SAI-' || v_year || '-' || lpad((v_seq + v_attempt)::text, 4, '0');
+-    begin
+-      insert into public.admissions_enquiries (
+-        branch_id, academic_session_id, application_no, applicant_full_name, guardian_name,
+-        phone, email, preferred_program, preferred_level, source, notes, status
+-      ) values (
+-        v_branch, v_session, v_no, btrim(p_full_name), nullif(btrim(coalesce(p_guardian_name, '')), ''),
+-        nullif(btrim(coalesce(p_phone, '')), ''), nullif(btrim(coalesce(p_email, '')), ''),
+-        nullif(btrim(coalesce(p_program, '')), ''), nullif(btrim(coalesce(p_level, '')), ''),
+-        'website', nullif(btrim(coalesce(p_notes, '')), ''), 'new'
+-      )
+-      returning * into v_row;
+-
+-      return jsonb_build_object(
+-        'application_no', v_row.application_no,
+-        'created_at', v_row.created_at,
+-        'program', v_row.preferred_program
+-      );
+-    exception when unique_violation then
+-      continue;
+-    end;
+-  end loop;
+-
+-  raise exception 'could_not_allocate_number' using errcode = '23505';
+-end;
+-$_$;
++$$;
+ 
+ 
+ SET default_tablespace = '';
+@@ -1054,30 +935,6 @@ CREATE TABLE public.academic_sessions (
+ );
+ 
+ 
+---
+--- Name: admission_reminder_log; Type: TABLE; Schema: public; Owner: -
+---
+-
+-CREATE TABLE public.admission_reminder_log (
+-    id uuid DEFAULT gen_random_uuid() NOT NULL,
+-    enquiry_id uuid NOT NULL,
+-    reminder_kind text DEFAULT 'stale_new'::text NOT NULL,
+-    sent_at timestamp with time zone DEFAULT now() NOT NULL
+-);
+-
+-
+---
+--- Name: admission_reminder_runs; Type: TABLE; Schema: public; Owner: -
+---
+-
+-CREATE TABLE public.admission_reminder_runs (
+-    run_date date NOT NULL,
+-    started_at timestamp with time zone DEFAULT now() NOT NULL,
+-    sent_count integer DEFAULT 0 NOT NULL,
+-    finished_at timestamp with time zone
+-);
+-
+-
+ --
+ -- Name: admissions_enquiries; Type: TABLE; Schema: public; Owner: -
+ --
+@@ -1086,7 +943,7 @@ CREATE TABLE public.admissions_enquiries (
+     id uuid DEFAULT gen_random_uuid() NOT NULL,
+     branch_id uuid NOT NULL,
+     academic_session_id uuid NOT NULL,
+-    application_no text NOT NULL,
++    application_no text DEFAULT ('ADM-'::text || (gen_random_uuid())::text) NOT NULL,
+     applicant_full_name text NOT NULL,
+     guardian_name text,
+     phone text,
+@@ -1107,22 +964,41 @@ CREATE TABLE public.admissions_enquiries (
+ 
+ 
+ --
+--- Name: admissions_application_no_seq; Type: SEQUENCE; Schema: public; Owner: -
++-- Name: attendance_records; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+-CREATE SEQUENCE public.admissions_application_no_seq
+-    START WITH 1042
+-    INCREMENT BY 1
+-    NO MINVALUE
+-    NO MAXVALUE
+-    CACHE 1;
++CREATE TABLE public.attendance_records (
++    id uuid DEFAULT gen_random_uuid() NOT NULL,
++    attendance_session_id uuid NOT NULL,
++    student_id uuid NOT NULL,
++    status text NOT NULL,
++    note text,
++    marked_by uuid DEFAULT auth.uid() NOT NULL,
++    marked_at timestamp with time zone DEFAULT now() NOT NULL,
++    updated_at timestamp with time zone DEFAULT now() NOT NULL,
++    CONSTRAINT attendance_records_status_check CHECK ((status = ANY (ARRAY['present'::text, 'absent'::text, 'late'::text, 'excused'::text])))
++);
+ 
+ 
+ --
+--- Name: admissions_application_no_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
++-- Name: attendance_sessions; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+-ALTER SEQUENCE public.admissions_application_no_seq OWNED BY public.admissions_enquiries.application_no;
++CREATE TABLE public.attendance_sessions (
++    id uuid DEFAULT gen_random_uuid() NOT NULL,
++    branch_id uuid NOT NULL,
++    academic_session_id uuid NOT NULL,
++    class_id uuid NOT NULL,
++    attendance_date date NOT NULL,
++    start_time timestamp with time zone,
++    end_time timestamp with time zone,
++    status text DEFAULT 'open'::text NOT NULL,
++    created_by uuid DEFAULT auth.uid() NOT NULL,
++    created_at timestamp with time zone DEFAULT now() NOT NULL,
++    updated_at timestamp with time zone DEFAULT now() NOT NULL,
++    CONSTRAINT attendance_sessions_check CHECK (((start_time IS NULL) OR (end_time IS NULL) OR (end_time >= start_time))),
++    CONSTRAINT attendance_sessions_status_check CHECK ((status = ANY (ARRAY['open'::text, 'closed'::text, 'cancelled'::text])))
++);
+ 
+ 
+ --
+@@ -1240,13 +1116,6 @@ CREATE TABLE public.user_roles (
+ );
+ 
+ 
+---
+--- Name: admissions_enquiries application_no; Type: DEFAULT; Schema: public; Owner: -
+---
+-
+-ALTER TABLE ONLY public.admissions_enquiries ALTER COLUMN application_no SET DEFAULT ('SAI-APP-'::text || nextval('public.admissions_application_no_seq'::regclass));
+-
+-
+ --
+ -- Name: academic_sessions academic_sessions_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+@@ -1264,43 +1133,51 @@ ALTER TABLE ONLY public.academic_sessions
+ 
+ 
+ --
+--- Name: admission_reminder_log admission_reminder_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++-- Name: admissions_enquiries admissions_enquiries_application_no_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.admissions_enquiries
++    ADD CONSTRAINT admissions_enquiries_application_no_key UNIQUE (application_no);
++
++
++--
++-- Name: admissions_enquiries admissions_enquiries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+-ALTER TABLE ONLY public.admission_reminder_log
+-    ADD CONSTRAINT admission_reminder_log_pkey PRIMARY KEY (id);
++ALTER TABLE ONLY public.admissions_enquiries
++    ADD CONSTRAINT admissions_enquiries_pkey PRIMARY KEY (id);
+ 
+ 
+ --
+--- Name: admission_reminder_log admission_reminder_log_unique; Type: CONSTRAINT; Schema: public; Owner: -
++-- Name: attendance_records attendance_records_attendance_session_id_student_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+-ALTER TABLE ONLY public.admission_reminder_log
+-    ADD CONSTRAINT admission_reminder_log_unique UNIQUE (enquiry_id, reminder_kind);
++ALTER TABLE ONLY public.attendance_records
++    ADD CONSTRAINT attendance_records_attendance_session_id_student_id_key UNIQUE (attendance_session_id, student_id);
+ 
+ 
+ --
+--- Name: admission_reminder_runs admission_reminder_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++-- Name: attendance_records attendance_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+-ALTER TABLE ONLY public.admission_reminder_runs
+-    ADD CONSTRAINT admission_reminder_runs_pkey PRIMARY KEY (run_date);
++ALTER TABLE ONLY public.attendance_records
++    ADD CONSTRAINT attendance_records_pkey PRIMARY KEY (id);
+ 
+ 
+ --
+--- Name: admissions_enquiries admissions_enquiries_application_no_key; Type: CONSTRAINT; Schema: public; Owner: -
++-- Name: attendance_sessions attendance_sessions_class_id_attendance_date_key; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+-ALTER TABLE ONLY public.admissions_enquiries
+-    ADD CONSTRAINT admissions_enquiries_application_no_key UNIQUE (application_no);
++ALTER TABLE ONLY public.attendance_sessions
++    ADD CONSTRAINT attendance_sessions_class_id_attendance_date_key UNIQUE (class_id, attendance_date);
+ 
+ 
+ --
+--- Name: admissions_enquiries admissions_enquiries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++-- Name: attendance_sessions attendance_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+-ALTER TABLE ONLY public.admissions_enquiries
+-    ADD CONSTRAINT admissions_enquiries_pkey PRIMARY KEY (id);
++ALTER TABLE ONLY public.attendance_sessions
++    ADD CONSTRAINT attendance_sessions_pkey PRIMARY KEY (id);
+ 
+ 
+ --
+@@ -1392,31 +1269,31 @@ ALTER TABLE ONLY public.user_roles
+ 
+ 
+ --
+--- Name: admission_reminder_log_enquiry_idx; Type: INDEX; Schema: public; Owner: -
++-- Name: admissions_assignee_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+-CREATE INDEX admission_reminder_log_enquiry_idx ON public.admission_reminder_log USING btree (enquiry_id);
++CREATE INDEX admissions_assignee_idx ON public.admissions_enquiries USING btree (assigned_to, branch_id);
+ 
+ 
+ --
+--- Name: admissions_assignee_idx; Type: INDEX; Schema: public; Owner: -
++-- Name: admissions_scope_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+-CREATE INDEX admissions_assignee_idx ON public.admissions_enquiries USING btree (assigned_to, branch_id);
++CREATE INDEX admissions_scope_idx ON public.admissions_enquiries USING btree (branch_id, academic_session_id, status, created_at DESC);
+ 
+ 
+ --
+--- Name: admissions_scope_idx; Type: INDEX; Schema: public; Owner: -
++-- Name: attendance_records_student_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+-CREATE INDEX admissions_scope_idx ON public.admissions_enquiries USING btree (branch_id, academic_session_id, status, created_at DESC);
++CREATE INDEX attendance_records_student_idx ON public.attendance_records USING btree (student_id, attendance_session_id);
+ 
+ 
+ --
+--- Name: audit_logs_entity_idx; Type: INDEX; Schema: public; Owner: -
++-- Name: attendance_sessions_scope_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+-CREATE INDEX audit_logs_entity_idx ON public.audit_logs USING btree (entity_type, entity_id, created_at);
++CREATE INDEX attendance_sessions_scope_idx ON public.attendance_sessions USING btree (branch_id, academic_session_id, attendance_date DESC);
+ 
+ 
+ --
+@@ -1454,6 +1331,34 @@ CREATE TRIGGER admissions_audit AFTER INSERT OR UPDATE ON public.admissions_enqu
+ CREATE TRIGGER admissions_prepare BEFORE INSERT OR UPDATE ON public.admissions_enquiries FOR EACH ROW EXECUTE FUNCTION public.sai_admissions_prepare();
+ 
+ 
++--
++-- Name: attendance_records attendance_record_audit; Type: TRIGGER; Schema: public; Owner: -
++--
++
++CREATE TRIGGER attendance_record_audit AFTER INSERT OR UPDATE ON public.attendance_records FOR EACH ROW EXECUTE FUNCTION public.sai_attendance_audit();
++
++
++--
++-- Name: attendance_records attendance_record_prepare; Type: TRIGGER; Schema: public; Owner: -
++--
++
++CREATE TRIGGER attendance_record_prepare BEFORE INSERT OR UPDATE ON public.attendance_records FOR EACH ROW EXECUTE FUNCTION public.sai_attendance_prepare_record();
++
++
++--
++-- Name: attendance_sessions attendance_session_audit; Type: TRIGGER; Schema: public; Owner: -
++--
++
++CREATE TRIGGER attendance_session_audit AFTER INSERT OR UPDATE ON public.attendance_sessions FOR EACH ROW EXECUTE FUNCTION public.sai_attendance_audit();
++
++
++--
++-- Name: attendance_sessions attendance_session_prepare; Type: TRIGGER; Schema: public; Owner: -
++--
++
++CREATE TRIGGER attendance_session_prepare BEFORE INSERT OR UPDATE ON public.attendance_sessions FOR EACH ROW EXECUTE FUNCTION public.sai_attendance_prepare_session();
++
++
+ --
+ -- Name: branches audit_branches_management; Type: TRIGGER; Schema: public; Owner: -
+ --
+@@ -1496,14 +1401,6 @@ CREATE TRIGGER audit_students_management AFTER INSERT OR UPDATE ON public.studen
+ CREATE TRIGGER students_validate_class_branch BEFORE INSERT OR UPDATE OF class_id, branch_id ON public.students FOR EACH ROW EXECUTE FUNCTION public.sai_management_validate_student_class();
+ 
+ 
+---
+--- Name: admission_reminder_log admission_reminder_log_enquiry_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+---
+-
+-ALTER TABLE ONLY public.admission_reminder_log
+-    ADD CONSTRAINT admission_reminder_log_enquiry_id_fkey FOREIGN KEY (enquiry_id) REFERENCES public.admissions_enquiries(id) ON DELETE CASCADE;
+-
+-
+ --
+ -- Name: admissions_enquiries admissions_enquiries_academic_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+@@ -1536,6 +1433,62 @@ ALTER TABLE ONLY public.admissions_enquiries
+     ADD CONSTRAINT admissions_enquiries_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id);
+ 
+ 
++--
++-- Name: attendance_records attendance_records_attendance_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.attendance_records
++    ADD CONSTRAINT attendance_records_attendance_session_id_fkey FOREIGN KEY (attendance_session_id) REFERENCES public.attendance_sessions(id);
++
++
++--
++-- Name: attendance_records attendance_records_marked_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.attendance_records
++    ADD CONSTRAINT attendance_records_marked_by_fkey FOREIGN KEY (marked_by) REFERENCES auth.users(id);
++
++
++--
++-- Name: attendance_records attendance_records_student_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.attendance_records
++    ADD CONSTRAINT attendance_records_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id);
++
++
++--
++-- Name: attendance_sessions attendance_sessions_academic_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.attendance_sessions
++    ADD CONSTRAINT attendance_sessions_academic_session_id_fkey FOREIGN KEY (academic_session_id) REFERENCES public.academic_sessions(id);
++
++
++--
++-- Name: attendance_sessions attendance_sessions_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.attendance_sessions
++    ADD CONSTRAINT attendance_sessions_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id);
++
++
++--
++-- Name: attendance_sessions attendance_sessions_class_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.attendance_sessions
++    ADD CONSTRAINT attendance_sessions_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id);
++
++
++--
++-- Name: attendance_sessions attendance_sessions_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.attendance_sessions
++    ADD CONSTRAINT attendance_sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id);
++
++
+ --
+ -- Name: audit_logs audit_logs_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+@@ -1683,18 +1636,6 @@ CREATE POLICY academic_sessions_select_authorized ON public.academic_sessions FO
+ CREATE POLICY academic_sessions_update_super_admin ON public.academic_sessions FOR UPDATE TO authenticated USING (public.sai_security_has_role('super_admin'::public.app_role)) WITH CHECK (public.sai_security_has_role('super_admin'::public.app_role));
+ 
+ 
+---
+--- Name: admission_reminder_log; Type: ROW SECURITY; Schema: public; Owner: -
+---
+-
+-ALTER TABLE public.admission_reminder_log ENABLE ROW LEVEL SECURITY;
+-
+---
+--- Name: admission_reminder_runs; Type: ROW SECURITY; Schema: public; Owner: -
+---
+-
+-ALTER TABLE public.admission_reminder_runs ENABLE ROW LEVEL SECURITY;
+-
+ --
+ -- Name: admissions_enquiries; Type: ROW SECURITY; Schema: public; Owner: -
+ --
+@@ -1722,6 +1663,66 @@ CREATE POLICY admissions_select_authorized ON public.admissions_enquiries FOR SE
+ CREATE POLICY admissions_update_staff ON public.admissions_enquiries FOR UPDATE TO authenticated USING ((public.sai_security_has_role('super_admin'::public.app_role) OR (public.sai_security_branch_member(branch_id) AND (public.sai_security_has_role('admin'::public.app_role) OR public.sai_security_has_role('receptionist'::public.app_role))))) WITH CHECK ((public.sai_security_has_role('super_admin'::public.app_role) OR (public.sai_security_branch_member(branch_id) AND (public.sai_security_has_role('admin'::public.app_role) OR public.sai_security_has_role('receptionist'::public.app_role)))));
+ 
+ 
++--
++-- Name: attendance_records; Type: ROW SECURITY; Schema: public; Owner: -
++--
++
++ALTER TABLE public.attendance_records ENABLE ROW LEVEL SECURITY;
++
++--
++-- Name: attendance_records attendance_records_insert; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY attendance_records_insert ON public.attendance_records FOR INSERT TO authenticated WITH CHECK ((EXISTS ( SELECT 1
++   FROM public.attendance_sessions a
++  WHERE ((a.id = attendance_records.attendance_session_id) AND public.sai_attendance_manage_class(a.class_id)))));
++
++
++--
++-- Name: attendance_records attendance_records_read; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY attendance_records_read ON public.attendance_records FOR SELECT TO authenticated USING (public.sai_attendance_view_record(attendance_session_id, student_id));
++
++
++--
++-- Name: attendance_records attendance_records_update; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY attendance_records_update ON public.attendance_records FOR UPDATE TO authenticated USING ((EXISTS ( SELECT 1
++   FROM public.attendance_sessions a
++  WHERE ((a.id = attendance_records.attendance_session_id) AND (public.sai_attendance_manage_class(a.class_id) OR (public.sai_security_has_role('receptionist'::public.app_role) AND public.sai_security_branch_member(a.branch_id))))))) WITH CHECK ((EXISTS ( SELECT 1
++   FROM public.attendance_sessions a
++  WHERE ((a.id = attendance_records.attendance_session_id) AND (public.sai_attendance_manage_class(a.class_id) OR (public.sai_security_has_role('receptionist'::public.app_role) AND public.sai_security_branch_member(a.branch_id)))))));
++
++
++--
++-- Name: attendance_sessions; Type: ROW SECURITY; Schema: public; Owner: -
++--
++
++ALTER TABLE public.attendance_sessions ENABLE ROW LEVEL SECURITY;
++
++--
++-- Name: attendance_sessions attendance_sessions_insert; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY attendance_sessions_insert ON public.attendance_sessions FOR INSERT TO authenticated WITH CHECK ((public.sai_attendance_manage_class(class_id) AND (created_by = ( SELECT auth.uid() AS uid))));
++
++
++--
++-- Name: attendance_sessions attendance_sessions_read; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY attendance_sessions_read ON public.attendance_sessions FOR SELECT TO authenticated USING (public.sai_attendance_view_session(id));
++
++
++--
++-- Name: attendance_sessions attendance_sessions_update; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY attendance_sessions_update ON public.attendance_sessions FOR UPDATE TO authenticated USING (public.sai_attendance_manage_class(class_id)) WITH CHECK (public.sai_attendance_manage_class(class_id));
++
++
+ --
+ -- Name: audit_logs; Type: ROW SECURITY; Schema: public; Owner: -
+ --
+@@ -1823,6 +1824,73 @@ CREATE POLICY classes_select_authorized ON public.classes FOR SELECT TO authenti
+ CREATE POLICY classes_update_scoped_admin ON public.classes FOR UPDATE TO authenticated USING ((public.sai_security_has_role('super_admin'::public.app_role) OR (public.sai_security_has_role('admin'::public.app_role) AND public.sai_security_branch_member(branch_id)))) WITH CHECK ((public.sai_security_has_role('super_admin'::public.app_role) OR (public.sai_security_has_role('admin'::public.app_role) AND public.sai_security_branch_member(branch_id))));
+ 
+ 
++--
++-- Name: classes finance_classes_lock; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY finance_classes_lock ON public.classes FOR UPDATE TO sai_finance_owner USING ((EXISTS ( SELECT 1
++   FROM public.user_roles r
++  WHERE ((r.user_id = auth.uid()) AND ((r.role = 'super_admin'::public.app_role) OR ((r.role = ANY (ARRAY['admin'::public.app_role, 'accountant'::public.app_role])) AND (EXISTS ( SELECT 1
++           FROM public.branch_memberships m
++          WHERE ((m.user_id = auth.uid()) AND (m.branch_id = classes.branch_id) AND m.is_active))))))))) WITH CHECK (false);
++
++
++--
++-- Name: classes finance_classes_read; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY finance_classes_read ON public.classes FOR SELECT TO sai_finance_owner USING ((EXISTS ( SELECT 1
++   FROM public.user_roles r
++  WHERE ((r.user_id = ( SELECT auth.uid() AS uid)) AND ((r.role = 'super_admin'::public.app_role) OR ((r.role = ANY (ARRAY['admin'::public.app_role, 'accountant'::public.app_role])) AND (EXISTS ( SELECT 1
++           FROM public.branch_memberships m
++          WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.branch_id = classes.branch_id) AND m.is_active)))))))));
++
++
++--
++-- Name: branch_memberships finance_memberships_read; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY finance_memberships_read ON public.branch_memberships FOR SELECT TO sai_finance_owner USING ((user_id = ( SELECT auth.uid() AS uid)));
++
++
++--
++-- Name: parent_student_links finance_parent_links_read; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY finance_parent_links_read ON public.parent_student_links FOR SELECT TO sai_finance_owner USING (((parent_user_id = ( SELECT auth.uid() AS uid)) AND (verified_at IS NOT NULL)));
++
++
++--
++-- Name: user_roles finance_roles_read; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY finance_roles_read ON public.user_roles FOR SELECT TO sai_finance_owner USING ((user_id = ( SELECT auth.uid() AS uid)));
++
++
++--
++-- Name: students finance_students_lock; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY finance_students_lock ON public.students FOR UPDATE TO sai_finance_owner USING ((EXISTS ( SELECT 1
++   FROM public.user_roles r
++  WHERE ((r.user_id = auth.uid()) AND ((r.role = 'super_admin'::public.app_role) OR ((r.role = ANY (ARRAY['admin'::public.app_role, 'accountant'::public.app_role])) AND (EXISTS ( SELECT 1
++           FROM public.branch_memberships m
++          WHERE ((m.user_id = auth.uid()) AND (m.branch_id = students.branch_id) AND m.is_active))))))))) WITH CHECK (false);
++
++
++--
++-- Name: students finance_students_read; Type: POLICY; Schema: public; Owner: -
++--
++
++CREATE POLICY finance_students_read ON public.students FOR SELECT TO sai_finance_owner USING (((user_id = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1
++   FROM public.parent_student_links l
++  WHERE ((l.student_id = students.id) AND (l.parent_user_id = ( SELECT auth.uid() AS uid)) AND (l.verified_at IS NOT NULL)))) OR (EXISTS ( SELECT 1
++   FROM public.user_roles r
++  WHERE ((r.user_id = ( SELECT auth.uid() AS uid)) AND ((r.role = 'super_admin'::public.app_role) OR ((r.role = ANY (ARRAY['admin'::public.app_role, 'accountant'::public.app_role, 'receptionist'::public.app_role])) AND (EXISTS ( SELECT 1
++           FROM public.branch_memberships m
++          WHERE ((m.user_id = ( SELECT auth.uid() AS uid)) AND (m.branch_id = students.branch_id) AND m.is_active))))))))));
++
++
+ --
+ -- Name: parent_student_links; Type: ROW SECURITY; Schema: public; Owner: -
+ --
+@@ -1907,5 +1975,5 @@ CREATE POLICY user_roles_select_self_or_super_admin ON public.user_roles FOR SEL
+ -- PostgreSQL database dump complete
+ --
+ 
+-\unrestrict XwtrCe5WBcfVAHY6UE2XcgynDJPNm9ba8ep7fl8K6TomhXW9KueQ2Fo8Ig0APJA
++\unrestrict o3byLYEzT84pYdIPyoRTDWZs9jNv4uEWpYltK3FiF2ZkqERb5bbwtgYR4JAqsWo
+ 

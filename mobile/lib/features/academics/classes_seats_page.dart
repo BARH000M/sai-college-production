@@ -38,7 +38,8 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
   List<String> _knownPrograms = const [];
 
   bool get _canManageClasses =>
-      widget.identity.roles.contains(AppRole.superAdmin) || widget.identity.roles.contains(AppRole.admin);
+      widget.identity.roles.contains(AppRole.superAdmin) ||
+      widget.identity.roles.contains(AppRole.admin);
 
   bool get _canMarkAttendance => const {
         AppRole.superAdmin,
@@ -57,7 +58,8 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
     final client = Supabase.instance.client;
     final classRows = await client
         .from('classes')
-        .select('id,name,program,capacity,is_active,teacher_id,branch_id,session_id')
+        .select(
+            'id,name,program,capacity,is_active,teacher_id,branch_id,session_id')
         .order('name', ascending: true);
     final studentRows = await client.from('students').select('class_id,status');
 
@@ -85,11 +87,17 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
             ))
         .toList();
 
-    _knownPrograms = rows.map((row) => row.program).where((program) => program != 'غير محدد').toSet().toList()..sort();
+    _knownPrograms = rows
+        .map((row) => row.program)
+        .where((program) => program != 'غير محدد')
+        .toSet()
+        .toList()
+      ..sort();
     return rows;
   }
 
-  Future<Map<String, String>> _nameMap(SupabaseClient client, String table) async {
+  Future<Map<String, String>> _nameMap(
+      SupabaseClient client, String table) async {
     try {
       final rows = await client.from(table).select('id,name');
       return {
@@ -104,21 +112,26 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
   void _retry() => setState(() => _future = _load());
 
   Future<void> _openForm({SaiClass? existing}) async {
-    final saved = await ClassFormSheet.show(context, existing: existing, knownPrograms: _knownPrograms);
+    final saved = await ClassFormSheet.show(context,
+        existing: existing, knownPrograms: _knownPrograms);
     if (saved == true && mounted) {
       _retry();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(existing == null ? 'تمت إضافة الصف بنجاح.' : 'تم تحديث بيانات الصف.'),
+        content: Text(existing == null
+            ? 'تمت إضافة الصف بنجاح.'
+            : 'تم تحديث بيانات الصف.'),
       ));
     }
   }
 
   void _openRegister(SaiClass row) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ClassRegisterPage(cls: row)));
+    Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => ClassRegisterPage(cls: row)));
   }
 
   void _openRoster(SaiClass row) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ClassRosterSheetPage(cls: row)));
+    Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => ClassRosterSheetPage(cls: row)));
   }
 
   List<SaiClass> _filter(List<SaiClass> rows) {
@@ -134,12 +147,17 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
   }
 
   void _openSheet(SaiClass row) {
-    final color = row.isFull ? SaiColors.danger : (row.isNearFull ? SaiColors.warning : SaiColors.success);
-    final tint = row.isFull ? SaiColors.dangerTint : (row.isNearFull ? SaiColors.warningTint : SaiColors.successTint);
+    final color = row.isFull
+        ? SaiColors.danger
+        : (row.isNearFull ? SaiColors.warning : SaiColors.success);
+    final tint = row.isFull
+        ? SaiColors.dangerTint
+        : (row.isNearFull ? SaiColors.warningTint : SaiColors.successTint);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
       builder: (sheetContext) => Padding(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
         child: Column(
@@ -148,12 +166,18 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
           children: [
             Row(
               children: [
-                Expanded(child: Text(row.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: SaiColors.ink))),
+                Expanded(
+                    child: Text(row.name,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: SaiColors.ink))),
                 TintChip(label: row.statusLabel, color: color, tint: tint),
               ],
             ),
             const SizedBox(height: 4),
-            Text(row.program, style: const TextStyle(fontSize: 11.5, color: SaiColors.muted)),
+            Text(row.program,
+                style: const TextStyle(fontSize: 11.5, color: SaiColors.muted)),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -164,9 +188,18 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
               ),
               child: Column(
                 children: [
-                  _InfoLine(icon: Icons.person_outline, label: 'معلم الصف', value: row.teacherName ?? 'غير مسند'),
-                  _InfoLine(icon: Icons.apartment_outlined, label: 'الفرع', value: row.branchName ?? '—'),
-                  _InfoLine(icon: Icons.calendar_month_outlined, label: 'الفصل الدراسي', value: row.sessionName ?? '—'),
+                  _InfoLine(
+                      icon: Icons.person_outline,
+                      label: 'معلم الصف',
+                      value: row.teacherName ?? 'غير مسند'),
+                  _InfoLine(
+                      icon: Icons.apartment_outlined,
+                      label: 'الفرع',
+                      value: row.branchName ?? '—'),
+                  _InfoLine(
+                      icon: Icons.calendar_month_outlined,
+                      label: 'الفصل الدراسي',
+                      value: row.sessionName ?? '—'),
                 ],
               ),
             ),
@@ -234,7 +267,9 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              child: TextButton(onPressed: () => Navigator.of(sheetContext).pop(), child: const Text('إغلاق')),
+              child: TextButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(),
+                  child: const Text('إغلاق')),
             ),
           ],
         ),
@@ -247,18 +282,23 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
     return FutureBuilder<List<SaiClass>>(
       future: _future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const LoadingState();
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LoadingState();
+        }
         if (snapshot.hasError) {
           return ErrorState(
-            message: 'تحقق من الاتصال وصلاحيات حسابك، ثم أعد المحاولة.\n${snapshot.error}',
+            message:
+                'تحقق من الاتصال وصلاحيات حسابك، ثم أعد المحاولة.\n${snapshot.error}',
             onRetry: _retry,
           );
         }
         final rows = snapshot.data ?? const <SaiClass>[];
-        final programs = rows.map((row) => row.program).toSet().toList()..sort();
+        final programs = rows.map((row) => row.program).toSet().toList()
+          ..sort();
         final filtered = _filter(rows);
         final totalSeats = rows.fold<int>(0, (sum, row) => sum + row.capacity);
-        final totalEnrolled = rows.fold<int>(0, (sum, row) => sum + row.enrolled);
+        final totalEnrolled =
+            rows.fold<int>(0, (sum, row) => sum + row.enrolled);
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
@@ -267,11 +307,14 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
               icon: Icons.meeting_room_outlined,
               title: 'إدارة الصفوف والمقاعد',
               actionLabel: _canManageClasses ? 'إضافة صف' : 'استيراد',
-              actionIcon: _canManageClasses ? Icons.add : Icons.upload_file_outlined,
-              onAction: _canManageClasses ? () => _openForm() : widget.onOpenImport,
+              actionIcon:
+                  _canManageClasses ? Icons.add : Icons.upload_file_outlined,
+              onAction:
+                  _canManageClasses ? () => _openForm() : widget.onOpenImport,
             ),
             const SizedBox(height: 10),
-            _SummaryStrip(count: rows.length, enrolled: totalEnrolled, seats: totalSeats),
+            _SummaryStrip(
+                count: rows.length, enrolled: totalEnrolled, seats: totalSeats),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -281,8 +324,10 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
                     style: const TextStyle(fontSize: 12.5),
                     decoration: const InputDecoration(
                       hintText: 'البحث عن صف أو برنامج...',
-                      prefixIcon: Icon(Icons.search, size: 18, color: SaiColors.muted),
-                      prefixIconConstraints: BoxConstraints(minWidth: 38, minHeight: 38),
+                      prefixIcon:
+                          Icon(Icons.search, size: 18, color: SaiColors.muted),
+                      prefixIconConstraints:
+                          BoxConstraints(minWidth: 38, minHeight: 38),
                     ),
                   ),
                 ),
@@ -299,16 +344,24 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
                     child: DropdownButton<String>(
                       value: _program,
                       isDense: true,
-                      icon: const Icon(Icons.expand_more, size: 18, color: SaiColors.muted),
-                      style: const TextStyle(fontSize: 11, fontFamily: 'Cairo', color: SaiColors.ink, fontWeight: FontWeight.w600),
+                      icon: const Icon(Icons.expand_more,
+                          size: 18, color: SaiColors.muted),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'Cairo',
+                          color: SaiColors.ink,
+                          fontWeight: FontWeight.w600),
                       items: [
-                        const DropdownMenuItem(value: 'all', child: Text('جميع البرامج')),
+                        const DropdownMenuItem(
+                            value: 'all', child: Text('جميع البرامج')),
                         ...programs.map((program) => DropdownMenuItem(
                               value: program,
-                              child: Text(program, overflow: TextOverflow.ellipsis),
+                              child: Text(program,
+                                  overflow: TextOverflow.ellipsis),
                             )),
                       ],
-                      onChanged: (value) => setState(() => _program = value ?? 'all'),
+                      onChanged: (value) =>
+                          setState(() => _program = value ?? 'all'),
                     ),
                   ),
                 ),
@@ -336,12 +389,17 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
                       row: row,
                       onTap: () => _openSheet(row),
                       onRoster: () => _openRoster(row),
-                      onRegister: _canMarkAttendance ? () => _openRegister(row) : null,
-                      onEdit: _canManageClasses ? () => _openForm(existing: row) : null,
+                      onRegister:
+                          _canMarkAttendance ? () => _openRegister(row) : null,
+                      onEdit: _canManageClasses
+                          ? () => _openForm(existing: row)
+                          : null,
                     ),
                   )),
             const SizedBox(height: 6),
-            _ToolsRow(onImport: widget.onOpenImport, onParentLink: widget.onOpenParentLink),
+            _ToolsRow(
+                onImport: widget.onOpenImport,
+                onParentLink: widget.onOpenParentLink),
           ],
         );
       },
@@ -350,7 +408,8 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
 }
 
 class _InfoLine extends StatelessWidget {
-  const _InfoLine({required this.icon, required this.label, required this.value});
+  const _InfoLine(
+      {required this.icon, required this.label, required this.value});
 
   final IconData icon;
   final String label;
@@ -364,12 +423,16 @@ class _InfoLine extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: SaiColors.muted),
           const SizedBox(width: 6),
-          Text('$label: ', style: const TextStyle(fontSize: 10.5, color: SaiColors.muted)),
+          Text('$label: ',
+              style: const TextStyle(fontSize: 10.5, color: SaiColors.muted)),
           Expanded(
             child: Text(value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: SaiColors.ink)),
           ),
         ],
       ),
@@ -394,8 +457,12 @@ class _ClassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = row.isFull ? SaiColors.danger : (row.isNearFull ? SaiColors.warning : SaiColors.success);
-    final tint = row.isFull ? SaiColors.dangerTint : (row.isNearFull ? SaiColors.warningTint : SaiColors.successTint);
+    final color = row.isFull
+        ? SaiColors.danger
+        : (row.isNearFull ? SaiColors.warning : SaiColors.success);
+    final tint = row.isFull
+        ? SaiColors.dangerTint
+        : (row.isNearFull ? SaiColors.warningTint : SaiColors.successTint);
 
     return Container(
       decoration: BoxDecoration(
@@ -415,7 +482,8 @@ class _ClassCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TintChip(label: row.statusLabel, color: color, tint: tint),
+                      TintChip(
+                          label: row.statusLabel, color: color, tint: tint),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -424,22 +492,29 @@ class _ClassCard extends StatelessWidget {
                             Text(row.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                                style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: SaiColors.ink)),
                             const SizedBox(height: 1),
                             Text(row.program,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
+                                style: const TextStyle(
+                                    fontSize: 10, color: SaiColors.muted)),
                             const SizedBox(height: 2),
                             Row(
                               children: [
-                                const Icon(Icons.person_outline, size: 11, color: SaiColors.muted),
+                                const Icon(Icons.person_outline,
+                                    size: 11, color: SaiColors.muted),
                                 const SizedBox(width: 3),
                                 Expanded(
                                   child: Text(row.teacherName ?? 'بدون معلم',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 9.5, color: SaiColors.muted)),
+                                      style: const TextStyle(
+                                          fontSize: 9.5,
+                                          color: SaiColors.muted)),
                                 ),
                               ],
                             ),
@@ -452,12 +527,18 @@ class _ClassCard extends StatelessWidget {
                           Row(
                             children: [
                               Text('${row.enrolled} / ${row.capacity}',
-                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                                  style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: SaiColors.ink)),
                               const SizedBox(width: 4),
-                              const Icon(Icons.people_alt_outlined, size: 15, color: SaiColors.ink),
+                              const Icon(Icons.people_alt_outlined,
+                                  size: 15, color: SaiColors.ink),
                             ],
                           ),
-                          const Text('المسجلون / السعة', style: TextStyle(fontSize: 8.5, color: SaiColors.muted)),
+                          const Text('المسجلون / السعة',
+                              style: TextStyle(
+                                  fontSize: 8.5, color: SaiColors.muted)),
                         ],
                       ),
                     ],
@@ -468,7 +549,10 @@ class _ClassCard extends StatelessWidget {
                       SizedBox(
                         width: 34,
                         child: Text('${row.percent}%',
-                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+                            style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: color)),
                       ),
                       Expanded(
                         child: ClipRRect(
@@ -492,7 +576,11 @@ class _ClassCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
             child: Row(
               children: [
-                Expanded(child: _CardAction(icon: Icons.description_outlined, label: 'كشف الصف', onTap: onRoster)),
+                Expanded(
+                    child: _CardAction(
+                        icon: Icons.description_outlined,
+                        label: 'كشف الصف',
+                        onTap: onRoster)),
                 Expanded(
                   child: _CardAction(
                     icon: Icons.fact_check_outlined,
@@ -517,7 +605,8 @@ class _ClassCard extends StatelessWidget {
 }
 
 class _CardAction extends StatelessWidget {
-  const _CardAction({required this.icon, required this.label, required this.onTap});
+  const _CardAction(
+      {required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
   final String label;
@@ -542,7 +631,10 @@ class _CardAction extends StatelessWidget {
                 child: Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: SaiColors.ink)),
               ),
             ],
           ),
@@ -553,7 +645,8 @@ class _CardAction extends StatelessWidget {
 }
 
 class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({required this.count, required this.enrolled, required this.seats});
+  const _SummaryStrip(
+      {required this.count, required this.enrolled, required this.seats});
 
   final int count;
   final int enrolled;
@@ -566,7 +659,7 @@ class _SummaryStrip extends StatelessWidget {
       decoration: BoxDecoration(
         color: SaiColors.goldTint,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: SaiColors.gold.withOpacity(0.28)),
+        border: Border.all(color: SaiColors.gold.withValues(alpha: 0.28)),
       ),
       child: Row(
         children: [
@@ -580,7 +673,8 @@ class _SummaryStrip extends StatelessWidget {
     );
   }
 
-  Widget _divider() => Container(width: 1, height: 22, color: SaiColors.gold.withOpacity(0.3));
+  Widget _divider() => Container(
+      width: 1, height: 22, color: SaiColors.gold.withValues(alpha: 0.3));
 }
 
 class _MiniStat extends StatelessWidget {
@@ -594,8 +688,13 @@ class _MiniStat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: SaiColors.ink)),
-          Text(label, style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: SaiColors.ink)),
+          Text(label,
+              style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
         ],
       ),
     );
@@ -612,16 +711,23 @@ class _ToolsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _ToolButton(icon: Icons.upload_file_outlined, label: 'استيراد الطلاب', onTap: onImport)),
+        Expanded(
+            child: _ToolButton(
+                icon: Icons.upload_file_outlined,
+                label: 'استيراد الطلاب',
+                onTap: onImport)),
         const SizedBox(width: 8),
-        Expanded(child: _ToolButton(icon: Icons.link, label: 'ربط ولي الأمر', onTap: onParentLink)),
+        Expanded(
+            child: _ToolButton(
+                icon: Icons.link, label: 'ربط ولي الأمر', onTap: onParentLink)),
       ],
     );
   }
 }
 
 class _ToolButton extends StatelessWidget {
-  const _ToolButton({required this.icon, required this.label, required this.onTap});
+  const _ToolButton(
+      {required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
   final String label;
@@ -643,7 +749,14 @@ class _ToolButton extends StatelessWidget {
           children: [
             Icon(icon, size: 17, color: SaiColors.maroon),
             const SizedBox(width: 7),
-            Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: SaiColors.ink))),
+            Expanded(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: SaiColors.ink))),
           ],
         ),
       ),
@@ -662,9 +775,15 @@ class _SheetStat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: SaiColors.ink)),
           const SizedBox(height: 2),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
         ],
       ),
     );

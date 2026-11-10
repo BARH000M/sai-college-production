@@ -16,18 +16,22 @@ class _NamedOption {
 /// Bottom sheet that creates a class — or edits an existing one — so capacity
 /// and the assigned teacher can be set straight from the phone.
 class ClassFormSheet extends StatefulWidget {
-  const ClassFormSheet({super.key, this.existing, this.knownPrograms = const []});
+  const ClassFormSheet(
+      {super.key, this.existing, this.knownPrograms = const []});
 
   final SaiClass? existing;
   final List<String> knownPrograms;
 
-  static Future<bool?> show(BuildContext context, {SaiClass? existing, List<String> knownPrograms = const []}) {
+  static Future<bool?> show(BuildContext context,
+      {SaiClass? existing, List<String> knownPrograms = const []}) {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => ClassFormSheet(existing: existing, knownPrograms: knownPrograms),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) =>
+          ClassFormSheet(existing: existing, knownPrograms: knownPrograms),
     );
   }
 
@@ -36,17 +40,20 @@ class ClassFormSheet extends StatefulWidget {
 }
 
 class _ClassFormSheetState extends State<ClassFormSheet> {
-  late final TextEditingController _name = TextEditingController(text: widget.existing?.name ?? '');
+  late final TextEditingController _name =
+      TextEditingController(text: widget.existing?.name ?? '');
   late final TextEditingController _program = TextEditingController(
-    text: widget.existing == null || widget.existing!.program == 'غير محدد' ? '' : widget.existing!.program,
+    text: widget.existing == null || widget.existing!.program == 'غير محدد'
+        ? ''
+        : widget.existing!.program,
   );
 
   late int _capacity = widget.existing?.capacity ?? 25;
   late bool _isActive = widget.existing?.isActive ?? true;
-  String? _branchId = widget.existing?.branchId;
-  String? _sessionId = widget.existing?.sessionId;
-  String? _teacherId = widget.existing?.teacherId;
-  String? _teacherName = widget.existing?.teacherName;
+  String? _branchId;
+  String? _sessionId;
+  String? _teacherId;
+  String? _teacherName;
 
   bool _loading = true;
   bool _saving = false;
@@ -62,6 +69,10 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
   @override
   void initState() {
     super.initState();
+    _branchId = widget.existing?.branchId;
+    _sessionId = widget.existing?.sessionId;
+    _teacherId = widget.existing?.teacherId;
+    _teacherName = widget.existing?.teacherName;
     _load();
   }
 
@@ -79,19 +90,29 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
     });
     final client = Supabase.instance.client;
     try {
-      final results = await Future.wait([
-        client.from('branches').select('id,name,is_active').eq('is_active', true).order('name'),
-        client.from('academic_sessions').select('id,name,is_active').order('starts_on', ascending: false),
+      final results = await Future.wait<Object>([
+        client
+            .from('branches')
+            .select('id,name,is_active')
+            .eq('is_active', true)
+            .order('name'),
+        client
+            .from('academic_sessions')
+            .select('id,name,is_active')
+            .order('starts_on', ascending: false),
         loadTeacherDirectory(client),
       ]);
 
       final branches = (results[0] as List)
           .whereType<Map<String, dynamic>>()
-          .map((row) => _NamedOption(id: row['id'] as String, name: (row['name'] as String?) ?? 'فرع'))
+          .map((row) => _NamedOption(
+              id: row['id'] as String, name: (row['name'] as String?) ?? 'فرع'))
           .toList();
       final sessions = (results[1] as List)
           .whereType<Map<String, dynamic>>()
-          .map((row) => _NamedOption(id: row['id'] as String, name: (row['name'] as String?) ?? 'فصل دراسي'))
+          .map((row) => _NamedOption(
+              id: row['id'] as String,
+              name: (row['name'] as String?) ?? 'فصل دراسي'))
           .toList();
       final teachers = (results[2] as List).cast<TeacherOption>();
 
@@ -104,7 +125,9 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
         _sessionId ??= sessions.isNotEmpty ? sessions.first.id : null;
         if (_teacherId != null) {
           for (final teacher in teachers) {
-            if (teacher.userId == _teacherId) _teacherName = teacher.displayName;
+            if (teacher.userId == _teacherId) {
+              _teacherName = teacher.displayName;
+            }
           }
         }
         _loading = false;
@@ -113,7 +136,8 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _loadError = 'تعذّر تحميل الفروع والفصول. تحقق من الاتصال ثم أعد المحاولة.\n$error';
+        _loadError =
+            'تعذّر تحميل الفروع والفصول. تحقق من الاتصال ثم أعد المحاولة.\n$error';
       });
     }
   }
@@ -121,14 +145,17 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
   Future<void> _pickTeacher() async {
     if (_teachers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لا تتوفر قائمة معلمين لهذا الحساب. يمكنك حفظ الصف بدون معلم وتعيينه لاحقاً.')),
+        const SnackBar(
+            content: Text(
+                'لا تتوفر قائمة معلمين لهذا الحساب. يمكنك حفظ الصف بدون معلم وتعيينه لاحقاً.')),
       );
       return;
     }
     final selected = await showModalBottomSheet<String?>(
       context: context,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
       builder: (sheetContext) {
         return SafeArea(
           child: Column(
@@ -138,7 +165,11 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                 padding: EdgeInsets.fromLTRB(18, 16, 18, 8),
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
-                  child: Text('اختيار معلم الصف', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                  child: Text('اختيار معلم الصف',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: SaiColors.ink)),
                 ),
               ),
               Flexible(
@@ -147,18 +178,27 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                   children: [
                     ListTile(
                       dense: true,
-                      leading: const Icon(Icons.person_off_outlined, size: 19, color: SaiColors.muted),
-                      title: const Text('بدون معلم', style: TextStyle(fontSize: 12.5, color: SaiColors.ink)),
+                      leading: const Icon(Icons.person_off_outlined,
+                          size: 19, color: SaiColors.muted),
+                      title: const Text('بدون معلم',
+                          style:
+                              TextStyle(fontSize: 12.5, color: SaiColors.ink)),
                       onTap: () => Navigator.of(sheetContext).pop(''),
                     ),
                     ..._teachers.map((teacher) => ListTile(
                           dense: true,
-                          leading: const Icon(Icons.person_outline, size: 19, color: SaiColors.maroon),
-                          title: Text(teacher.displayName, style: const TextStyle(fontSize: 12.5, color: SaiColors.ink)),
+                          leading: const Icon(Icons.person_outline,
+                              size: 19, color: SaiColors.maroon),
+                          title: Text(teacher.displayName,
+                              style: const TextStyle(
+                                  fontSize: 12.5, color: SaiColors.ink)),
                           subtitle: teacher.email.isEmpty
                               ? null
-                              : Text(teacher.email, style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
-                          onTap: () => Navigator.of(sheetContext).pop(teacher.userId),
+                              : Text(teacher.email,
+                                  style: const TextStyle(
+                                      fontSize: 10, color: SaiColors.muted)),
+                          onTap: () =>
+                              Navigator.of(sheetContext).pop(teacher.userId),
                         )),
                   ],
                 ),
@@ -177,13 +217,17 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
         return;
       }
       _teacherId = selected;
-      _teacherName = _teachers.firstWhere((teacher) => teacher.userId == selected).displayName;
+      _teacherName = _teachers
+          .firstWhere((teacher) => teacher.userId == selected)
+          .displayName;
     });
   }
 
   String? _validate() {
     if (_name.text.trim().isEmpty) return 'اكتب اسم الصف أولاً.';
-    if (_name.text.trim().length > 80) return 'اسم الصف طويل جداً (80 حرفاً كحد أقصى).';
+    if (_name.text.trim().length > 80) {
+      return 'اسم الصف طويل جداً (80 حرفاً كحد أقصى).';
+    }
     if (_capacity < 1) return 'السعة يجب أن تكون أكبر من صفر.';
     if (_capacity > 500) return 'السعة القصوى 500 مقعد.';
     if (_branchId == null) return 'اختر الفرع.';
@@ -216,7 +260,11 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
 
     try {
       if (_isEdit) {
-        final updated = await client.from('classes').update(payload).eq('id', widget.existing!.id).select('id');
+        final updated = await client
+            .from('classes')
+            .update(payload)
+            .eq('id', widget.existing!.id)
+            .select('id');
         if ((updated as List).isEmpty) {
           throw Exception('لم يتم تحديث الصف. تحقق من صلاحية تعديل هذا الفرع.');
         }
@@ -228,7 +276,8 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
     } catch (error) {
       if (!mounted) return;
       final raw = error.toString();
-      final friendly = raw.toLowerCase().contains('row-level security') || raw.contains('42501')
+      final friendly = raw.toLowerCase().contains('row-level security') ||
+              raw.contains('42501')
           ? 'لا تملك صلاحية تعديل صفوف هذا الفرع. تواصل مع إدارة الكلية.'
           : raw.toLowerCase().contains('duplicate')
               ? 'يوجد صف بهذا الاسم في الفرع نفسه.'
@@ -263,14 +312,16 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                               controller: _name,
                               textInputAction: TextInputAction.next,
                               style: const TextStyle(fontSize: 13),
-                              decoration: const InputDecoration(hintText: 'مثال: صف HSK 2 — صباحي'),
+                              decoration: const InputDecoration(
+                                  hintText: 'مثال: صف HSK 2 — صباحي'),
                             ),
                             const SizedBox(height: 14),
                             const _FieldLabel('البرنامج / المسار'),
                             TextField(
                               controller: _program,
                               style: const TextStyle(fontSize: 13),
-                              decoration: const InputDecoration(hintText: 'مثال: دبلوم اللغة الصينية'),
+                              decoration: const InputDecoration(
+                                  hintText: 'مثال: دبلوم اللغة الصينية'),
                             ),
                             if (widget.knownPrograms.isNotEmpty) ...[
                               const SizedBox(height: 8),
@@ -281,16 +332,26 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                                     .where((program) => program != 'غير محدد')
                                     .take(6)
                                     .map((program) => InkWell(
-                                          onTap: () => setState(() => _program.text = program),
-                                          borderRadius: BorderRadius.circular(20),
+                                          onTap: () => setState(
+                                              () => _program.text = program),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 5),
                                             decoration: BoxDecoration(
                                               color: SaiColors.goldTint,
-                                              borderRadius: BorderRadius.circular(20),
-                                              border: Border.all(color: SaiColors.gold.withOpacity(0.3)),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                  color: SaiColors.gold
+                                                      .withValues(alpha: 0.3)),
                                             ),
-                                            child: Text(program, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: SaiColors.ink)),
+                                            child: Text(program,
+                                                style: const TextStyle(
+                                                    fontSize: 10.5,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: SaiColors.ink)),
                                           ),
                                         ))
                                     .toList(),
@@ -300,7 +361,8 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                             const _FieldLabel('السعة (عدد المقاعد)'),
                             _CapacityStepper(
                               value: _capacity,
-                              onChanged: (value) => setState(() => _capacity = value.clamp(1, 500)),
+                              onChanged: (value) => setState(
+                                  () => _capacity = value.clamp(1, 500)),
                             ),
                             const SizedBox(height: 16),
                             const _FieldLabel('معلم الصف'),
@@ -317,7 +379,8 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                               value: _branchId,
                               options: _branches,
                               hint: 'اختر الفرع',
-                              onChanged: (value) => setState(() => _branchId = value),
+                              onChanged: (value) =>
+                                  setState(() => _branchId = value),
                             ),
                             const SizedBox(height: 16),
                             const _FieldLabel('الفصل الدراسي'),
@@ -326,32 +389,50 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                               value: _sessionId,
                               options: _sessions,
                               hint: 'اختر الفصل الدراسي',
-                              onChanged: (value) => setState(() => _sessionId = value),
+                              onChanged: (value) =>
+                                  setState(() => _sessionId = value),
                             ),
                             const SizedBox(height: 16),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 4),
                               decoration: BoxDecoration(
                                 color: SaiColors.cream,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: SaiColors.border),
                               ),
-                              child: SwitchListTile(
-                                contentPadding: EdgeInsets.zero,
-                                value: _isActive,
-                                title: const Text('صف نشط', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
-                                subtitle: const Text('الصفوف غير النشطة تظهر في السجلات لكنها لا تُسند للطلاب الجدد.',
-                                    style: TextStyle(fontSize: 10, color: SaiColors.muted)),
-                                onChanged: (value) => setState(() => _isActive = value),
+                              child: Material(
+                                type: MaterialType.transparency,
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  value: _isActive,
+                                  title: const Text('صف نشط',
+                                      style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: SaiColors.ink)),
+                                  subtitle: const Text(
+                                      'الصفوف غير النشطة تظهر في السجلات لكنها لا تُسند للطلاب الجدد.',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          color: SaiColors.muted)),
+                                  onChanged: (value) =>
+                                      setState(() => _isActive = value),
+                                ),
                               ),
                             ),
                             if (_formError != null) ...[
                               const SizedBox(height: 14),
-                              NoteBanner(message: _formError!, color: SaiColors.danger, tint: SaiColors.dangerTint, icon: Icons.error_outline),
+                              NoteBanner(
+                                  message: _formError!,
+                                  color: SaiColors.danger,
+                                  tint: SaiColors.dangerTint,
+                                  icon: Icons.error_outline),
                             ],
                             const SizedBox(height: 10),
                             const NoteBanner(
-                              message: 'الطلاب لا يُضافون من هنا. أنشئ الصف أولاً ثم استخدم «استيراد الطلاب» أو سجل الطالب لإسناده إلى هذا الصف.',
+                              message:
+                                  'الطلاب لا يُضافون من هنا. أنشئ الصف أولاً ثم استخدم «استيراد الطلاب» أو سجل الطالب لإسناده إلى هذا الصف.',
                             ),
                           ],
                         ),
@@ -366,7 +447,9 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+                      onPressed: _saving
+                          ? null
+                          : () => Navigator.of(context).pop(false),
                       child: const Text('إلغاء'),
                     ),
                   ),
@@ -374,9 +457,15 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                   Expanded(
                     flex: 2,
                     child: FilledButton(
-                      onPressed: _saving || _loading || _loadError != null ? null : _save,
+                      onPressed: _saving || _loading || _loadError != null
+                          ? null
+                          : _save,
                       child: _saving
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
                           : Text(_isEdit ? 'حفظ التعديلات' : 'إضافة الصف'),
                     ),
                   ),
@@ -409,8 +498,11 @@ class _Header extends StatelessWidget {
           Container(
             width: 34,
             height: 34,
-            decoration: BoxDecoration(color: SaiColors.maroon, borderRadius: BorderRadius.circular(10)),
-            child: Icon(isEdit ? Icons.edit_outlined : Icons.add_home_outlined, size: 18, color: Colors.white),
+            decoration: BoxDecoration(
+                color: SaiColors.maroon,
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(isEdit ? Icons.edit_outlined : Icons.add_home_outlined,
+                size: 18, color: Colors.white),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -418,7 +510,10 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(isEdit ? 'تعديل بيانات الصف' : 'إضافة صف جديد',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: SaiColors.ink)),
                 const Text('السعة والمعلم يمكن ضبطهما من هنا مباشرة',
                     style: TextStyle(fontSize: 10, color: SaiColors.muted)),
               ],
@@ -442,7 +537,11 @@ class _FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: SaiColors.ink)),
       );
 }
 
@@ -467,8 +566,13 @@ class _CapacityStepper extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
-                Text('$value', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: SaiColors.ink)),
-                const Text('مقعد', style: TextStyle(fontSize: 9.5, color: SaiColors.muted)),
+                Text('$value',
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: SaiColors.ink)),
+                const Text('مقعد',
+                    style: TextStyle(fontSize: 9.5, color: SaiColors.muted)),
               ],
             ),
           ),
@@ -481,17 +585,25 @@ class _CapacityStepper extends StatelessWidget {
                       onTap: () => onChanged(seat),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 5),
                         decoration: BoxDecoration(
-                          color: value == seat ? SaiColors.maroonTint : SaiColors.cream,
+                          color: value == seat
+                              ? SaiColors.maroonTint
+                              : SaiColors.cream,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: value == seat ? SaiColors.maroon.withOpacity(0.35) : SaiColors.border),
+                          border: Border.all(
+                              color: value == seat
+                                  ? SaiColors.maroon.withValues(alpha: 0.35)
+                                  : SaiColors.border),
                         ),
                         child: Text('$seat',
                             style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w700,
-                                color: value == seat ? SaiColors.maroon : SaiColors.muted)),
+                                color: value == seat
+                                    ? SaiColors.maroon
+                                    : SaiColors.muted)),
                       ),
                     ))
                 .toList(),
@@ -516,7 +628,10 @@ class _StepButton extends StatelessWidget {
       child: Container(
         width: 38,
         height: 38,
-        decoration: BoxDecoration(color: SaiColors.cream, borderRadius: BorderRadius.circular(10), border: Border.all(color: SaiColors.border)),
+        decoration: BoxDecoration(
+            color: SaiColors.cream,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: SaiColors.border)),
         child: Icon(icon, size: 18, color: SaiColors.maroon),
       ),
     );
@@ -524,7 +639,11 @@ class _StepButton extends StatelessWidget {
 }
 
 class _TapField extends StatelessWidget {
-  const _TapField({required this.icon, required this.text, required this.onTap, this.muted = false});
+  const _TapField(
+      {required this.icon,
+      required this.text,
+      required this.onTap,
+      this.muted = false});
 
   final IconData icon;
   final String text;
@@ -552,7 +671,10 @@ class _TapField extends StatelessWidget {
                 text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12.5, color: muted ? SaiColors.muted : SaiColors.ink, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    fontSize: 12.5,
+                    color: muted ? SaiColors.muted : SaiColors.ink,
+                    fontWeight: FontWeight.w600),
               ),
             ),
             const Icon(Icons.expand_more, size: 18, color: SaiColors.muted),
@@ -597,11 +719,21 @@ class _OptionDropdown extends StatelessWidget {
               child: DropdownButton<String>(
                 value: exists ? value : null,
                 isExpanded: true,
-                hint: Text(hint, style: const TextStyle(fontSize: 12.5, color: SaiColors.muted)),
-                icon: const Icon(Icons.expand_more, size: 18, color: SaiColors.muted),
-                style: const TextStyle(fontSize: 12.5, fontFamily: 'Cairo', color: SaiColors.ink, fontWeight: FontWeight.w600),
+                hint: Text(hint,
+                    style: const TextStyle(
+                        fontSize: 12.5, color: SaiColors.muted)),
+                icon: const Icon(Icons.expand_more,
+                    size: 18, color: SaiColors.muted),
+                style: const TextStyle(
+                    fontSize: 12.5,
+                    fontFamily: 'Cairo',
+                    color: SaiColors.ink,
+                    fontWeight: FontWeight.w600),
                 items: options
-                    .map((option) => DropdownMenuItem(value: option.id, child: Text(option.name, overflow: TextOverflow.ellipsis)))
+                    .map((option) => DropdownMenuItem(
+                        value: option.id,
+                        child:
+                            Text(option.name, overflow: TextOverflow.ellipsis)))
                     .toList(),
                 onChanged: onChanged,
               ),

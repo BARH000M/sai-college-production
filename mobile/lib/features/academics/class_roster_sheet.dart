@@ -7,7 +7,8 @@ import 'class_models.dart';
 import 'class_roster_export.dart';
 
 String _two(int value) => value.toString().padLeft(2, '0');
-String _printed(DateTime value) => '${value.year}/${_two(value.month)}/${_two(value.day)}';
+String _printed(DateTime value) =>
+    '${value.year}/${_two(value.month)}/${_two(value.day)}';
 
 /// Official class roster sheet — the printable document that leaves the phone
 /// as text (WhatsApp / e-mail / print) with the college letterhead.
@@ -50,10 +51,12 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
 
   Future<void> _share(List<RosterStudent> students) async {
     try {
-      await copyClassRoster(cls: widget.cls, students: students, issuedAt: _issuedAt);
+      await copyClassRoster(
+          cls: widget.cls, students: students, issuedAt: _issuedAt);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('تم نسخ كشف الصف — الصقه في واتساب أو البريد، أو أرسله للطباعة.'),
+        content: Text(
+            'تم نسخ كشف الصف — الصقه في واتساب أو البريد، أو أرسله للطباعة.'),
       ));
     } catch (error) {
       if (!mounted) return;
@@ -77,19 +80,27 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('كشف طلاب الصف', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SaiColors.ink)),
-                Text(widget.cls.name, style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
+                const Text('كشف طلاب الصف',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: SaiColors.ink)),
+                Text(widget.cls.name,
+                    style:
+                        const TextStyle(fontSize: 10, color: SaiColors.muted)),
               ],
             ),
             leading: IconButton(
               onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_forward, size: 20, color: SaiColors.ink),
+              icon: const Icon(Icons.arrow_forward,
+                  size: 20, color: SaiColors.ink),
             ),
             actions: [
               IconButton(
                 tooltip: 'مشاركة الكشف',
                 onPressed: busy ? null : () => _share(students),
-                icon: const Icon(Icons.ios_share, size: 19, color: SaiColors.ink),
+                icon:
+                    const Icon(Icons.ios_share, size: 19, color: SaiColors.ink),
               ),
             ],
           ),
@@ -116,7 +127,8 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                             const _Letterhead(),
                             const SizedBox(height: 14),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 7),
                               decoration: BoxDecoration(
                                 color: SaiColors.maroon,
                                 borderRadius: BorderRadius.circular(4),
@@ -124,11 +136,17 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                               child: const Text(
                                 'كشف طلاب الصف — يُعتمد مرجعاً للحضور والتقييم',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white),
+                                style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white),
                               ),
                             ),
                             const SizedBox(height: 12),
-                            _MetaGrid(cls: widget.cls, issuedAt: _issuedAt, count: students.length),
+                            _MetaGrid(
+                                cls: widget.cls,
+                                issuedAt: _issuedAt,
+                                count: students.length),
                             const SizedBox(height: 14),
                             _RosterTable(students: students),
                             const SizedBox(height: 12),
@@ -136,14 +154,21 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                             const SizedBox(height: 14),
                             const Text(
                               'يوثّق هذا الكشف الطلاب المسجلين في الصف عند تاريخ الإصدار. أي تغيير في القيد أو النقل يُسجَّل من سجل الطالب، وتُعاد طباعة الكشف بعد التحديث.',
-                              style: TextStyle(fontSize: 9.5, height: 1.8, color: SaiColors.muted),
+                              style: TextStyle(
+                                  fontSize: 9.5,
+                                  height: 1.8,
+                                  color: SaiColors.muted),
                             ),
                             const SizedBox(height: 22),
-                            Row(
+                            const Row(
                               children: [
-                                Expanded(child: _SignatureLine(label: 'توقيع معلم الصف')),
-                                const SizedBox(width: 18),
-                                Expanded(child: _SignatureLine(label: 'توقيع إدارة الكلية')),
+                                Expanded(
+                                    child: _SignatureLine(
+                                        label: 'توقيع معلم الصف')),
+                                SizedBox(width: 18),
+                                Expanded(
+                                    child: _SignatureLine(
+                                        label: 'توقيع إدارة الكلية')),
                               ],
                             ),
                             const SizedBox(height: 18),
@@ -154,11 +179,13 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                                 Expanded(
                                   child: Text(
                                     'كلية ساي التعليمية اليمنية الصينية · ${widget.cls.branchName ?? 'الفرع الرئيسي'}',
-                                    style: const TextStyle(fontSize: 8.5, color: SaiColors.muted),
+                                    style: const TextStyle(
+                                        fontSize: 8.5, color: SaiColors.muted),
                                   ),
                                 ),
                                 Text('صفحة 1 من 1 · ${students.length} طالباً',
-                                    style: const TextStyle(fontSize: 8.5, color: SaiColors.muted)),
+                                    style: const TextStyle(
+                                        fontSize: 8.5, color: SaiColors.muted)),
                               ],
                             ),
                           ],
@@ -175,12 +202,16 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                       child: const Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.info_outline, size: 15, color: SaiColors.gold),
+                          Icon(Icons.info_outline,
+                              size: 15, color: SaiColors.gold),
                           SizedBox(width: 7),
                           Expanded(
                             child: Text(
                               'زر المشاركة ينسخ الكشف كاملاً بترويسة الكلية وأعمدة التوقيع، جاهزاً للصق في واتساب أو البريد أو برنامج الطباعة.',
-                              style: TextStyle(fontSize: 10, height: 1.7, color: SaiColors.muted),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  height: 1.7,
+                                  color: SaiColors.muted),
                             ),
                           ),
                         ],
@@ -208,7 +239,9 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                   Expanded(
                     flex: 2,
                     child: FilledButton.icon(
-                      onPressed: busy || snapshot.hasError ? null : () => _share(students),
+                      onPressed: busy || snapshot.hasError
+                          ? null
+                          : () => _share(students),
                       icon: const Icon(Icons.ios_share, size: 17),
                       label: const Text('مشاركة / طباعة الكشف'),
                     ),
@@ -240,7 +273,9 @@ class _Letterhead extends StatelessWidget {
             border: Border.all(color: SaiColors.border),
           ),
           padding: const EdgeInsets.all(3),
-          child: ClipOval(child: Image.asset('assets/images/sai-logo.png', fit: BoxFit.contain)),
+          child: ClipOval(
+              child: Image.asset('assets/images/sai-logo.png',
+                  fit: BoxFit.contain)),
         ),
         const SizedBox(width: 10),
         const Expanded(
@@ -250,12 +285,19 @@ class _Letterhead extends StatelessWidget {
               Text(
                 'كلية ساي التعليمية اليمنية الصينية',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: SaiColors.ink, height: 1.5),
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: SaiColors.ink,
+                    height: 1.5),
               ),
               SizedBox(height: 1),
               Text(
                 '世门赛艾教育学院',
-                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: SaiColors.gold),
+                style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                    color: SaiColors.gold),
               ),
               SizedBox(height: 3),
               Text(
@@ -272,9 +314,10 @@ class _Letterhead extends StatelessWidget {
           decoration: BoxDecoration(
             color: SaiColors.goldTint,
             shape: BoxShape.circle,
-            border: Border.all(color: SaiColors.gold.withOpacity(0.4)),
+            border: Border.all(color: SaiColors.gold.withValues(alpha: 0.4)),
           ),
-          child: const Icon(Icons.verified_outlined, size: 20, color: SaiColors.gold),
+          child: const Icon(Icons.verified_outlined,
+              size: 20, color: SaiColors.gold),
         ),
       ],
     );
@@ -282,7 +325,8 @@ class _Letterhead extends StatelessWidget {
 }
 
 class _MetaGrid extends StatelessWidget {
-  const _MetaGrid({required this.cls, required this.issuedAt, required this.count});
+  const _MetaGrid(
+      {required this.cls, required this.issuedAt, required this.count});
 
   final SaiClass cls;
   final DateTime issuedAt;
@@ -317,7 +361,10 @@ class _MetaGrid extends StatelessWidget {
                 children: [
                   _metaCell(items[i].key, items[i].value),
                   const SizedBox(width: 8),
-                  if (i + 1 < items.length) _metaCell(items[i + 1].key, items[i + 1].value) else const Spacer(),
+                  if (i + 1 < items.length)
+                    _metaCell(items[i + 1].key, items[i + 1].value)
+                  else
+                    const Spacer(),
                 ],
               ),
             ),
@@ -331,13 +378,18 @@ class _MetaGrid extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label: ', style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
+          Text('$label: ',
+              style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
           Expanded(
             child: Text(
               value,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: SaiColors.ink, height: 1.5),
+              style: const TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  color: SaiColors.ink,
+                  height: 1.5),
             ),
           ),
         ],
@@ -362,10 +414,16 @@ class _RosterTable extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             child: const Row(
               children: [
-                SizedBox(width: 22, child: Text('م', style: _headStyle, textAlign: TextAlign.center)),
+                SizedBox(
+                    width: 22,
+                    child: Text('م',
+                        style: _headStyle, textAlign: TextAlign.center)),
                 Expanded(flex: 3, child: Text('اسم الطالب', style: _headStyle)),
                 Expanded(flex: 2, child: Text('رقم القيد', style: _headStyle)),
-                Expanded(flex: 2, child: Text('الحضور', style: _headStyle, textAlign: TextAlign.center)),
+                Expanded(
+                    flex: 2,
+                    child: Text('الحضور',
+                        style: _headStyle, textAlign: TextAlign.center)),
               ],
             ),
           ),
@@ -381,8 +439,11 @@ class _RosterTable extends StatelessWidget {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
                 decoration: BoxDecoration(
-                  color: index.isEven ? Colors.white : SaiColors.cream.withOpacity(0.55),
-                  border: const Border(top: BorderSide(color: SaiColors.border)),
+                  color: index.isEven
+                      ? Colors.white
+                      : SaiColors.cream.withValues(alpha: 0.55),
+                  border:
+                      const Border(top: BorderSide(color: SaiColors.border)),
                 ),
                 child: Row(
                   children: [
@@ -390,7 +451,8 @@ class _RosterTable extends StatelessWidget {
                       width: 22,
                       child: Text('${index + 1}',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
+                          style: const TextStyle(
+                              fontSize: 9, color: SaiColors.muted)),
                     ),
                     Expanded(
                       flex: 3,
@@ -398,7 +460,10 @@ class _RosterTable extends StatelessWidget {
                         student.fullName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: SaiColors.ink),
+                        style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: SaiColors.ink),
                       ),
                     ),
                     Expanded(
@@ -406,7 +471,8 @@ class _RosterTable extends StatelessWidget {
                       child: Text(student.admissionNo,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 9, color: SaiColors.muted)),
+                          style: const TextStyle(
+                              fontSize: 9, color: SaiColors.muted)),
                     ),
                     Expanded(
                       flex: 2,
@@ -429,7 +495,11 @@ class _RosterTable extends StatelessWidget {
   }
 }
 
-const _headStyle = TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: SaiColors.ink, height: 1.4);
+const _headStyle = TextStyle(
+    fontSize: 9,
+    fontWeight: FontWeight.w700,
+    color: SaiColors.ink,
+    height: 1.4);
 
 class _Tally extends StatelessWidget {
   const _Tally({required this.students, required this.cls});
@@ -454,10 +524,14 @@ class _Tally extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: SaiColors.goldTint,
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: SaiColors.gold.withOpacity(0.3)),
+                  border:
+                      Border.all(color: SaiColors.gold.withValues(alpha: 0.3)),
                 ),
                 child: Text(item,
-                    style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                    style: const TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w700,
+                        color: SaiColors.ink)),
               ))
           .toList(),
     );
@@ -475,7 +549,8 @@ class _SignatureLine extends StatelessWidget {
       children: [
         Container(height: 1, color: SaiColors.border),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 8.5, color: SaiColors.muted)),
+        Text(label,
+            style: const TextStyle(fontSize: 8.5, color: SaiColors.muted)),
       ],
     );
   }
