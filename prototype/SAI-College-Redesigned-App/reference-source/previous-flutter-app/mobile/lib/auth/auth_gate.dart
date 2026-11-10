@@ -1,6 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart' show State, StatefulWidget;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../core/supabase.dart';
 import '../shell/app_shell.dart';
 import 'login_page.dart';
@@ -109,43 +112,57 @@ class _AuthGateState extends State<AuthGate> {
     if (db.auth.currentSession == null) return const LoginPage();
     if (_pending != null) {
       return RecoveryPage(
-          resumePending: true,
-          onFinished: () {
-            setState(() => _pending = null);
-            unawaited(_checkPending());
-          });
+        resumePending: true,
+        onFinished: () {
+          setState(() => _pending = null);
+          unawaited(_checkPending());
+        },
+      );
     }
     if (_checkingPending || _loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_profile == null) {
       return Scaffold(
-          body: Center(
-              child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 40),
-                        const SizedBox(height: 12),
-                        Text(_error ?? 'تعذّر قراءة الملف الشخصي',
-                            textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                            onPressed: () => unawaited(_load()),
-                            child: const Text('إعادة المحاولة')),
-                        TextButton(
-                            onPressed: () => unawaited(db.auth.signOut()),
-                            child: const Text('تسجيل الخروج')),
-                      ]))));
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 40),
+                const SizedBox(height: 12),
+                Text(
+                  _error ?? 'تعذّر قراءة الملف الشخصي',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => unawaited(_load()),
+                  child: const Text('إعادة المحاولة'),
+                ),
+                TextButton(
+                  onPressed: () => unawaited(db.auth.signOut()),
+                  child: const Text('تسجيل الخروج'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
     if (!_profile!.active) {
       return const Scaffold(
-          body: Center(
-              child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('الحساب موقوف. تواصل مع إدارة المدرسة.',
-                      textAlign: TextAlign.center))));
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'الحساب موقوف. تواصل مع إدارة المدرسة.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
     }
     return AppShell(profile: _profile!);
   }
