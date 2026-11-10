@@ -169,7 +169,8 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                     teacher.email.toLowerCase().contains(term))
                 .toList();
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom),
               child: SizedBox(
                 height: MediaQuery.of(context).size.height * 0.62,
                 child: Column(
@@ -178,7 +179,9 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                     Container(
                       width: 38,
                       height: 4,
-                      decoration: BoxDecoration(color: SaiColors.border, borderRadius: BorderRadius.circular(4)),
+                      decoration: BoxDecoration(
+                          color: SaiColors.border,
+                          borderRadius: BorderRadius.circular(4)),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 10, 6, 4),
@@ -186,12 +189,18 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                         children: [
                           const Expanded(
                             child: Text('اختيار معلم الصف',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: SaiColors.ink)),
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: SaiColors.ink)),
                           ),
-                          Text('${filtered.length} معلم', style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
+                          Text('${filtered.length} معلم',
+                              style: const TextStyle(
+                                  fontSize: 10, color: SaiColors.muted)),
                           IconButton(
                             onPressed: () => Navigator.of(sheetContext).pop(),
-                            icon: const Icon(Icons.close, size: 18, color: SaiColors.muted),
+                            icon: const Icon(Icons.close,
+                                size: 18, color: SaiColors.muted),
                           ),
                         ],
                       ),
@@ -199,12 +208,15 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: TextField(
-                        onChanged: (value) => setSheetState(() => query = value),
+                        onChanged: (value) =>
+                            setSheetState(() => query = value),
                         style: const TextStyle(fontSize: 12.5),
                         decoration: const InputDecoration(
                           hintText: 'ابحث باسم المعلم أو بريده',
-                          prefixIcon: Icon(Icons.search, size: 18, color: SaiColors.muted),
-                          prefixIconConstraints: BoxConstraints(minWidth: 38, minHeight: 38),
+                          prefixIcon: Icon(Icons.search,
+                              size: 18, color: SaiColors.muted),
+                          prefixIconConstraints:
+                              BoxConstraints(minWidth: 38, minHeight: 38),
                         ),
                       ),
                     ),
@@ -215,34 +227,47 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                           if (term.isEmpty)
                             ListTile(
                               dense: true,
-                              leading: const Icon(Icons.person_off_outlined, size: 19, color: SaiColors.muted),
-                              title: const Text('بدون معلم', style: TextStyle(fontSize: 12.5, color: SaiColors.ink)),
+                              leading: const Icon(Icons.person_off_outlined,
+                                  size: 19, color: SaiColors.muted),
+                              title: const Text('بدون معلم',
+                                  style: TextStyle(
+                                      fontSize: 12.5, color: SaiColors.ink)),
                               onTap: () => Navigator.of(sheetContext).pop(''),
                             ),
                           if (filtered.isEmpty)
                             const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 24),
                               child: Text('لا يوجد معلم مطابق لكلمة البحث.',
-                                  textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: SaiColors.muted)),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontSize: 11.5, color: SaiColors.muted)),
                             )
                           else
                             ...filtered.map((teacher) => ListTile(
                                   dense: true,
-                                  leading: const Icon(Icons.person_outline, size: 19, color: SaiColors.maroon),
+                                  leading: const Icon(Icons.person_outline,
+                                      size: 19, color: SaiColors.maroon),
                                   title: Text(teacher.displayName,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 12.5, color: SaiColors.ink)),
+                                      style: const TextStyle(
+                                          fontSize: 12.5,
+                                          color: SaiColors.ink)),
                                   subtitle: teacher.email.isEmpty
                                       ? null
                                       : Text(teacher.email,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 10, color: SaiColors.muted)),
+                                          style: const TextStyle(
+                                              fontSize: 10,
+                                              color: SaiColors.muted)),
                                   trailing: _teacherId == teacher.userId
-                                      ? const Icon(Icons.check_circle, size: 17, color: SaiColors.success)
+                                      ? const Icon(Icons.check_circle,
+                                          size: 17, color: SaiColors.success)
                                       : null,
-                                  onTap: () => Navigator.of(sheetContext).pop(teacher.userId),
+                                  onTap: () => Navigator.of(sheetContext)
+                                      .pop(teacher.userId),
                                 )),
                         ],
                       ),

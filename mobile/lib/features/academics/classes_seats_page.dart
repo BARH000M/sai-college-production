@@ -137,7 +137,8 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
 
   Future<void> _openTransfer({SaiClass? source}) async {
     final moved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(builder: (_) => StudentTransferPage(initialSourceId: source?.id)),
+      MaterialPageRoute<bool>(
+          builder: (_) => StudentTransferPage(initialSourceId: source?.id)),
     );
     if (moved == true && mounted) _retry();
   }
@@ -171,130 +172,133 @@ class _ClassesSeatsPageState extends State<ClassesSeatsPage> {
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
         child: SingleChildScrollView(
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                    child: Text(row.name,
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: SaiColors.ink))),
-                TintChip(label: row.statusLabel, color: color, tint: tint),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(row.program,
-                style: const TextStyle(fontSize: 11.5, color: SaiColors.muted)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: SaiColors.cream,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: SaiColors.border),
-              ),
-              child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  _InfoLine(
-                      icon: Icons.person_outline,
-                      label: 'معلم الصف',
-                      value: row.teacherName ?? 'غير مسند'),
-                  _InfoLine(
-                      icon: Icons.apartment_outlined,
-                      label: 'الفرع',
-                      value: row.branchName ?? '—'),
-                  _InfoLine(
-                      icon: Icons.calendar_month_outlined,
-                      label: 'الفصل الدراسي',
-                      value: row.sessionName ?? '—'),
+                  Expanded(
+                      child: Text(row.name,
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: SaiColors.ink))),
+                  TintChip(label: row.statusLabel, color: color, tint: tint),
                 ],
               ),
-            ),
-            const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: row.ratio,
-                minHeight: 7,
-                backgroundColor: SaiColors.creamDeep,
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _SheetStat(label: 'المسجلون', value: '${row.enrolled}'),
-                _SheetStat(label: 'السعة', value: '${row.capacity}'),
-                _SheetStat(label: 'المقاعد المتاحة', value: '${row.available}'),
-                _SheetStat(label: 'نسبة الإشغال', value: '${row.percent}%'),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(sheetContext).pop();
-                      _openRoster(row);
-                    },
-                    icon: const Icon(Icons.description_outlined, size: 16),
-                    label: const Text('كشف الصف'),
-                  ),
+              const SizedBox(height: 4),
+              Text(row.program,
+                  style:
+                      const TextStyle(fontSize: 11.5, color: SaiColors.muted)),
+              const SizedBox(height: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: SaiColors.cream,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: SaiColors.border),
                 ),
-                if (_canMarkAttendance) ...[
-                  const SizedBox(width: 8),
+                child: Column(
+                  children: [
+                    _InfoLine(
+                        icon: Icons.person_outline,
+                        label: 'معلم الصف',
+                        value: row.teacherName ?? 'غير مسند'),
+                    _InfoLine(
+                        icon: Icons.apartment_outlined,
+                        label: 'الفرع',
+                        value: row.branchName ?? '—'),
+                    _InfoLine(
+                        icon: Icons.calendar_month_outlined,
+                        label: 'الفصل الدراسي',
+                        value: row.sessionName ?? '—'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: row.ratio,
+                  minHeight: 7,
+                  backgroundColor: SaiColors.creamDeep,
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _SheetStat(label: 'المسجلون', value: '${row.enrolled}'),
+                  _SheetStat(label: 'السعة', value: '${row.capacity}'),
+                  _SheetStat(
+                      label: 'المقاعد المتاحة', value: '${row.available}'),
+                  _SheetStat(label: 'نسبة الإشغال', value: '${row.percent}%'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.of(sheetContext).pop();
-                        _openRegister(row);
+                        _openRoster(row);
                       },
-                      icon: const Icon(Icons.fact_check_outlined, size: 16),
-                      label: const Text('الحضور'),
+                      icon: const Icon(Icons.description_outlined, size: 16),
+                      label: const Text('كشف الصف'),
                     ),
                   ),
+                  if (_canMarkAttendance) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(sheetContext).pop();
+                          _openRegister(row);
+                        },
+                        icon: const Icon(Icons.fact_check_outlined, size: 16),
+                        label: const Text('الحضور'),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-            if (_canManageClasses) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    _openTransfer(source: row);
-                  },
-                  icon: const Icon(Icons.swap_horiz, size: 16),
-                  label: const Text('نقل طلاب من هذا الصف'),
-                ),
               ),
+              if (_canManageClasses) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      _openTransfer(source: row);
+                    },
+                    icon: const Icon(Icons.swap_horiz, size: 16),
+                    label: const Text('نقل طلاب من هذا الصف'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      _openForm(existing: row);
+                    },
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text('تعديل السعة والمعلم'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    _openForm(existing: row);
-                  },
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  label: const Text('تعديل السعة والمعلم'),
-                ),
+                child: TextButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: const Text('إغلاق')),
               ),
             ],
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                  onPressed: () => Navigator.of(sheetContext).pop(),
-                  child: const Text('إغلاق')),
-            ),
-          ],
-        ),
+          ),
         ),
       ),
     );
@@ -727,7 +731,8 @@ class _MiniStat extends StatelessWidget {
 }
 
 class _ToolsRow extends StatelessWidget {
-  const _ToolsRow({required this.onImport, required this.onParentLink, this.onTransfer});
+  const _ToolsRow(
+      {required this.onImport, required this.onParentLink, this.onTransfer});
 
   final VoidCallback onImport;
   final VoidCallback onParentLink;
@@ -748,12 +753,19 @@ class _ToolsRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Expanded(child: _ToolButton(icon: Icons.link, label: 'ربط ولي الأمر', onTap: onParentLink)),
+            Expanded(
+                child: _ToolButton(
+                    icon: Icons.link,
+                    label: 'ربط ولي الأمر',
+                    onTap: onParentLink)),
           ],
         ),
         if (onTransfer != null) ...[
           const SizedBox(height: 8),
-          _ToolButton(icon: Icons.swap_horiz, label: 'نقل طلاب بين الصفوف', onTap: onTransfer!),
+          _ToolButton(
+              icon: Icons.swap_horiz,
+              label: 'نقل طلاب بين الصفوف',
+              onTap: onTransfer!),
         ],
       ],
     );

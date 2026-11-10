@@ -68,7 +68,8 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
             .from('attendance_records')
             .select('student_id,status')
             .inFilter('attendance_session_id', sessionIds);
-        for (final record in (records as List).whereType<Map<String, dynamic>>()) {
+        for (final record
+            in (records as List).whereType<Map<String, dynamic>>()) {
           final studentId = record['student_id'] as String?;
           final status = record['status'] as String?;
           if (studentId == null || status == null) continue;
@@ -210,7 +211,10 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                             const SizedBox(height: 6),
                             Text(
                               'حضور الشهر = أيام الحضور (حاضر + متأخر) من إجمالي الأيام المسجّلة في ${monthLabel(_issuedAt)}.',
-                              style: const TextStyle(fontSize: 8.5, height: 1.6, color: SaiColors.muted),
+                              style: const TextStyle(
+                                  fontSize: 8.5,
+                                  height: 1.6,
+                                  color: SaiColors.muted),
                             ),
                             const SizedBox(height: 12),
                             _Tally(students: students, cls: widget.cls),
@@ -271,7 +275,10 @@ class _ClassRosterSheetPageState extends State<ClassRosterSheetPage> {
                           Expanded(
                             child: Text(
                               'يعرض عمود «حضور الشهر» أيام الحضور مقابل الأيام المسجّلة فعلياً من سجل الحضور، وزر المشاركة ينسخ الكشف كاملاً بترويسة الكلية وأعمدة التوقيع، جاهزاً للصق في واتساب أو البريد أو برنامج الطباعة.',
-                              style: TextStyle(fontSize: 10, height: 1.7, color: SaiColors.muted),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  height: 1.7,
+                                  color: SaiColors.muted),
                             ),
                           ),
                         ],
@@ -482,7 +489,8 @@ class _RosterTable extends StatelessWidget {
                 Expanded(flex: 2, child: Text('رقم القيد', style: _headStyle)),
                 Expanded(
                   flex: 2,
-                  child: Text('حضور الشهر', style: _headStyle, textAlign: TextAlign.center),
+                  child: Text('حضور الشهر',
+                      style: _headStyle, textAlign: TextAlign.center),
                 ),
               ],
             ),
@@ -576,12 +584,14 @@ class _AttendanceCell extends StatelessWidget {
         Text(
           student.attendanceShort,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: SaiColors.ink),
+          style: const TextStyle(
+              fontSize: 9, fontWeight: FontWeight.w700, color: SaiColors.ink),
         ),
         Text(
           '$percent%',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: color),
+          style:
+              TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: color),
         ),
       ],
     );
