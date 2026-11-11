@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { loadManagementBranches, loadManagementOptions, type Option } from "../lib/management";
 import { AdmissionReceipt } from "../components/AdmissionReceipt";
@@ -99,7 +99,10 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
   const [history, setHistory] = useState<AdmissionHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const canEditBranch = (branch: string) => manager && (isSuper || (!scopeLoading && !scopeError && scope.includes(branch)));
+  const canEditBranch = useCallback(
+    (branch: string) => manager && (isSuper || (!scopeLoading && !scopeError && scope.includes(branch))),
+    [manager, isSuper, scopeLoading, scopeError, scope],
+  );
   const staffBranch = editing === undefined ? filters.branch : draft.branch_id;
 
   useEffect(() => {
@@ -134,7 +137,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
       .catch((failure: unknown) => { if (active) setSessionError(errorText(failure)); })
       .finally(() => { if (active) setSessionLoading(false); });
     return () => { active = false; };
-  }, [staffBranch, isSuper, manager, scope, scopeLoading, scopeError, retry]);
+  }, [staffBranch, isSuper, manager, scope, scopeLoading, scopeError, retry, canEditBranch]);
 
   useEffect(() => {
     let active = true;
@@ -157,7 +160,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
       .catch((failure: unknown) => { if (active) setStaffError(errorText(failure)); })
       .finally(() => { if (active) setStaffLoading(false); });
     return () => { active = false; };
-  }, [staffBranch, isSuper, manager, scope, scopeLoading, scopeError, retry]);
+  }, [staffBranch, isSuper, manager, scope, scopeLoading, scopeError, retry, canEditBranch]);
 
   useEffect(() => {
     const enquiryId = selected?.id ?? null;

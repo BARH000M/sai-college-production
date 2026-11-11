@@ -260,7 +260,7 @@ class _RosterScreenState extends State<RosterScreen> {
                     children: [
                       const Icon(
                         Icons.person_outline,
-                        color: darkRed,
+                        color: gold,
                         size: 26,
                       ),
                       const SizedBox(width: 9),

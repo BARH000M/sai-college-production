@@ -49,10 +49,10 @@ export function ReviewLab() {
     return () => { active = false; };
   }, [retry]);
 
-  const words = data?.words ?? [];
-  const progress = data?.progress ?? [];
+  const words = useMemo(() => data?.words ?? [], [data]);
+  const progress = useMemo(() => data?.progress ?? [], [data]);
   const learnerId = data?.learnerId ?? null;
-  const lessons = data?.lessons ?? [];
+  const lessons = useMemo(() => data?.lessons ?? [], [data]);
 
   const summary = useMemo(
     () => weeklyReviewSummary(words, progress, learnerId),

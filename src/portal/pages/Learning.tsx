@@ -67,7 +67,7 @@ export function Learning({ view, roles }: { view: LearningView; roles: readonly 
   const mode: "staff" | "learner" = roles.some((role) => staffRoles.includes(role)) ? "staff" : "learner";
   const isStudent = roles.includes("student");
 
-  const students = state.data?.students ?? [];
+  const students = useMemo(() => state.data?.students ?? [], [state.data]);
   useEffect(() => {
     if (mode !== "learner" || !students.length) return;
     if (!students.some((student) => student.id === learnerId)) setLearnerId(students[0].id);

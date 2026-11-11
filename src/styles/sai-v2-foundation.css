@@ -1,0 +1,62 @@
+/* Yemen SAI V2 visual foundation. Additive and scoped; existing approved pages remain intact. */
+@font-face {
+  font-family: 'SaiCairo';
+  src: url('../portal/assets/Cairo-400.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SaiCairo';
+  src: url('../portal/assets/Cairo-700.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SaiNotoSC';
+  src: url('../../mobile/assets/fonts/NotoSansSC.otf') format('opentype');
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  --font-body: 'SaiCairo', 'SaiNotoSC', system-ui, sans-serif;
+  --font-heading: 'SaiCairo', 'SaiNotoSC', system-ui, sans-serif;
+  --font-label: 'SaiCairo', 'SaiNotoSC', system-ui, sans-serif;
+  --sai-red: #b6000b;
+  --sai-red-strong: #78000a;
+  --sai-gold: #da9b16;
+  --sai-surface: #fbf6f0;
+  --sai-ink: #251d1d;
+  --sai-border: #e5dcd4;
+  --sai-radius: 14px;
+  --sai-focus: 0 0 0 3px rgba(182,0,11,.28);
+}
+html { text-size-adjust: 100%; }
+body { font-family: var(--font-body); min-width: 320px; }
+:where(button,input,select,textarea) { font: inherit; }
+:where(button,a,input,select,textarea,[tabindex]):focus-visible {
+  outline: 3px solid var(--sai-red); outline-offset: 3px;
+}
+:lang(zh), [lang^='zh'] { font-family: 'SaiNotoSC','SaiCairo', sans-serif; }
+.portal-root .panel {
+  border-radius: var(--sai-radius);
+  box-shadow: 0 2px 12px rgba(28,23,20,.045);
+}
+.portal-root .workspace { max-width: min(100%, 1500px); margin-inline: auto; }
+.portal-root .button { min-height: 44px; }
+.portal-root .data-note { font-size: clamp(12px, .9rem, 14px); }
+.portal-root :focus-visible { outline: 3px solid var(--sai-red); outline-offset: 3px; }
+@media (max-width: 700px) {
+  .portal-root .workspace { padding-inline: clamp(12px, 3vw, 22px); }
+  .portal-root .panel { border-radius: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

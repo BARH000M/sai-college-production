@@ -35,7 +35,7 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
   }, [version]);
 
   const workspace = state.status === "ready" ? state.data : null;
-  const students = workspace?.students ?? [];
+  const students = useMemo(() => workspace?.students ?? [], [workspace]);
 
   useEffect(() => {
     if (!students.length) {

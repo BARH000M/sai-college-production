@@ -4,11 +4,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { stripTypeScriptTypes } = require("node:module");
 
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/management.ts"), "utf8")
+const source = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/management.ts"), "utf8")
   .replace('import { supabase } from "./supabase";', "const supabase = globalThis.__managementTestSupabase;");
 const code = stripTypeScriptTypes(source, { mode: "strip" });
 const modulePromise = import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
-const formCode = stripTypeScriptTypes(fs.readFileSync(path.join(__dirname, "../src/lib/managementForms.ts"), "utf8"), { mode: "strip" });
+const formCode = stripTypeScriptTypes(fs.readFileSync(path.join(__dirname, "../../src/portal/lib/managementForms.ts"), "utf8"), { mode: "strip" });
 const formsPromise = import(`data:text/javascript;base64,${Buffer.from(formCode).toString("base64")}`);
 const baseFilters = { search: "", branch: "", session: "", classId: "", status: "", page: 0 };
 
@@ -57,11 +57,11 @@ test("management controls follow the approved role exceptions", async () => {
 });
 
 test("management source exposes deactivation without deletion operations", () => {
-  for (const file of ["../src/pages/ManagementPage.tsx", "../src/lib/management.ts"]) {
+  for (const file of ["../../src/portal/pages/ManagementPage.tsx", "../../src/portal/lib/management.ts"]) {
     const text = fs.readFileSync(path.join(__dirname, file), "utf8");
     assert.doesNotMatch(text, /\.delete\s*\(|\btruncate\b|\bdelete\s+from\b/i);
   }
-  const page = fs.readFileSync(path.join(__dirname, "../src/pages/ManagementPage.tsx"), "utf8");
+  const page = fs.readFileSync(path.join(__dirname, "../../src/portal/pages/ManagementPage.tsx"), "utf8");
   assert.match(page, /status: "inactive"/);
   assert.match(page, /is_active: false/);
 });

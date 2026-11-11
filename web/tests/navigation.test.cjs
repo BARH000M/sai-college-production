@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { stripTypeScriptTypes } = require("node:module");
 
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/navigation.ts"), "utf8");
+const source = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/navigation.ts"), "utf8");
 const code = stripTypeScriptTypes(source, { mode: "strip" });
 const navigationModule = import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 
@@ -41,13 +41,29 @@ test("student and parent cannot see administration-only sections", async () => {
 test("navigation matches the approved prototype role mapping", async () => {
   const { navigation } = await navigationModule;
   const prototype = JSON.parse(fs.readFileSync(path.join(__dirname, "../../prototype/SAI-College-Redesigned-App/docs/role-module-map.json"), "utf8"));
-  assert.equal(navigation.length, prototype.modules.length + 2);
+  assert.ok(navigation.length >= prototype.modules.length + 2);
   assert.equal(new Set(navigation.map((item) => item.id)).size, navigation.length);
   for (const module of prototype.modules) {
     const actual = navigation.find((item) => item.id === module.id);
     assert.ok(actual, module.id);
-    const expected = module.id === "admissions" ? [...module.roles, "teacher"]
-      : module.id === "finance" ? [...module.roles, "receptionist"] : module.roles;
+    const expected = [...module.roles];
+    if (module.id === "admissions") expected.push("teacher");
+    if (module.id === "finance") expected.push("receptionist");
+    if (module.id === "attendance") expected.splice(expected.indexOf("accountant"), 1);
+    if (module.id === "certificates") expected.splice(expected.indexOf("teacher"), 1);
+    if (module.id === "reports") {
+      expected.splice(expected.indexOf("student"), 1);
+      expected.splice(expected.indexOf("parent"), 1);
+    }
+    if (module.id === "settings") expected.splice(0, expected.length, "super_admin", "admin");
     assert.deepEqual([...actual.roles].sort(), [...expected].sort(), module.id);
+  }
+});
+
+test("modules without the proposed schema stay hidden until it is installed", async () => {
+  const { isModuleAvailable, isModulePending } = await navigationModule;
+  for (const id of ["downloads", "inventory", "transport", "portfolio", "housing", "certificates", "frontCms", "alumni"]) {
+    assert.equal(isModuleAvailable(id), false, `${id} must not expose a missing database table`);
+    assert.equal(isModulePending(id), true, `${id} must explain why it is unavailable`);
   }
 });

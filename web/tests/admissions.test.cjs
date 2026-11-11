@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { stripTypeScriptTypes } = require("node:module");
 
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/admissions.ts"), "utf8")
+const source = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/admissions.ts"), "utf8")
   .replace('import { supabase } from "./supabase";', "const supabase = globalThis.__admissionsTestSupabase;");
 const code = stripTypeScriptTypes(source, { mode: "strip" });
 async function load(suffix, client) {
@@ -108,7 +108,7 @@ test("query and denied writes surface errors and zero-row updates fail", async (
 });
 
 test("admissions implementation has no deletion operation", () => {
-  for (const file of ["../src/lib/admissions.ts", "../src/pages/Admissions.tsx", "../../supabase/migrations/004_admissions.sql"]) {
+  for (const file of ["../../src/portal/lib/admissions.ts", "../../src/portal/pages/Admissions.tsx", "../../supabase/migrations/004_admissions.sql"]) {
     const text = fs.readFileSync(path.join(__dirname, file), "utf8");
     assert.doesNotMatch(text, /\.delete\s*\(|\btruncate\b|\bdelete\s+from\b|\bdrop\b/i);
   }
