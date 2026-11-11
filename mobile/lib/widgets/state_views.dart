@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../design_system/design_system.dart';
+import 'package:sai_college_mobile/design_system/design_system.dart';
 
 /// Feature-screen aliases of the shared design-system states.
 ///
