@@ -1,15 +1,46 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../core/branding.dart';
 
 const red = Color(0xFFB6000B);
 const darkRed = Color(0xFF78000A);
 const gold = Color(0xFFDA9B16);
 const cream = Color(0xFFFBF6F0);
 const ink = Color(0xFF251D1D);
+const brandGradient = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: [darkRed, red, darkRed],
+);
+
+/// Paint the Android/iOS status area before applying SafeArea to the body.
+class BrandBody extends StatelessWidget {
+  const BrandBody({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+    value: SystemUiOverlayStyle.light.copyWith(
+      statusBarColor: Colors.transparent,
+    ),
+    child: ColoredBox(
+      color: darkRed,
+      child: SafeArea(
+        top: true,
+        bottom: false,
+        child: Material(color: cream, child: child),
+      ),
+    ),
+  );
+}
+
 ThemeData saiTheme() => ThemeData(
   useMaterial3: true,
   fontFamily: 'Cairo',
+  fontFamilyFallback: const ['NotoSC'],
   scaffoldBackgroundColor: cream,
   colorScheme: ColorScheme.fromSeed(
     seedColor: red,
@@ -116,13 +147,7 @@ class SaiHeader extends StatelessWidget {
           child: ClipPath(
             clipper: GoldWave(),
             child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [darkRed, red, darkRed],
-                ),
-              ),
+              decoration: const BoxDecoration(gradient: brandGradient),
               child: child,
             ),
           ),
@@ -142,14 +167,14 @@ class Brand extends StatelessWidget {
       ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Image.asset(
-          'assets/images/sai_logo.png',
+          logoAsset,
           height: compact ? 44 : 76,
           width: compact ? 44 : 76,
         ),
       ),
       const SizedBox(height: 7),
       Text(
-        'كلية ساي التعليمية اليمنية الصينية',
+        collegeArabic,
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Colors.white,
@@ -158,8 +183,12 @@ class Brand extends StatelessWidget {
         ),
       ),
       const Text(
-        '也门赛艾教育学院',
-        style: TextStyle(color: Color(0xFFFFD56E), fontSize: 13),
+        collegeChinese,
+        style: TextStyle(
+          color: Color(0xFFFFD56E),
+          fontSize: 13,
+          fontFamily: 'NotoSC',
+        ),
       ),
     ],
   );
@@ -242,9 +271,15 @@ class RedButton extends StatelessWidget {
 }
 
 class ProgressCard extends StatelessWidget {
-  const ProgressCard({super.key, this.value, this.title = 'التقدم الدراسي'});
+  const ProgressCard({
+    super.key,
+    this.value,
+    this.title = 'التقدم الدراسي',
+    this.subtitle = 'الدروس المكتملة على هذا الجهاز',
+  });
   final double? value;
   final String title;
+  final String subtitle;
   @override
   Widget build(BuildContext context) => SaiCard(
     child: Row(
@@ -259,11 +294,7 @@ class ProgressCard extends StatelessWidget {
                 'اللغة الصينية',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
               ),
-              Text(
-                value == null
-                    ? 'لا توجد بيانات تقدم متصلة'
-                    : 'المستوى SAI2 • بيانات توضيحية',
-              ),
+              Text(value == null ? 'لا توجد بيانات تقدم متصلة' : subtitle),
             ],
           ),
         ),
@@ -293,6 +324,32 @@ class ProgressCard extends StatelessWidget {
             ],
           ),
         ),
+      ],
+    ),
+  );
+}
+
+class SectionHeading extends StatelessWidget {
+  const SectionHeading(this.title, {super.key, this.action});
+  final String title;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 5, bottom: 10),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: ink,
+            ),
+          ),
+        ),
+        if (action != null) action!,
       ],
     ),
   );
