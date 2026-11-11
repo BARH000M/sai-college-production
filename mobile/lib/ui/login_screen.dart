@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: const TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w800,
-                                  color: darkRed,
+                                  color: gold,
                                 ),
                               ),
                               const SizedBox(height: 18),
@@ -185,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: Text(
                                     message!,
-                                    style: const TextStyle(color: darkRed),
+                                    style: const TextStyle(color: gold),
                                   ),
                                 ),
                               RedButton(
@@ -202,9 +202,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ? 'معاينة • بيانات توضيحية'
                                     : 'كلية ساي التعليمية',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.black54,
+                                  color: ink.withValues(alpha: .76),
                                 ),
                               ),
                             ],

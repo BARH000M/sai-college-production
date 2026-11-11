@@ -35,9 +35,9 @@ export function VocabularyPage({ roles }: { roles: readonly string[] }) {
   }, [retry]);
 
   const isLearner = roles.includes("student") || roles.includes("parent");
-  const words = data?.words ?? [];
-  const courses = data?.courses ?? [];
-  const lessons = data?.lessons ?? [];
+  const words = useMemo(() => data?.words ?? [], [data]);
+  const courses = useMemo(() => data?.courses ?? [], [data]);
+  const lessons = useMemo(() => data?.lessons ?? [], [data]);
   const progress = data?.progress ?? [];
   const learnerId = data?.learnerId ?? null;
 

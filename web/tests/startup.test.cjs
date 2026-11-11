@@ -8,7 +8,7 @@ const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 
 async function moduleUrl(file, replace = (source) => source) {
-  const filePath = path.join(__dirname, "../src", file);
+  const filePath = path.join(__dirname, "../../src/portal", file);
   const source = replace(fs.readFileSync(filePath, "utf8"));
   const { code } = await transformWithOxc(source, filePath, {});
   return `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
@@ -30,12 +30,12 @@ test("startup errors are explicit and configured authentication options are pres
     await assert.rejects(loadSupabase({}, () => assert.fail("must not create a client")), SupabaseInitializationError);
     const cause = new Error("invalid URL");
     await assert.rejects(
-      loadSupabase({ VITE_SUPABASE_URL: "invalid", VITE_SUPABASE_ANON_KEY: "key" }, () => { throw cause; }),
+      loadSupabase(      { VITE_PUBLIC_SUPABASE_URL: "invalid", VITE_PUBLIC_SUPABASE_ANON_KEY: "key" }, () => { throw cause; }),
       (error) => error instanceof SupabaseInitializationError && error.cause === cause,
     );
     const client = {};
     const result = await loadSupabase(
-      { VITE_SUPABASE_URL: "https://example.invalid", VITE_SUPABASE_ANON_KEY: "key" },
+      { VITE_PUBLIC_SUPABASE_URL: "https://example.invalid", VITE_PUBLIC_SUPABASE_ANON_KEY: "key" },
       (url, key, options) => {
         assert.equal(url, "https://example.invalid");
         assert.equal(key, "key");

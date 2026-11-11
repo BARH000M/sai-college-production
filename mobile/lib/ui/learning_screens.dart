@@ -16,7 +16,7 @@ class LevelBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (symbol, character, base, light) = switch (code) {
+    final (symbol, character, base, _) = switch (code) {
       'P0' => (
         Icons.graphic_eq_rounded,
         '声',
@@ -49,7 +49,7 @@ class LevelBadge extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
-            colors: [light, Colors.white],
+            colors: [base, darkRed],
           ),
           border: Border.all(color: base.withValues(alpha: .14)),
           borderRadius: BorderRadius.circular(14),
@@ -127,7 +127,7 @@ class CourseCatalog extends StatelessWidget {
                     Text(course.subtitle, style: const TextStyle(fontSize: 12)),
                     Text(
                       '${course.lessons.length} دروس',
-                      style: const TextStyle(fontSize: 11, color: darkRed),
+                      style: const TextStyle(fontSize: 11, color: gold),
                     ),
                   ],
                 ),
@@ -139,7 +139,7 @@ class CourseCatalog extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: darkRed,
+                  color: gold,
                 ),
               ),
               const Icon(Icons.chevron_left, size: 18),
@@ -355,7 +355,7 @@ class _LessonScreenState extends State<LessonScreen> {
                         style: const TextStyle(
                           fontFamily: 'NotoSC',
                           fontSize: 24,
-                          color: darkRed,
+                          color: gold,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -384,7 +384,7 @@ class _LessonScreenState extends State<LessonScreen> {
                                 style: const TextStyle(
                                   fontFamily: 'NotoSC',
                                   fontSize: 20,
-                                  color: darkRed,
+                                  color: gold,
                                 ),
                               ),
                               Text(
@@ -542,7 +542,7 @@ class _TracePainter extends CustomPainter {
       grid,
     );
     final pen = Paint()
-      ..color = darkRed
+      ..color = gold
       ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
     for (var i = 1; i < points.length; i++) {

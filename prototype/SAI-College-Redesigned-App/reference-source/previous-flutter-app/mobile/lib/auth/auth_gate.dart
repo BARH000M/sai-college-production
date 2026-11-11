@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart' show State, StatefulWidget;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/supabase.dart';

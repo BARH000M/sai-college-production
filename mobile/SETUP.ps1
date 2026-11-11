@@ -12,6 +12,29 @@ if (-not (Test-Path 'android')) {
     if (-not (Test-Path '.metadata')) { Copy-Item (Join-Path $scaffold '.metadata') $PSScriptRoot }
     Remove-Item -LiteralPath $scaffold -Recurse -Force
 }
+# Google Play target API requirement. Keep the compile SDK chosen by the installed
+# Flutter toolchain, but set targetSdk to 36 for store builds.
+$gradleCandidates = @(
+    (Join-Path $PSScriptRoot 'android\app\build.gradle.kts'),
+    (Join-Path $PSScriptRoot 'android\app\build.gradle')
+)
+$gradlePath = $gradleCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $gradlePath) { throw 'Could not find android/app/build.gradle(.kts).' }
+$gradle = [IO.File]::ReadAllText($gradlePath)
+if ($gradlePath.EndsWith('.kts')) {
+    if ($gradle -match 'targetSdk\s*=\s*flutter\.targetSdkVersion') {
+        $gradle = [regex]::Replace($gradle, 'targetSdk\s*=\s*flutter\.targetSdkVersion', 'targetSdk = 36', 1)
+    } elseif ($gradle -notmatch 'targetSdk\s*=\s*36') {
+        throw 'Unrecognized Kotlin Gradle targetSdk configuration; update it to 36 and rerun SETUP.ps1.'
+    }
+} else {
+    if ($gradle -match 'targetSdkVersion\s+flutter\.targetSdkVersion') {
+        $gradle = [regex]::Replace($gradle, 'targetSdkVersion\s+flutter\.targetSdkVersion', 'targetSdkVersion 36', 1)
+    } elseif ($gradle -notmatch 'targetSdkVersion\s+36') {
+        throw 'Unrecognized Groovy Gradle targetSdk configuration; update it to 36 and rerun SETUP.ps1.'
+    }
+}
+[IO.File]::WriteAllText($gradlePath, $gradle, [Text.UTF8Encoding]::new($false))
 $android = 'http://schemas.android.com/apk/res/android'
 $native = Join-Path $PSScriptRoot 'android\app\src\main'
 $manifestPath = Join-Path $native 'AndroidManifest.xml'
@@ -128,4 +151,4 @@ if (Test-Path -LiteralPath $iosInfo) {
 }
 flutter pub get
 if ($LASTEXITCODE -ne 0) { throw 'Dependency download failed.' }
-Write-Host 'Setup complete. Run .\BUILD_PREVIEW.ps1' -ForegroundColor Green
+Write-Host 'Setup complete. Use .\BUILD_LIVE.ps1 for shared Supabase data, or .\BUILD_PREVIEW.ps1 for local demo data.' -ForegroundColor Green

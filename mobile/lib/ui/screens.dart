@@ -10,6 +10,8 @@ import '../data/module_registry.dart';
 import 'class_screens.dart';
 import 'components.dart';
 import 'learning_screens.dart';
+import 'live_courses.dart';
+import 'live_academic.dart';
 import 'live_modules.dart';
 import 'system_settings_screen.dart';
 import 'printing.dart';
@@ -241,8 +243,8 @@ class _CollegeShellState extends State<CollegeShell> {
           ? null
           : NavigationBar(
               height: 68,
-              backgroundColor: const Color(0xFFFFFCF9),
-              indicatorColor: const Color(0xFFF9E2DD),
+              backgroundColor: darkRed,
+              indicatorColor: red,
               selectedIndex: selected < 0 ? 0 : selected,
               onDestinationSelected: (index) => go(tabs[index]),
               destinations: [
@@ -282,7 +284,7 @@ class _CollegeShellState extends State<CollegeShell> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Color(0xFFFFE8E2),
+                color: gold,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -346,7 +348,7 @@ class _CollegeShellState extends State<CollegeShell> {
                 ])
                   if (can(target))
                     ListTile(
-                      leading: Icon(features[target]!.$2, color: red),
+                      leading: Icon(features[target]!.$2, color: gold),
                       title: Text(features[target]!.$1),
                       trailing: const Icon(Icons.chevron_left),
                       onTap: () {
@@ -355,7 +357,7 @@ class _CollegeShellState extends State<CollegeShell> {
                       },
                     ),
                 ListTile(
-                  leading: const Icon(Icons.support_agent, color: red),
+                  leading: const Icon(Icons.support_agent, color: gold),
                   title: const Text('الدعم والمساعدة'),
                   onTap: () => showDialog<void>(
                     context: context,
@@ -386,11 +388,11 @@ class _CollegeShellState extends State<CollegeShell> {
                 ),
                 const Divider(),
                 ListTile(
-                  leading: const Icon(Icons.logout, color: red),
+                  leading: const Icon(Icons.logout, color: gold),
                   title: const Text(
                     'تسجيل الخروج',
                     style: TextStyle(
-                      color: darkRed,
+                      color: gold,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -414,8 +416,10 @@ class _CollegeShellState extends State<CollegeShell> {
     return switch (page) {
       PageId.home => home(),
       PageId.systems => systems(),
-      PageId.learning => learningHome(),
-      PageId.courses || PageId.lesson => CourseCatalog(learning: learning),
+      PageId.learning || PageId.courses => demo == null
+          ? LiveCourseCatalog(roles: roles)
+          : CourseCatalog(learning: learning),
+      PageId.lesson => CourseCatalog(learning: learning),
       PageId.classes => ClassesScreen(
         key: const ValueKey(PageId.classes),
         roles: roles,
@@ -426,6 +430,16 @@ class _CollegeShellState extends State<CollegeShell> {
         roles: roles,
         demo: demo,
         attendance: true,
+      ),
+      PageId.attendance when demo == null => const LiveAttendanceScreen(),
+      PageId.finance when demo == null => const LiveFinanceScreen(),
+      PageId.exams when demo == null => const LiveUnavailableModule(
+        title: 'الاختبارات والنتائج',
+        message: 'وحدة الاختبارات غير مربوطة بعد: قاعدة البيانات الحالية لا تحتوي جداول للاختبارات أو الدرجات. أضف مخطط الاختبارات المعتمد قبل تسجيل أي نتائج.',
+      ),
+      PageId.schedule when demo == null => const LiveUnavailableModule(
+        title: 'الجدول الدراسي',
+        message: 'لا يوجد جدول دراسي في مخطط قاعدة البيانات الحالي. ستظهر المواعيد هنا بعد إضافة جداول الشعب والحصص وربطها بالفصل الدراسي.',
       ),
       PageId.profile => profile(),
       PageId.settings => demo == null
@@ -523,7 +537,7 @@ class _CollegeShellState extends State<CollegeShell> {
 
   Widget _metric(String count, String label, IconData icon) => Column(
     children: [
-      Icon(icon, color: darkRed, size: 25),
+      Icon(icon, color: gold, size: 25),
       Text(
         count,
         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
@@ -562,7 +576,7 @@ class _CollegeShellState extends State<CollegeShell> {
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
-                        Icon(features[target]!.$2, color: darkRed, size: 31),
+                        Icon(features[target]!.$2, color: gold, size: 31),
                         const SizedBox(height: 7),
                         Text(
                           features[target]!.$1,
@@ -643,8 +657,8 @@ class _CollegeShellState extends State<CollegeShell> {
       const Center(
         child: CircleAvatar(
           radius: 34,
-          backgroundColor: Color(0xFFF9DED6),
-          child: Icon(Icons.person_outline, color: darkRed, size: 38),
+          backgroundColor: Color(0xFF640007),
+          child: Icon(Icons.person_outline, color: gold, size: 38),
         ),
       ),
       const SizedBox(height: 12),

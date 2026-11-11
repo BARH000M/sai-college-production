@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { stripTypeScriptTypes } = require("node:module");
 
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/finance.ts"), "utf8");
+const source = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/finance.ts"), "utf8");
 const code = stripTypeScriptTypes(source, { mode: "strip" });
 const finance = import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 

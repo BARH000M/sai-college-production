@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useLang from '@/hooks/useLang';
 import Navbar from '@/components/feature/Navbar';
@@ -51,7 +51,7 @@ export default function ApplicationStatusPage() {
   const [historyError, setHistoryError] = useState('');
   const autoLookupDone = useRef(false);
 
-  async function lookup(raw: string) {
+  const lookup = useCallback(async (raw: string) => {
     const value = raw.trim();
     if (value.length < 6) {
       setStatus('error');
@@ -81,7 +81,7 @@ export default function ApplicationStatusPage() {
       setStatus('error');
       setErrorMessage(isAr ? 'خطأ في الشبكة. تحقق من الاتصال وحاول مجددًا.' : 'Network error. Check your connection and try again.');
     }
-  }
+  }, [isAr]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -95,7 +95,7 @@ export default function ApplicationStatusPage() {
     if (preset.length < 6) return;
     setReference(preset);
     void lookup(preset);
-  }, [searchParams]);
+  }, [lookup, searchParams]);
 
   useEffect(() => {
     if (!result) {

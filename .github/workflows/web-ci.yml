@@ -1,0 +1,48 @@
+name: SAI V2 Web Checks
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/web-ci.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/web-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  main-web:
+    name: Portal / production SPA
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run type-check
+      - run: npm run build
+  secondary-web:
+    name: web/ compatibility and unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      # Standalone web/ build excluded: incomplete entrypoint.

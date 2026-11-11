@@ -249,7 +249,7 @@ class _RecordDetailState extends State<_RecordDetail> {
                       item.label,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: darkRed,
+                        color: gold,
                       ),
                     ),
                     Text(
