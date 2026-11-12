@@ -1,0 +1,41 @@
+/* Additive navigation styling. It deliberately keeps SAI's original colors,
+   Cairo typography, page components, and existing responsive shell. */
+.portal-root .role-sidebar-nav { display: grid; gap: 2px; }
+.portal-root .role-nav-toggle {
+  appearance: none;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  text-align: start;
+  cursor: pointer;
+}
+.portal-root .role-nav-current > .role-nav-toggle {
+  background: oklch(var(--primary-50));
+  color: oklch(var(--primary-700));
+}
+.portal-root .role-nav-label { flex: 1; min-width: 0; }
+.portal-root .role-nav-chevron { margin-inline-start: auto; font-size: 16px; transition: transform .15s ease; }
+.portal-root .role-nav-chevron.rotated { transform: rotate(180deg); }
+.portal-root .role-nav-children {
+  margin-inline-start: 16px;
+  padding-inline-start: 8px;
+  border-inline-start: 1px solid oklch(var(--background-300));
+}
+.portal-root .role-nav-child { min-height: 38px; padding: 7px 9px; font-size: 11px; }
+.portal-root .role-nav-child > i:first-child { font-size: 15px; min-width: 20px; }
+.portal-root .layout.collapsed .role-nav-children { display: none; }
+.portal-root .layout.collapsed .role-nav-chevron { display: none; }
+@media (max-width: 900px) {
+  .portal-root .layout.collapsed .role-nav-children { display: block; }
+  .portal-root .role-nav-children { margin-inline-start: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portal-root .role-nav-chevron { transition: none; }
+}
+
+.portal-root .portal-quick-links { margin: 12px 10px 0; font-size: 11px; }
+.portal-root .portal-quick-links summary { cursor: pointer; font-weight: 700; }
+.portal-root .portal-quick-links-items { display: grid; gap: 5px; margin-top: 8px; }
+.portal-root .portal-quick-links-items a { padding: 5px 8px; border-radius: 6px; }
+.portal-root .portal-quick-links-items a:hover,
+.portal-root .portal-quick-links-items a.active { background: oklch(var(--primary-50)); color: oklch(var(--primary-700)); }

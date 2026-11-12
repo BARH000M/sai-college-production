@@ -3,6 +3,9 @@ import { NavLink } from "react-router-dom";
 import logo from "../assets/saiLogo";
 import { isAppRole, modulePath, roleLabels, visibleNavigation } from "../lib/navigation";
 import { useLearningNotifications } from "../hooks/useLearningNotifications";
+import { RoleSidebar } from "./RoleSidebar";
+import { mobileTabs } from "../lib/sidebarSections";
+import "./role-sidebar.css";
 import { useNotificationFeed } from "../hooks/useNotificationFeed";
 
 export function AppShell({ profileName, email, roles, onSignOut, busy, signOutError, children }: {
@@ -26,10 +29,14 @@ export function AppShell({ profileName, email, roles, onSignOut, busy, signOutEr
         <div className="sidebar-label"><strong>كلية ساي</strong><small>{names}</small></div>
         <button className="icon-button collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "توسيع القائمة" : "طي القائمة"} aria-expanded={!collapsed}>☰</button>
       </div>
+      <details className="portal-quick-links sidebar-label">
+        <summary>روابط سريعة</summary>
+        <div className="portal-quick-links-items">
+          {mobileTabs(roles).map((item) => <NavLink key={item.id} to={modulePath(item)} onClick={() => setMenuOpen(false)}>{item.label}</NavLink>)}
+        </div>
+      </details>
       <p className="nav-heading sidebar-label">القائمة الرئيسية</p>
-      <nav aria-label="التنقل الرئيسي">
-        {links.map((item) => <NavLink key={item.id} className="nav-link" to={modulePath(item)} onClick={() => setMenuOpen(false)} title={item.label}><i className={item.icon} aria-hidden="true"></i><span className="sidebar-label">{item.label}{item.id === "homework" && unreadCount > 0 && <small className="nav-badge" aria-label={`${unreadCount} تحديث جديد`}>{unreadCount}</small>}</span></NavLink>)}
-      </nav>
+      <RoleSidebar roles={roles} collapsed={collapsed} onExpand={() => setCollapsed(false)} onNavigate={() => setMenuOpen(false)} unreadCount={unreadCount} />
       <p className="sidebar-note sidebar-label"><NavLink to="/" className="nav-link"><i className="ri-arrow-go-back-line" aria-hidden="true"></i><span className="sidebar-label">الموقع التعريفي</span></NavLink>{names}</p>
     </aside>
     <div className="main-area">
@@ -49,7 +56,7 @@ export function AppShell({ profileName, email, roles, onSignOut, busy, signOutEr
       {children}
     </div>
     <nav className="bottom-nav" aria-label="التنقل على الهاتف">
-      {links.slice(0, 5).map((item) => <NavLink key={item.id} to={modulePath(item)}><i className={item.icon} aria-hidden="true"></i><small>{item.label}</small></NavLink>)}
+      {mobileTabs(roles).map((item) => <NavLink key={item.id} to={modulePath(item)}><i className={item.icon} aria-hidden="true"></i><small>{item.label}</small></NavLink>)}
     </nav>
   </div>;
 }
