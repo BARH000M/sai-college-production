@@ -185,12 +185,16 @@ export async function loadStaffHome(): Promise<StaffHome> {
 }
 
 export async function loadTeacherHome(userId: string): Promise<TeacherSection[]> {
-  const [directories, allClasses, students] = await Promise.all([
+  const [directories, mine] = await Promise.all([
     loadDirectories(),
-    loadClassRows(),
-    loadActiveStudents(),
+    paged<ClassRow>((from, to) => supabase.from("classes")
+      .select("id,name,program,capacity,teacher_id,branch_id,session_id,is_active")
+      .eq("teacher_id", userId).order("name").order("id").range(from, to)),
   ]);
-  const mine = allClasses.filter((item) => item.teacher_id === userId);
+  const ids = mine.map((item) => item.id);
+  const students = ids.length ? await paged<StudentRow>((from, to) => supabase.from("students")
+    .select("id,full_name,admission_no,class_id,branch_id,date_of_birth,user_id")
+    .eq("status", "active").in("class_id", ids).order("full_name").order("id").range(from, to)) : [];
   const sections = buildSections(mine, students, directories.branches, directories.sessions);
   const roster = new Map<string, RosterStudent[]>();
   students.forEach((student) => {

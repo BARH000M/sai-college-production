@@ -11,6 +11,7 @@ import 'class_screens.dart';
 import 'components.dart';
 import 'learning_screens.dart';
 import 'live_courses.dart';
+import 'teacher_portal.dart';
 import 'live_academic.dart';
 import 'live_modules.dart';
 import 'system_settings_screen.dart';
@@ -105,6 +106,8 @@ class _CollegeShellState extends State<CollegeShell> {
   Set<Role> get roles => widget.account.roles;
   DemoWorkspace? get demo => widget.demo;
   bool can(PageId target) => Access.allows(roles, target);
+  bool get teacherOnly => roles.contains(Role.teacher) &&
+      !roles.contains(Role.admin) && !roles.contains(Role.super_admin);
   String get learnerId =>
       roles.contains(Role.student) || roles.contains(Role.parent)
       ? DemoSchool.studentId
@@ -422,6 +425,8 @@ class _CollegeShellState extends State<CollegeShell> {
       PageId.lesson => demo == null
           ? LiveCourseCatalog(roles: roles)
           : CourseCatalog(learning: learning),
+      PageId.classes || PageId.assignments || PageId.attendance
+          when demo == null && teacherOnly => const TeacherPortal(),
       PageId.classes => ClassesScreen(
         key: const ValueKey(PageId.classes),
         roles: roles,
@@ -524,6 +529,10 @@ class _CollegeShellState extends State<CollegeShell> {
     if (demo == null && roles.contains(Role.student)) ...[
       const SectionHeading('مقرراتي المتاحة'),
       SizedBox(height: 300, child: LiveCourseCatalog(roles: roles)),
+    ],
+    if (demo == null && teacherOnly) ...[
+      const SectionHeading('بوابة المعلم'),
+      SizedBox(height: 300, child: TeacherPortal()),
     ],
     const SectionHeading('أدوات حسابك'),
     for (final target in favorites.where((target) => target != PageId.systems))

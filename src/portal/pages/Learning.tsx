@@ -41,7 +41,8 @@ export function Learning({ view, roles, userId }: { view: LearningView; roles: r
     let active = true;
     setState((current) => (current.status === "ready" ? current : { status: "loading", data: null, error: null }));
     const learnerOnly = !roles.some((role) => staffRoles.includes(role));
-    loadLearningWorkspace(learnerOnly, learnerOnly && roles.includes("student") ? userId ?? undefined : undefined)
+    const teacherOnly = roles.includes("teacher") && !roles.some((role) => ["super_admin", "admin"].includes(role));
+    loadLearningWorkspace(learnerOnly, learnerOnly && roles.includes("student") ? userId ?? undefined : undefined, teacherOnly ? userId ?? undefined : undefined)
       .then((data) => { if (active) setState({ status: "ready", data, error: null }); })
       .catch((error: unknown) => { if (active) setState({ status: "error", data: null, error: message(error) }); });
     return () => { active = false; };
@@ -185,7 +186,7 @@ function StaffSummary({ scope }: { scope: LearningScope }) {
     <div className="learn-stats">
       <div className="learn-stat"><span>المقررات</span><strong>{workspace.courses.length}</strong></div>
       <div className="learn-stat"><span>الصفوف</span><strong>{classes.size}</strong></div>
-      <div className="learn-stat"><span>دروس مكتملة</span><strong>{completed}</strong></div>
+      <div className="learn-stat"><span>حالات إكمال سابقة غير متحققة</span><strong>{completed}</strong></div>
       <div className="learn-stat"><span>واجبات مصححة</span><strong>{graded}</strong></div>
     </div>
   </section>;

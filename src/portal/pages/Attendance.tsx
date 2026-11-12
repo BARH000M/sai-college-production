@@ -39,19 +39,23 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
   const [retry, setRetry] = useState(0);
   const selectedClass = classes.find((item) => item.id === selected?.class_id);
   const chosenClass = classes.find((item) => item.id === filters.classId);
-  const manager = !!selectedClass && canManageAttendance(roles, userId, scope, selectedClass);
+  const teacherReadOnly = roles.includes("teacher") && !roles.some((role) => ["super_admin", "admin", "receptionist"].includes(role));
+  const rosterReader = !!selectedClass && canManageAttendance(roles, userId, scope, selectedClass);
+  const manager = rosterReader && !teacherReadOnly;
   const corrector = !!selected && canCorrectAttendance(roles, scope, selected.branch_id);
-  const canCreate = !!chosenClass && canManageAttendance(roles, userId, scope, chosenClass);
+  const canCreate = !teacherReadOnly && !!chosenClass && canManageAttendance(roles, userId, scope, chosenClass);
 
   useEffect(() => {
     if (!allowed) { setLoading(false); return; }
     let active = true;
     setLoading(true); setError(null);
+    const assignedClasses = loadAttendanceClasses().then((rows) =>
+      teacherReadOnly ? rows.filter((row) => row.teacher_id === userId) : rows);
     Promise.all([
-      loadAttendanceClasses(),
+      assignedClasses,
       loadManagementOptions("", ""),
       staff && !roles.includes("super_admin") && userId ? loadManagementBranches(userId) : Promise.resolve([]),
-      loadAttendanceSessions(filters),
+      assignedClasses.then((rows) => loadAttendanceSessions(filters, teacherReadOnly ? rows.map((row) => row.id) : undefined)),
     ]).then(([classRows, options, memberships, result]) => {
       if (!active) return;
       setClasses(classRows); setBranches(options.branches); setSessions(options.sessions);
@@ -59,13 +63,13 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
     }).catch((failure: unknown) => { if (active) { setRows([]); setError(errorText(failure)); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [allowed, staff, userId, roles, filters, retry]);
+  }, [allowed, staff, userId, roles, filters, retry, teacherReadOnly]);
 
   useEffect(() => {
     if (!selected) { setRoster([]); setHistory([]); return; }
     let active = true;
     setDetailLoading(true); setDetailError(null);
-    const request = manager || corrector
+    const request = rosterReader || corrector
       ? loadAttendanceRoster(selected.id).then((value) => ({ roster: value, history: [] as AttendanceRecord[] }))
       : loadAttendanceHistory(selected.id).then((value) => ({ roster: [] as RosterEntry[], history: value }));
     request.then((value) => {
@@ -76,7 +80,7 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
     }).catch((failure: unknown) => { if (active) { setRoster([]); setHistory([]); setDetailError(errorText(failure)); } })
       .finally(() => { if (active) setDetailLoading(false); });
     return () => { active = false; };
-  }, [selected, manager, corrector, retry]);
+  }, [selected, rosterReader, corrector, retry]);
 
   function filter(key: keyof AttendanceFilters, value: string) {
     setSelected(null); setDrafts({}); setMessage(null);
@@ -98,7 +102,7 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
   const branchIds = [...new Set(classes.map((item) => item.branch_id))];
   const sessionIds = [...new Set(classes.filter((item) => !filters.branch || item.branch_id === filters.branch).map((item) => item.academic_session_id))];
   const sessionLabels = { open: "مفتوحة", closed: "مغلقة", cancelled: "ملغاة" };
-  const visibleStatuses = manager || corrector ? roster.map((row) => row.attendance_status) : history.map((row) => row.status);
+  const visibleStatuses = rosterReader || corrector ? roster.map((row) => row.attendance_status) : history.map((row) => row.status);
 
   const editableRows = roster.filter((row) => selected?.status === "open" && (manager || (corrector && !!row.record_id)));
   const pendingDrafts = editableRows.filter((row) => !!drafts[row.student_id]?.status);
@@ -142,6 +146,7 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
   return <main className="workspace">
     <div className="page-heading"><div><p className="eyebrow">إدارة الأكاديمية</p><h1>الحضور والغياب</h1></div></div>
     <p className="data-note">تاريخ الحضور حسب توقيت عدن. تظهر البيانات المسموح بها فقط؛ لا يمكن تعديل الجلسات المغلقة أو الملغاة.</p>
+    {teacherReadOnly && <p className="data-note">عرض الحضور للمعلم فقط حتى التحقق من صلاحيات الكتابة في البيئة المعتمدة.</p>}
     <fieldset className="context-card" disabled={saving}>
       <label>الفرع<select value={filters.branch} onChange={(e) => filter("branch", e.target.value)}><option value="">كل الفروع المتاحة</option>{branchIds.map((id) => <option key={id} value={id}>{branchName(id)}</option>)}</select></label>
       <label>الجلسة الأكاديمية<select value={filters.session} onChange={(e) => filter("session", e.target.value)}><option value="">كل الجلسات المتاحة</option>{sessionIds.map((id) => <option key={id} value={id}>{sessionName(id)}</option>)}</select></label>
@@ -183,7 +188,7 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
             </button>
           </div>
         </div>}
-        {(manager || corrector) ? (!roster.length ? <p className="muted">لا توجد سجلات أو طلاب متاحون.</p> : <div className="table-scroll"><table className="management-table"><thead><tr><th>الطالب</th><th>الحضور</th><th>ملاحظة</th><th>الحفظ</th></tr></thead><tbody>
+        {(rosterReader || corrector) ? (!roster.length ? <p className="muted">لا توجد سجلات أو طلاب متاحون.</p> : <div className="table-scroll"><table className="management-table"><thead><tr><th>الطالب</th><th>الحضور</th><th>ملاحظة</th><th>الحفظ</th></tr></thead><tbody>
           {roster.map((row) => {
             const draft = drafts[row.student_id] ?? { status: "", note: "" };
             const editable = selected.status === "open" && (manager || (corrector && !!row.record_id));

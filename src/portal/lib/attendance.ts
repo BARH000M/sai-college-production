@@ -57,8 +57,10 @@ async function loadDirectory<T>(name: string, args: Record<string, string>, guar
 export const loadAttendanceClasses = () => loadDirectory("sai_attendance_classes", {}, isAttendanceClass);
 export const loadAttendanceRoster = (id: string) => loadDirectory("sai_attendance_roster", { wanted_session: id }, isRosterEntry);
 
-export async function loadAttendanceSessions(filters: AttendanceFilters) {
+export async function loadAttendanceSessions(filters: AttendanceFilters, classIds?: string[]) {
+  if (classIds && !classIds.length) return { rows: [], count: 0 };
   let query = supabase.from("attendance_sessions").select("id,branch_id,academic_session_id,class_id,attendance_date,status", { count: "exact" });
+  if (classIds) query = query.in("class_id", classIds);
   if (filters.branch) query = query.eq("branch_id", filters.branch);
   if (filters.session) query = query.eq("academic_session_id", filters.session);
   if (filters.classId) query = query.eq("class_id", filters.classId);

@@ -156,8 +156,45 @@ function isSubmissionStatus(value: unknown): value is SubmissionStatus {
   return value === "submitted" || value === "graded" || value === "returned";
 }
 
-export async function loadLearningWorkspace(learnerOnly = false, studentUserId?: string): Promise<LearningWorkspace> {
+export async function loadLearningWorkspace(learnerOnly = false, studentUserId?: string, teacherUserId?: string): Promise<LearningWorkspace> {
   const studentQuery = supabase.from("students").select(workspaceColumns.students).order("full_name");
+  if (teacherUserId) {
+    const assigned = await supabase.from("classes").select("id").eq("teacher_id", teacherUserId);
+    if (assigned.error) throw new Error(assigned.error.message);
+    const ids = (assigned.data ?? []).map((row) => row.id);
+    if (!ids.length) return { students: [], classes: [], branches: [], courses: [], lessons: [], homework: [], progress: [], submissions: [] };
+    const [students, classes, branches, courses] = await Promise.all([
+      studentQuery.in("class_id", ids),
+      supabase.from("classes").select(workspaceColumns.classes).in("id", ids),
+      supabase.from("branches").select(workspaceColumns.branches),
+      supabase.from("learning_courses").select(workspaceColumns.courses).eq("is_active", true).in("class_id", ids).order("title"),
+    ]);
+    const studentRows = pick(students, "الطلاب");
+    const courseRows = pick(courses, "المقررات");
+    const courseIds = courseRows.map((course) => course.id);
+    const studentIds = studentRows.map((student) => student.id);
+    const empty = { data: [], error: null };
+    const [lessons, homework, progress, submissions] = await Promise.all([
+      courseIds.length ? supabase.from("learning_lessons").select(workspaceColumns.lessons).in("course_id", courseIds).order("position") : empty,
+      courseIds.length ? supabase.from("learning_homework").select(workspaceColumns.homework).in("course_id", courseIds).order("due_at") : empty,
+      studentIds.length ? supabase.from("learning_lesson_progress").select(workspaceColumns.progress).in("student_id", studentIds) : empty,
+      studentIds.length ? supabase.from("learning_homework_submissions").select(workspaceColumns.submissions).in("student_id", studentIds) : empty,
+    ]);
+    const homeworkRows = pick(homework, "الواجبات");
+    const lessonRows = pick(lessons, "الدروس");
+    const classByStudent = new Map(studentRows.map((row) => [row.id, row.class_id]));
+    const classByCourse = new Map(courseRows.map((row) => [row.id, row.class_id]));
+    const classByHomework = new Map(homeworkRows.map((row) => [row.id, classByCourse.get(row.course_id)]));
+    const classByLesson = new Map(lessonRows.map((row) => [row.id, classByCourse.get(row.course_id)]));
+    return {
+      students: studentRows, classes: pick(classes, "الصفوف"), branches: pick(branches, "الفروع"),
+      courses: courseRows, lessons: lessonRows, homework: homeworkRows,
+      progress: pick(progress, "سجل التقدم").filter((row) => classByLesson.has(row.lesson_id)
+        && classByLesson.get(row.lesson_id) === classByStudent.get(row.student_id) && isLessonStatus(row.status)) as LessonProgress[],
+      submissions: pick(submissions, "الواجبات المسلَّمة").filter((row) => classByHomework.has(row.homework_id)
+        && classByHomework.get(row.homework_id) === classByStudent.get(row.student_id) && isSubmissionStatus(row.status)) as HomeworkSubmission[],
+    };
+  }
   const [students, classes, branches, courses] = await Promise.all([
     studentUserId ? studentQuery.eq("user_id", studentUserId) : studentQuery,
     supabase.from("classes").select(workspaceColumns.classes),

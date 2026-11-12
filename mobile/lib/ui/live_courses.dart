@@ -31,6 +31,15 @@ class _LiveCourseCatalogState extends State<LiveCourseCatalog> {
 
   Future<List<Map<String, dynamic>>> _loadCourses(Set<Role> roles) async {
     final client = Supabase.instance.client;
+    if (roles.contains(Role.teacher) && !roles.contains(Role.admin) && !roles.contains(Role.super_admin)) {
+      final user = client.auth.currentUser;
+      if (user == null) throw StateError('انتهت الجلسة. يرجى تسجيل الدخول.');
+      final classes = await client.from('classes').select('id').eq('teacher_id', user.id);
+      final ids = classes.map((row) => row['id'] as String).toList();
+      if (ids.isEmpty) return [];
+      return client.from('learning_courses').select('id,title,description,level')
+          .eq('is_active', true).inFilter('class_id', ids).order('title');
+    }
     final staff = roles.any((role) => {
       Role.super_admin, Role.admin, Role.teacher, Role.content_editor,
     }.contains(role));

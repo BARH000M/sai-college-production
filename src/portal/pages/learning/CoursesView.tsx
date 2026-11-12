@@ -37,13 +37,13 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
       const slots = courseLessons.length * students.length;
       if (!slots) return { label: "لا يوجد طلبة", percent: 0 };
       const done = workspace.progress.filter((row) => ids.has(row.lesson_id) && row.status === "completed").length;
-      return { label: `${done} من ${slots} إنجاز`, percent: Math.round((done / slots) * 100) };
+      return { label: `${done} من ${slots} حالة إكمال سابقة غير متحققة`, percent: Math.round((done / slots) * 100) };
     }
     const ids = new Set(courseLessons.map((lesson) => lesson.id));
     const rows = workspace.progress.filter((row) => ids.has(row.lesson_id) && row.student_id === learnerId);
     const done = rows.filter((row) => row.status === "completed").length;
     return {
-      label: `${done} من ${courseLessons.length} دروس`,
+      label: `${done} من ${courseLessons.length} حالة إكمال سابقة غير متحققة`,
       percent: courseLessons.length ? Math.round((done / courseLessons.length) * 100) : 0,
     };
   }
@@ -106,7 +106,7 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
             </div>
             <div className="learn-lesson-side">
               {mode === "staff"
-                ? <span className="learn-pill">{doneCount} / {classStudents.length} أكملوا</span>
+                ? <span className="learn-pill">{doneCount} / {classStudents.length} حالة إكمال سابقة غير متحققة</span>
                 : <span className={`learn-pill learn-status-${status}`}>{lessonStatusLabels[status]}</span>}
               <div className="actions">
                 <button
