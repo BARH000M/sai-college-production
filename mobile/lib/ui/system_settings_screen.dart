@@ -127,7 +127,10 @@ class _LiveSystemSettingsScreenState extends State<LiveSystemSettingsScreen> {
             '${row['category']}.${row['setting_key']}': (row['value_text'] ?? '').toString(),
         };
         return ListView(padding: const EdgeInsets.all(16), children: [
-          const Text('إعدادات Yemen SAI · قاعدة بيانات موحدة',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
+          Row(children:[
+            const Expanded(child: Text('إعدادات Yemen SAI · قاعدة بيانات موحدة',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold))),
+            IconButton(tooltip:'تحديث من قاعدة البيانات المشتركة',onPressed:()=>setState(_reload),icon:const Icon(Icons.refresh_rounded)),
+          ]),
           const SizedBox(height:8),
           const Text('الإعدادات غير السرية فقط. ضبط SMTP أو SMS أو WhatsApp لا يعني أن خدمة الإرسال مفعلة؛ يلزم تكامل خادم مستقل.'),
           const SizedBox(height:12),

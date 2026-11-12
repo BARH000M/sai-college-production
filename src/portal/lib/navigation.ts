@@ -79,7 +79,7 @@ const availableModuleIds: readonly string[] = [
   "courses", "homework", "progress", "attendance", "roles", "reports", "cms",
   "academics", "timetable", "qr", "listening", "speaking", "tones", "vocabulary",
   "handwriting", "reading", "review", "library", "communications", "finance",
-  "downloads", "inventory", "transport", "portfolio", "housing", "certificates", "frontCms", "alumni", "settings",
+  "settings",
 ];
 
 export function isAppRole(value: string): value is AppRole {
@@ -113,6 +113,14 @@ export const pendingModules: readonly { id: string; label: string; reason: strin
   { id: "approvals", label: "المراجعة والنشر", reason: "تحتاج حالات مراجعة واعتماد للمحتوى." },
   { id: "staff", label: "شؤون الموظفين", reason: "تحتاج سجلات موظفين وعقوداً وحضوراً إدارياً." },
   { id: "reception", label: "الاستقبال", reason: "تحتاج مسار زوار ومواعيد مستقل عن القبول." },
+  { id: "downloads", label: "مركز التحميل", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
+  { id: "inventory", label: "المخزون", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
+  { id: "transport", label: "النقل", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
+  { id: "portfolio", label: "ملف الإنجاز", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
+  { id: "housing", label: "السكن", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
+  { id: "certificates", label: "الشهادات", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
+  { id: "frontCms", label: "صفحات Front CMS", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
+  { id: "alumni", label: "الخريجون", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
 ] as const;
 
 export function isModulePending(id: string): boolean {

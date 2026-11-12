@@ -8,8 +8,8 @@ import '../core/branding.dart';
 const red = Color(0xFFB6000B);
 const darkRed = Color(0xFF78000A);
 const gold = Color(0xFFDA9B16);
-const cream = Color(0xFFFBF6F0);
-const ink = Color(0xFF251D1D);
+const cream = Color(0xFF4B0006);
+const ink = Color(0xFFFFF3E0);
 const brandGradient = LinearGradient(
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
@@ -43,9 +43,12 @@ ThemeData saiTheme() => ThemeData(
   fontFamilyFallback: const ['NotoSC'],
   scaffoldBackgroundColor: cream,
   colorScheme: ColorScheme.fromSeed(
+    brightness: Brightness.dark,
     seedColor: red,
-    primary: red,
-    surface: cream,
+    primary: gold,
+    secondary: red,
+    surface: darkRed,
+    onSurface: ink,
   ),
   textTheme: const TextTheme(
     bodyMedium: TextStyle(fontSize: 13, color: ink),
@@ -57,11 +60,11 @@ ThemeData saiTheme() => ThemeData(
   ),
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
-    fillColor: Colors.white,
+    fillColor: const Color(0xFF680007),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(24),
-      borderSide: const BorderSide(color: Color(0xFFD8CFC7)),
+      borderSide: const BorderSide(color: Color(0xFFB5584C)),
     ),
   ),
 );
@@ -83,13 +86,13 @@ class SaiCard extends StatelessWidget {
       gradient: const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Colors.white, Color(0xFFFCF7F3)],
+        colors: [Color(0xFF92000D), Color(0xFF650007)],
       ),
-      border: Border.all(color: const Color(0xFFE8D8CB)),
+      border: Border.all(color: const Color(0xFF9C5A32)),
       borderRadius: BorderRadius.circular(18),
       boxShadow: const [
         BoxShadow(
-          color: Color(0x127B4A18),
+          color: Color(0x55000000),
           blurRadius: 7,
           offset: Offset(0, 3),
         ),
@@ -309,7 +312,7 @@ class ProgressCard extends StatelessWidget {
                 child: CircularProgressIndicator(
                   value: value ?? 0,
                   strokeWidth: 7,
-                  backgroundColor: const Color(0xFFE9DFD3),
+                  backgroundColor: const Color(0xFF9B3B42),
                   color: gold,
                 ),
               ),
@@ -318,7 +321,7 @@ class ProgressCard extends StatelessWidget {
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 20,
-                  color: Color(0xFFAA5200),
+                  color: gold,
                 ),
               ),
             ],
@@ -370,10 +373,10 @@ class Tile extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFECCC),
+            color: const Color(0xFF5D0007),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: red, size: 26),
+          child: Icon(icon, color: gold, size: 26),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -384,7 +387,7 @@ class Tile extends StatelessWidget {
               if (subtitle != null)
                 Text(
                   subtitle!,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  style: TextStyle(fontSize: 12, color: ink.withValues(alpha: .76)),
                 ),
             ],
           ),

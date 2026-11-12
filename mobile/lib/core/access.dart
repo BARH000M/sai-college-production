@@ -69,17 +69,17 @@ class Access {
       },
       PageId.admissions => {Role.receptionist},
       PageId.finance => {Role.accountant, Role.student, Role.parent},
-      PageId.library => {Role.librarian, Role.student, Role.teacher},
+      PageId.library => {Role.librarian, Role.student, Role.parent, Role.teacher},
       PageId.downloads => {
         Role.teacher,
         Role.student,
         Role.parent,
+        Role.librarian,
         Role.content_editor,
       },
-      PageId.inventory => {Role.accountant, Role.receptionist},
+      PageId.inventory => {Role.accountant},
       PageId.transport => {
         Role.receptionist,
-        Role.teacher,
         Role.student,
         Role.parent,
       },
@@ -90,7 +90,13 @@ class Access {
       PageId.alumni => {Role.receptionist},
       PageId.settings => <Role>{},
       PageId.exams => {Role.teacher, Role.student, Role.parent},
-      PageId.reports => {Role.accountant},
+      PageId.reports => {
+        Role.teacher,
+        Role.accountant,
+        Role.receptionist,
+        Role.librarian,
+        Role.content_editor,
+      },
       PageId.attendance ||
       PageId.schedule => {Role.teacher, Role.student, Role.parent},
       PageId.assignments => {Role.teacher, Role.student, Role.parent},
@@ -113,7 +119,8 @@ class Access {
       PageId.finance => roles.contains(Role.accountant),
       PageId.library => roles.contains(Role.librarian),
       PageId.content || PageId.frontCms => roles.contains(Role.content_editor),
-      PageId.downloads => roles.contains(Role.content_editor),
+      PageId.downloads =>
+          roles.contains(Role.content_editor) || roles.contains(Role.librarian),
       PageId.inventory => roles.contains(Role.accountant),
       PageId.transport ||
       PageId.housing ||

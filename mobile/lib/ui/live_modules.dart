@@ -246,13 +246,13 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
             IconButton(
               tooltip: 'تحديث البيانات',
               onPressed: () => setState(_reload),
-              icon: const Icon(Icons.refresh_rounded, color: darkRed),
+              icon: const Icon(Icons.refresh_rounded, color: gold),
             ),
             if (canWrite)
               IconButton(
                 tooltip: 'إضافة سجل',
                 onPressed: busy ? null : () => _edit(),
-                icon: const Icon(Icons.add_circle, color: darkRed),
+                icon: const Icon(Icons.add_circle, color: gold),
               ),
           ],
         ),
@@ -291,7 +291,7 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
                   child: ListTile(
                     title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
                     subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-                    leading: const Icon(Icons.article_outlined, color: darkRed),
+                    leading: const Icon(Icons.article_outlined, color: gold),
                     trailing: canWrite
                         ? PopupMenuButton<String>(
                             onSelected: (choice) {
@@ -360,6 +360,7 @@ class _ModuleEditorState extends State<_ModuleEditor> {
   late final TextEditingController title;
   late final TextEditingController description;
   late final Map<String, TextEditingController> extra;
+  late final Map<String, bool> booleanExtra;
   String? branchId;
 
   @override
@@ -369,7 +370,13 @@ class _ModuleEditorState extends State<_ModuleEditor> {
     description = TextEditingController(text: '${widget.existing?['description'] ?? ''}');
     extra = {
       for (final field in widget.spec.fields)
+        if (!field.boolean)
         field.key: TextEditingController(text: '${widget.existing?[field.key] ?? ''}'),
+    };
+    booleanExtra = {
+      for (final field in widget.spec.fields)
+        if (field.boolean)
+          field.key: (widget.existing?[field.key] as bool?) ?? false,
     };
     if (widget.branches.length == 1) branchId = widget.branches.first['id'] as String;
   }
@@ -391,6 +398,10 @@ class _ModuleEditorState extends State<_ModuleEditor> {
       if (widget.existing == null) 'branch_id': branchId,
     };
     for (final field in widget.spec.fields) {
+      if (field.boolean) {
+        payload[field.key] = booleanExtra[field.key] ?? false;
+        continue;
+      }
       final value = extra[field.key]!.text.trim();
       // An empty optional field means NULL, not the string "null".
       payload[field.key] = value.isEmpty ? null : (field.numeric ? int.tryParse(value) : value);
@@ -435,13 +446,28 @@ class _ModuleEditorState extends State<_ModuleEditor> {
               ),
               for (final field in widget.spec.fields) ...[
                 const SizedBox(height: 10),
-                TextFormField(
-                  controller: extra[field.key],
-                  decoration: InputDecoration(labelText: field.label),
-                  keyboardType: field.numeric ? TextInputType.number : TextInputType.text,
-                  validator: (value) => field.numeric && value != null && value.trim().isNotEmpty && (int.tryParse(value.trim()) == null || int.parse(value.trim()) < 0)
-                      ? 'أدخل عدداً صحيحاً غير سالب' : null,
-                ),
+                if (field.boolean)
+                  DropdownButtonFormField<bool>(
+                    initialValue: booleanExtra[field.key] ?? false,
+                    decoration: InputDecoration(labelText: field.label),
+                    items: const [
+                      DropdownMenuItem(value: true, child: Text('نعم')),
+                      DropdownMenuItem(value: false, child: Text('لا')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => booleanExtra[field.key] = value);
+                      }
+                    },
+                  )
+                else
+                  TextFormField(
+                    controller: extra[field.key],
+                    decoration: InputDecoration(labelText: field.label),
+                    keyboardType: field.numeric ? TextInputType.number : TextInputType.text,
+                    validator: (value) => field.numeric && value != null && value.trim().isNotEmpty && (int.tryParse(value.trim()) == null || int.parse(value.trim()) < 0)
+                        ? 'أدخل عدداً صحيحاً غير سالب' : null,
+                  ),
               ],
               const SizedBox(height: 9),
               const Text('العمليات تُحفظ في Supabase فوراً وتخضع لصلاحيات قاعدة البيانات.', style: TextStyle(fontSize: 11)),
@@ -493,7 +519,7 @@ class _LiveReportsScreenState extends State<LiveReportsScreen> {
           for (final item in snapshot.data!)
             SaiCard(child: ListTile(
               title: Text(item.$1),
-              trailing: Text(item.$2?.toString() ?? 'غير متاح', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: darkRed)),
+              trailing: Text(item.$2?.toString() ?? 'غير متاح', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: gold)),
             )),
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -527,7 +553,7 @@ class CollegeSettingsScreen extends StatelessWidget {
         SaiCard(
           padding: 6,
           child: ListTile(
-            leading: const Icon(Icons.settings_outlined, color: darkRed),
+            leading: const Icon(Icons.settings_outlined, color: gold),
             title: Text(entry),
             subtitle: const Text('يلزم ربط إعدادات الخادم المخصصة لهذه الوظيفة'),
           ),

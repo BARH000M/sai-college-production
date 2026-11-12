@@ -21,6 +21,15 @@ void main() {
     }
   });
 
+  test('Shared web fields remain editable with Supabase column types', () {
+    final downloadFields = onlineModules[PageId.downloads]!.fields;
+    expect(downloadFields.any((field) => field.key == 'is_published' && field.boolean), true);
+    final cmsFields = onlineModules[PageId.frontCms]!.fields;
+    expect(cmsFields.any((field) => field.key == 'is_published' && field.boolean), true);
+    final certificateFields = onlineModules[PageId.certificates]!.fields;
+    expect(certificateFields.any((field) => field.key == 'issued_on'), true);
+  });
+
   test('Only permitted roles see sensitive pages', () {
     for (final role in [Role.student, Role.parent]) {
       expect(Access.allows({role}, PageId.settings), false);

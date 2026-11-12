@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadParentChildren, loadStudentRecord, type ChildRecord } from "../../lib/home";
-import { formatDate } from "./SectionBits";
+import { formatDate } from "./dateFormat";
 
 type State =
   | { status: "loading"; data: null; error: null }

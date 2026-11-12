@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadStaffHome, type StaffHome as StaffHomeData } from "../../lib/home";
-import { AdmissionChip, formatDateTime, OccupancyBar } from "./SectionBits";
+import { formatDateTime } from "./dateFormat";
+import { AdmissionChip, OccupancyBar } from "./SectionBits";
 
 type State =
   | { status: "loading"; data: null; error: null }

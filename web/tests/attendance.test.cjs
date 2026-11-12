@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { stripTypeScriptTypes } = require("node:module");
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/attendance.ts"), "utf8")
+const source = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/attendance.ts"), "utf8")
   .replace('import { supabase } from "./supabase";', "const supabase = globalThis.__attendanceTestSupabase;");
 const code = stripTypeScriptTypes(source, { mode: "strip" });
 async function load(suffix, client) {
@@ -64,7 +64,7 @@ test("future creation and duplicate or denied writes never report success", asyn
 });
 
 test("attendance implementation exposes no destructive operations", () => {
-  for (const file of ["../src/lib/attendance.ts", "../src/pages/Attendance.tsx", "../../supabase/migrations/006_attendance.sql"]) {
+  for (const file of ["../../src/portal/lib/attendance.ts", "../../src/portal/pages/Attendance.tsx", "../../supabase/migrations/006_attendance.sql"]) {
     assert.doesNotMatch(fs.readFileSync(path.join(__dirname, file), "utf8"), /\.delete\s*\(|\btruncate\b|\bdelete\s+from\b|\bdrop\b/i);
   }
 });

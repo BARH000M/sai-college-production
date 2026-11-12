@@ -28,4 +28,11 @@ void main() {
   test('Unknown role strings never grant access', () {
     expect(Access.parse(['owner', 'SUPER_ADMIN']), isEmpty);
   });
+  test('Module roles match the shared web navigation', () {
+    expect(Access.allows({Role.librarian}, PageId.downloads), true);
+    expect(Access.allows({Role.parent}, PageId.library), true);
+    expect(Access.allows({Role.accountant}, PageId.inventory), true);
+    expect(Access.allows({Role.receptionist}, PageId.inventory), false);
+    expect(Access.allows({Role.teacher}, PageId.transport), false);
+  });
 }

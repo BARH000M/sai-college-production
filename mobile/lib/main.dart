@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -22,20 +23,52 @@ Future<void> main() async {
     } catch (_) {
       startupError = 'تعذر فتح بيانات المعاينة على هذا الجهاز.';
     }
-  } else if (publicKey.isEmpty || publicKey == 'PASTE_PUBLIC_KEY_HERE') {
-    startupError = 'أضف SUPABASE_PUBLIC_KEY في config/live.json ثم أعد البناء.';
-  } else if (publicKey.startsWith('sb_secret_')) {
-    startupError = 'استخدم المفتاح العام الخاص بتطبيقات المستخدمين.';
   } else {
-    try {
-      // initialize restores the SDK's saved session before we choose a screen.
-      // ignore: deprecated_member_use
-      await Supabase.initialize(url: backendUrl, anonKey: publicKey);
-    } catch (_) {
-      startupError = 'تعذر تهيئة الاتصال. تحقق من الإعدادات وحاول مجدداً.';
+    final keyError = _publicKeyError(publicKey);
+    if (keyError != null) {
+      startupError = keyError;
+    } else {
+      try {
+        // initialize restores the SDK's saved session before we choose a screen.
+        // ignore: deprecated_member_use
+        await Supabase.initialize(url: backendUrl, anonKey: publicKey);
+      } catch (_) {
+        startupError = 'تعذر تهيئة الاتصال. تحقق من الإعدادات وحاول مجدداً.';
+      }
     }
   }
   runApp(SaiApp(startupError: startupError, demo: demo));
+}
+
+String? _publicKeyError(String key) {
+  if (key.isEmpty || key == 'PASTE_PUBLIC_KEY_HERE') {
+    return 'أضف المفتاح العام في config/live.json ثم أعد البناء.';
+  }
+  if (key.startsWith('sb_secret_')) {
+    return 'مفتاح sb_secret سري ولا يوضع داخل تطبيق الهاتف.';
+  }
+  if (key.startsWith('sb_publishable_')) return null;
+
+  final parts = key.split('.');
+  if (parts.length != 3) return 'المفتاح غير صالح؛ استخدم anon أو sb_publishable للمشروع.';
+  try {
+    final payload = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+    );
+    if (payload is! Map) return 'تعذر التحقق من المفتاح العام.';
+    if (payload['role'] == 'service_role') {
+      return 'مفتاح service_role سري ولا يوضع داخل تطبيق الهاتف.';
+    }
+    if (payload['ref'] != 'aeryusbrulqdxjdynwfh') {
+      return 'المفتاح لا يخص مشروع Supabase المعتمد لهذا التطبيق.';
+    }
+    if (payload['role'] != 'anon') {
+      return 'استخدم المفتاح العام anon أو sb_publishable لهذا المشروع.';
+    }
+  } catch (_) {
+    return 'تعذر التحقق من المفتاح العام. راجع config/live.json.';
+  }
+  return null;
 }
 
 class SaiApp extends StatelessWidget {
@@ -49,7 +82,7 @@ class SaiApp extends StatelessWidget {
     title: 'Yemen SAI',
     theme: saiTheme(),
     locale: const Locale('ar'),
-    supportedLocales: const [Locale('ar'), Locale('en')],
+    supportedLocales: const [Locale('ar'), Locale('en'), Locale('zh', 'CN')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     home: startupError != null
         ? Scaffold(

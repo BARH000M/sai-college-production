@@ -4,10 +4,16 @@ import '../core/access.dart';
 /// Only the modules with a [table] read from Supabase.  Existing server tables
 /// remain authoritative; this client never creates shadow/local copies.
 class ModuleField {
-  const ModuleField(this.key, this.label, {this.numeric = false});
+  const ModuleField(
+    this.key,
+    this.label, {
+    this.numeric = false,
+    this.boolean = false,
+  });
   final String key;
   final String label;
   final bool numeric;
+  final bool boolean;
 }
 
 class ModuleSpec {
@@ -59,7 +65,11 @@ const onlineModules = <PageId, ModuleSpec>{
     title: 'مركز التحميل',
     subtitle: 'الملفات والموارد التعليمية والإدارية',
     writable: true,
-    fields: [ModuleField('category', 'التصنيف'), ModuleField('storage_path', 'مسار الملف في التخزين الآمن')],
+    fields: [
+      ModuleField('category', 'التصنيف'),
+      ModuleField('storage_path', 'مسار الملف في التخزين الآمن'),
+      ModuleField('is_published', 'منشور', boolean: true),
+    ],
   ),
   PageId.inventory: ModuleSpec(
     page: PageId.inventory,
@@ -99,7 +109,11 @@ const onlineModules = <PageId, ModuleSpec>{
     title: 'الشهادات',
     subtitle: 'مسودات وسجلات الشهادات الصادرة',
     writable: true,
-    fields: [ModuleField('student_id', 'معرّف الطالب UUID'), ModuleField('serial_code', 'الرقم التسلسلي')],
+    fields: [
+      ModuleField('student_id', 'معرّف الطالب UUID'),
+      ModuleField('serial_code', 'الرقم التسلسلي'),
+      ModuleField('issued_on', 'تاريخ الإصدار YYYY-MM-DD'),
+    ],
   ),
   PageId.frontCms: ModuleSpec(
     page: PageId.frontCms,
@@ -107,7 +121,11 @@ const onlineModules = <PageId, ModuleSpec>{
     title: 'Front CMS',
     subtitle: 'صفحات ومحتوى الموقع العام',
     writable: true,
-    fields: [ModuleField('slug', 'الرابط المختصر'), ModuleField('body', 'المحتوى')],
+    fields: [
+      ModuleField('slug', 'الرابط المختصر'),
+      ModuleField('body', 'المحتوى'),
+      ModuleField('is_published', 'منشور', boolean: true),
+    ],
   ),
   PageId.alumni: ModuleSpec(
     page: PageId.alumni,
