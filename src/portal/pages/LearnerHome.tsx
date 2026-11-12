@@ -19,7 +19,7 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
  * do there. This view gathers the pieces a learner actually needs on arrival: their
  * courses, the homework still due, and the grades already released.
  */
-export function LearnerHome({ roles }: { roles: readonly string[] }) {
+export function LearnerHome({ roles, userId }: { roles: readonly string[]; userId: string }) {
   const isStudent = roles.includes("student");
   const [state, setState] = useState<State>({ status: "loading", data: null, error: null });
   const [version, setVersion] = useState(0);
@@ -28,11 +28,11 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
   useEffect(() => {
     let active = true;
     setState({ status: "loading", data: null, error: null });
-    loadLearningWorkspace()
+    loadLearningWorkspace(true, isStudent ? userId : undefined)
       .then((data) => { if (active) setState({ status: "ready", data, error: null }); })
       .catch((error: unknown) => { if (active) setState({ status: "error", data: null, error: message(error) }); });
     return () => { active = false; };
-  }, [version]);
+  }, [version, isStudent, userId]);
 
   const workspace = state.status === "ready" ? state.data : null;
   const students = useMemo(() => workspace?.students ?? [], [workspace]);
@@ -94,9 +94,11 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
     .sort((a, b) => new Date(b.submission?.graded_at ?? 0).getTime() - new Date(a.submission?.graded_at ?? 0).getTime())
     .slice(0, 6);
 
-  const gradedScores = gradedRows.map((row) => row.submission?.score ?? 0);
-  const average = gradedScores.length
-    ? Math.round(gradedScores.reduce((total, score) => total + score, 0) / gradedScores.length)
+  const gradedPercentages = gradedRows
+    .filter((row) => row.item.max_score > 0 && row.submission?.score != null)
+    .map((row) => (row.submission!.score! / row.item.max_score) * 100);
+  const average = gradedPercentages.length
+    ? Math.round(gradedPercentages.reduce((total, score) => total + score, 0) / gradedPercentages.length)
     : null;
 
   const overall = useMemo(() => {
@@ -126,6 +128,7 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
 
     {state.status === "error" && <section className="panel">
       <p className="error-box" role="alert">تعذر تحميل بياناتك التعليمية: {state.error}</p>
+      <p className="data-note">تحقق من اتصال الإنترنت وصلاحية الحساب، ثم أعد المحاولة.</p>
       <div className="actions" style={{ marginTop: 12 }}>
         <button className="button secondary" onClick={reload}>إعادة المحاولة</button>
       </div>
@@ -161,8 +164,8 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
       </div>
       <div className="learn-stats">
         <div className="learn-stat"><span>المقررات</span><strong>{courses.length}</strong></div>
-        <div className="learn-stat"><span>دروس مكتملة</span><strong>{overall.completed} / {overall.total}</strong></div>
-        <div className="learn-stat"><span>نسبة التقدم</span><strong>{overall.percent}%</strong></div>
+        <div className="learn-stat"><span>حالات إكمال سابقة غير متحققة</span><strong>{overall.completed} / {overall.total}</strong></div>
+        <div className="learn-stat"><span>نسبة الحالات السابقة غير المتحققة</span><strong>{overall.percent}%</strong></div>
         <div className="learn-stat"><span>واجبات مستحقة</span><strong>{pending.length}</strong></div>
       </div>
     </section>}
@@ -193,12 +196,12 @@ export function LearnerHome({ roles }: { roles: readonly string[] }) {
     {learner && !!courses.length && <div className="learner-grid">
       <section className="panel">
         <h2>مقرراتي</h2>
-        <p className="data-note">نسبة الإنجاز تعتمد على الدروس التي سُجّلت كمكتملة.</p>
+        <p className="data-note">الحالات السابقة مسجلة ذاتياً وغير متحققة، ولا تمثل إنجازاً معتمداً.</p>
         <div className="learn-course-grid">
           {courseRows.map(({ course, lessonCount, homeworkCount, summary }) => <Link
             key={course.id}
             className="learn-course"
-            to="/portal/modules/courses"
+            to={`/portal/modules/courses?course=${encodeURIComponent(course.id)}`}
           >
             <strong>{course.title}</strong>
             <small>{lessonCount} درساً · {homeworkCount} واجباً</small>

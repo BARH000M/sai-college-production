@@ -9,6 +9,7 @@ import { PortalHome } from "./pages/PortalHome";
 import { Profile } from "./pages/Profile";
 import { ModuleEntry } from "./pages/ModuleEntry";
 import { isAppRole } from "./lib/navigation";
+import { canAccessOperations } from "./lib/studentLearning";
 import {
   getInitialAuthState, restoreAuthState, signIn, signOut,
   subscribeToAuthChanges, type AuthState,
@@ -114,7 +115,11 @@ export default function PortalApp() {
           <Route path="login" element={<Navigate to={HOME} replace />} />
           <Route path="dashboard" element={protectedPage(<PortalHome roles={auth.roles} userId={auth.userId} />)} />
           <Route path="profile" element={protectedPage(<Profile userId={auth.userId ?? ""} email={auth.email} roles={auth.roles} />)} />
-          <Route path="operations" element={protectedPage(<Dashboard />)} />
+          <Route path="operations" element={protectedPage(
+            canAccessOperations(auth.roles)
+              ? <Dashboard />
+              : <StatusCard title="الوصول غير متاح" message="لوحة الإدارة غير متاحة لأدوار حسابك." link={HOME} />
+          )} />
           <Route path="modules/:moduleId" element={protectedPage(<ModuleEntry roles={auth.roles} userId={auth.userId} />)} />
           <Route path="" element={<Navigate to={HOME} replace />} />
           <Route path="*" element={<StatusCard title="الصفحة غير موجودة" message="العنوان المطلوب غير متاح." link={HOME} />} />

@@ -419,7 +419,9 @@ class _CollegeShellState extends State<CollegeShell> {
       PageId.learning || PageId.courses => demo == null
           ? LiveCourseCatalog(roles: roles)
           : CourseCatalog(learning: learning),
-      PageId.lesson => CourseCatalog(learning: learning),
+      PageId.lesson => demo == null
+          ? LiveCourseCatalog(roles: roles)
+          : CourseCatalog(learning: learning),
       PageId.classes => ClassesScreen(
         key: const ValueKey(PageId.classes),
         roles: roles,
@@ -519,6 +521,10 @@ class _CollegeShellState extends State<CollegeShell> {
         value: completed / lessonCount,
         subtitle: '$completed من $lessonCount درساً',
       ),
+    if (demo == null && roles.contains(Role.student)) ...[
+      const SectionHeading('مقرراتي المتاحة'),
+      SizedBox(height: 300, child: LiveCourseCatalog(roles: roles)),
+    ],
     const SectionHeading('أدوات حسابك'),
     for (final target in favorites.where((target) => target != PageId.systems))
       Tile(features[target]!.$1, features[target]!.$2, onTap: () => go(target)),

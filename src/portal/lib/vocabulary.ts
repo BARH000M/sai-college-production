@@ -56,39 +56,53 @@ function fail(label: string, message: string | undefined): never {
   throw new Error(`${label}: ${message ?? "طلب غير صالح"}`);
 }
 
-export async function loadVocabularyWorkspace(): Promise<VocabularyWorkspace> {
-  const [{ data: authData }, words, courses, lessons] = await Promise.all([
+export async function loadVocabularyWorkspace(studentOnly = false): Promise<VocabularyWorkspace> {
+  const [auth, courses] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from("learning_vocabulary").select(wordColumns).order("position"),
     supabase.from("learning_courses").select("id,title,level,class_id").eq("is_active", true).order("title"),
-    supabase.from("learning_lessons").select("id,course_id,title,position").order("position"),
   ]);
 
-  if (words.error) fail("تعذر تحميل المفردات", words.error.message);
+  if (auth.error) fail("تعذر التحقق من الحساب", auth.error.message);
   if (courses.error) fail("تعذر تحميل المقررات", courses.error.message);
-  if (lessons.error) fail("تعذر تحميل الدروس", lessons.error.message);
 
-  const userId = authData.user?.id ?? null;
+  const userId = auth.data.user?.id ?? null;
   let learnerId: string | null = null;
+  let classId: string | null = null;
   let progress: VocabularyProgress[] = [];
 
   if (userId) {
-    const student = await supabase.from("students").select("id").eq("user_id", userId).limit(1).maybeSingle();
-    if (!student.error && student.data && typeof student.data.id === "string") {
+    const student = await supabase.from("students").select("id,class_id").eq("user_id", userId).limit(1).maybeSingle();
+    if (student.error) fail("تعذر تحميل سجل الطالب", student.error.message);
+    if (student.data && typeof student.data.id === "string") {
       learnerId = student.data.id;
+      classId = student.data.class_id;
       const rows = await supabase
         .from("learning_vocab_progress")
         .select(progressColumns)
         .eq("student_id", learnerId);
-      if (!rows.error && Array.isArray(rows.data)) {
+      if (rows.error) fail("تعذر تحميل مراجعة المفردات", rows.error.message);
+      if (Array.isArray(rows.data)) {
         progress = rows.data as VocabularyProgress[];
       }
     }
   }
 
+  const visibleCourses = (courses.data ?? []).filter((course) => !studentOnly || (learnerId && course.class_id === classId));
+  const courseIds = visibleCourses.map((course) => course.id);
+  const empty = { data: [], error: null };
+  const [words, lessons] = await Promise.all([
+    courseIds.length
+      ? supabase.from("learning_vocabulary").select(wordColumns).eq("is_published", true).in("course_id", courseIds).order("position")
+      : empty,
+    courseIds.length
+      ? supabase.from("learning_lessons").select("id,course_id,title,position").eq("is_published", true).in("course_id", courseIds).order("position")
+      : empty,
+  ]);
+  if (words.error) fail("تعذر تحميل المفردات", words.error.message);
+  if (lessons.error) fail("تعذر تحميل الدروس", lessons.error.message);
   return {
     words: (words.data ?? []) as VocabularyWord[],
-    courses: (courses.data ?? []) as VocabularyCourse[],
+    courses: visibleCourses as VocabularyCourse[],
     lessons: (lessons.data ?? []) as VocabularyLesson[],
     progress,
     learnerId,
@@ -145,7 +159,7 @@ export async function saveWordProgress(
 export const wordStatusLabels: Record<WordStatus, string> = {
   new: "جديدة",
   learning: "قيد المراجعة",
-  known: "أتقنتها",
+  known: "أتذكرها (تقييم ذاتي)",
 };
 
 export const partOfSpeechOptions: readonly string[] = [

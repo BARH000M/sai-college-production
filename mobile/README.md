@@ -21,21 +21,15 @@
 ```powershell
 Set-Location 'D:\SAI-College-Production\mobile'
 flutter pub get
-flutter run `
-  --dart-define=SUPABASE_URL=https://aeryusbrulqdxjdynwfh.supabase.co `
-  --dart-define=SUPABASE_PUBLISHABLE_KEY=PASTE_PUBLIC_KEY_HERE
+flutter run --dart-define-from-file=config/live.json
 ```
 
-استبدل `PASTE_PUBLIC_KEY_HERE` بالمفتاح العام من إعدادات مشروع **sai-college-production / main**. المفتاح قيمة عامة للتطبيق؛ لا ترسل المفاتيح أو كلمات المرور في المحادثة.
-
-اسم المتغير القديم `SUPABASE_ANON_KEY` ما زال مقروءًا كمفتاح احتياطي، لذلك سكربتات البناء الحالية تعمل دون تعديل.
+انسخ `config/live.example.json` إلى `config/live.json`، وضع المفتاح العام للمشروع المعتمد في `SUPABASE_PUBLIC_KEY`. عنوان المشروع محدد في التطبيق. لا تضع مفتاح الخدمة أو كلمة مرور في الملف.
 
 لإنشاء APK تجريبي:
 
 ```powershell
-flutter build apk --debug `
-  --dart-define=SUPABASE_URL=https://aeryusbrulqdxjdynwfh.supabase.co `
-  --dart-define=SUPABASE_PUBLISHABLE_KEY=PASTE_PUBLIC_KEY_HERE
+flutter build apk --debug --dart-define-from-file=config/live.json
 ```
 
 ## الجودة والتحقق المستمر

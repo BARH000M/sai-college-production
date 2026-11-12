@@ -95,7 +95,7 @@ class _LiveVocabularyPracticeState extends State<LiveVocabularyPractice> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              known ? 'أُضيفت إلى الكلمات المتقنة' : 'سُجلت للمراجعة',
+              known ? 'حُفظ تقييمك الذاتي للكلمة' : 'سُجلت للمراجعة',
             ),
           ),
         );
@@ -185,7 +185,7 @@ class _LiveVocabularyPracticeState extends State<LiveVocabularyPractice> {
         return const Center(child: CircularProgressIndicator());
       }
       if (snapshot.hasError) {
-        return EmptyPanel('تعذر تحميل المفردات المنشورة لهذا المقرر.');
+        return EmptyPanel('تعذر تحميل المفردات المنشورة لهذا المقرر.', retry: () => setState(_load));
       }
       final data = snapshot.data!;
       if (data.words.isEmpty) {
@@ -275,7 +275,7 @@ class _LiveVocabularyPracticeState extends State<LiveVocabularyPractice> {
               ],
             ),
           ),
-          const SectionHeading('تدرّب على كتابة الحرف'),
+          const SectionHeading('تدرّب على كتابة الحرف (دون تقييم آلي)'),
           SaiCard(
             child: Column(
               children: [
@@ -330,7 +330,7 @@ class _LiveVocabularyPracticeState extends State<LiveVocabularyPractice> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'ما معنى هذه الكلمة؟ حاول تذكرها قبل إظهار الإجابة.',
+                  'ما معنى هذه الكلمة؟ التصنيف تقييم ذاتي وليس إثباتاً للإتقان.',
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -347,12 +347,12 @@ class _LiveVocabularyPracticeState extends State<LiveVocabularyPractice> {
                       onPressed: _saving
                           ? null
                           : () => _saveProgress(data, word, true),
-                      child: const Text('أتقنتها'),
+                      child: const Text('أتذكرها'),
                     ),
                     OutlinedButton.icon(
                       onPressed: () => _quiz(data, word),
                       icon: const Icon(Icons.quiz_outlined),
-                      label: const Text('اختبر ذاكرتك'),
+                      label: const Text('تدريب غير مصنف'),
                     ),
                     TextButton(
                       onPressed: () => _next(data.words.length),

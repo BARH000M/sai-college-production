@@ -26,7 +26,26 @@ class _LiveCourseCatalogState extends State<LiveCourseCatalog> {
   }
 
   void _reload() {
-    courses = Supabase.instance.client
+    courses = _loadCourses(widget.roles);
+  }
+
+  Future<List<Map<String, dynamic>>> _loadCourses(Set<Role> roles) async {
+    final client = Supabase.instance.client;
+    final staff = roles.any((role) => {
+      Role.super_admin, Role.admin, Role.teacher, Role.content_editor,
+    }.contains(role));
+    if (!staff && roles.contains(Role.student)) {
+      final user = client.auth.currentUser;
+      if (user == null) throw StateError('انتهت الجلسة. يرجى تسجيل الدخول.');
+      final student = await client.from('students').select('class_id')
+          .eq('user_id', user.id).maybeSingle();
+      final classId = student?['class_id'];
+      if (classId == null) return [];
+      return client.from('learning_courses')
+          .select('id,title,description,level')
+          .eq('is_active', true).eq('class_id', classId).order('title');
+    }
+    return client
         .from('learning_courses')
         .select('id,title,description,level')
         .eq('is_active', true)
@@ -45,7 +64,7 @@ class _LiveCourseCatalogState extends State<LiveCourseCatalog> {
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: EmptyPanel(
-              'تعذر تحميل المقررات المنشورة من قاعدة البيانات المشتركة.',
+            'تعذر تحميل المقررات. تحقق من اتصال الإنترنت وصلاحية الحساب.',
               retry: () => setState(_reload),
             ),
           ),
@@ -154,7 +173,7 @@ class _LiveCourseLessonsState extends State<LiveCourseLessons> {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: EmptyPanel('تعذر تحميل دروس هذا المقرر.', retry: () => setState(_reload)),
+              child: EmptyPanel('تعذر تحميل دروس هذا المقرر. تحقق من اتصال الإنترنت وصلاحية الحساب.', retry: () => setState(_reload)),
             ),
           );
         }
@@ -175,7 +194,7 @@ class _LiveCourseLessonsState extends State<LiveCourseLessons> {
               child: const ListTile(
                 leading: Icon(Icons.translate_rounded, color: gold),
                 title: Text('تدريب المفردات الصينية'),
-                subtitle: Text('استماع • كتابة • اختبار • متابعة التقدم'),
+                subtitle: Text('مراجعة ذاتية للمفردات المنشورة'),
                 trailing: Icon(Icons.chevron_left_rounded, color: gold),
               ),
             ),
@@ -197,7 +216,7 @@ class _LiveCourseLessonsState extends State<LiveCourseLessons> {
                   leading: Icon(_lessonIcon('${lesson['kind'] ?? ''}'), color: gold),
                   title: Text('${lesson['title'] ?? 'درس'}'),
                   subtitle: Text(
-                    [lesson['summary'], '${lesson['duration_minutes'] ?? 45} دقيقة']
+                    [lesson['summary'], if (lesson['duration_minutes'] != null) '${lesson['duration_minutes']} دقيقة']
                         .where((value) => value != null && '$value'.trim().isNotEmpty)
                         .join(' • '),
                     maxLines: 2,
@@ -226,8 +245,8 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
   late final Future<String?> mediaUrl;
   String? studentId;
   bool progressReady = false;
-  bool completed = false;
-  bool savingProgress = false;
+  String? progressStatus;
+  String? progressError;
 
   @override
   void initState() {
@@ -244,7 +263,7 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
     try {
       final client = Supabase.instance.client;
       final user = client.auth.currentUser;
-      if (user == null) return;
+      if (user == null) throw StateError('انتهت الجلسة. يرجى تسجيل الدخول.');
       final student = await client
           .from('students')
           .select('id')
@@ -258,9 +277,9 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
           .eq('lesson_id', widget.lesson['id'])
           .eq('student_id', studentId!)
           .maybeSingle();
-      if (mounted) setState(() => completed = row?['status'] == 'completed');
-    } catch (_) {
-      // RLS may allow lesson reading while withholding progress details.
+      if (mounted) setState(() => progressStatus = row?['status'] as String?);
+    } catch (error) {
+      if (mounted) setState(() => progressError = 'تعذر تحميل حالة التقدم: $error');
     } finally {
       if (mounted) setState(() => progressReady = true);
     }
@@ -291,39 +310,6 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
     }
   }
 
-  Future<void> _markComplete() async {
-    final id = studentId;
-    if (id == null || savingProgress || completed) return;
-    setState(() => savingProgress = true);
-    try {
-      final response = await Supabase.instance.client
-          .from('learning_lesson_progress')
-          .upsert(
-            {
-              'lesson_id': widget.lesson['id'],
-              'student_id': id,
-              'status': 'completed',
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-            onConflict: 'lesson_id,student_id',
-          )
-          .select('lesson_id');
-      if (!mounted) return;
-      if (response.isEmpty) {
-        _notice('لم تسمح صلاحيات الحساب بحفظ التقدم.');
-        return;
-      }
-      setState(() => completed = true);
-      _notice('تم حفظ إكمال الدرس في قاعدة البيانات المشتركة.');
-    } on PostgrestException catch (e) {
-      if (mounted) _notice('رفضت قاعدة البيانات حفظ التقدم: ${e.message}');
-    } catch (_) {
-      if (mounted) _notice('تعذر حفظ التقدم. حاول مجدداً.');
-    } finally {
-      if (mounted) setState(() => savingProgress = false);
-    }
-  }
-
   void _notice(String message) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 
@@ -350,7 +336,7 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'المدة: ${widget.lesson['duration_minutes'] ?? 45} دقيقة · نوع المحتوى: ${_contentLabel(contentKind)}',
+                  '${widget.lesson['duration_minutes'] == null ? '' : 'المدة: ${widget.lesson['duration_minutes']} دقيقة · '}نوع المحتوى: ${_contentLabel(contentKind)}',
                 ),
               ],
             ),
@@ -359,6 +345,10 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
             SaiCard(
               child: SelectableText(body, style: Theme.of(context).textTheme.bodyLarge),
             ),
+          if ((body == null || body.isEmpty) &&
+              (widget.lesson['content_path'] == null || '${widget.lesson['content_path']}'.trim().isEmpty) &&
+              (widget.lesson['content_url'] == null || '${widget.lesson['content_url']}'.trim().isEmpty))
+            const EmptyPanel('لا توجد مادة تعليمية متاحة لهذا الدرس بعد.'),
           if (contentKind != 'none' &&
               (widget.lesson['content_path'] != null || widget.lesson['content_url'] != null))
             FutureBuilder<String?>(
@@ -379,25 +369,32 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
                 );
               },
             ),
-          if (widget.canTrack && progressReady && studentId != null)
-            SaiCard(
-              child: completed
-                  ? const ListTile(
-                      leading: Icon(Icons.check_circle_rounded, color: gold),
-                      title: Text('تم إكمال الدرس وحفظه في حسابك.'),
-                    )
-                  : FilledButton.icon(
-                      onPressed: savingProgress ? null : _markComplete,
-                      icon: const Icon(Icons.task_alt_rounded),
-                      label: Text(savingProgress ? 'جارٍ الحفظ…' : 'إكمال الدرس وحفظ التقدم'),
-                    ),
-            ),
-          if (widget.canTrack && progressReady && studentId == null)
+          if (widget.canTrack && progressReady && progressError != null)
+            EmptyPanel(progressError!, retry: () {
+              setState(() { progressReady = false; progressError = null; });
+              _loadProgress();
+            }),
+          if (widget.canTrack && progressReady && studentId != null && progressError == null)
+            LessonProgressNotice(status: progressStatus),
+          if (widget.canTrack && progressReady && studentId == null && progressError == null)
             const EmptyPanel('لا يوجد ملف طالب مرتبط بهذا الحساب؛ لم يُسجل تقدم محلي بديل.'),
         ],
       ),
     );
   }
+}
+
+class LessonProgressNotice extends StatelessWidget {
+  const LessonProgressNotice({super.key, required this.status});
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) => SaiCard(
+    child: Text(
+      '${status == 'completed' ? 'توجد حالة إكمال سابقة غير متحققة. ' : status == 'in_progress' ? 'الحالة المسجلة: قيد الدراسة. ' : 'لا توجد حالة إكمال مسجلة. '}'
+      'تسجيل الإكمال معطل حتى يتوفر تقييم موثوق.',
+    ),
+  );
 }
 
 IconData _lessonIcon(String kind) => switch (kind) {

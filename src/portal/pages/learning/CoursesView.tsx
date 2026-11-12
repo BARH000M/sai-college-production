@@ -1,27 +1,24 @@
 import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
-  lessonKindLabels, lessonStatusLabels, saveLessonProgress, statusForLesson,
-  type LearningScope, type LearningCourse, type LessonStatus,
+  lessonKindLabels, lessonStatusLabels, statusForLesson,
+  type LearningScope, type LearningCourse,
 } from "@/portal/lib/learning";
 import { LessonContent } from "@/portal/pages/learning/LessonContent";
 import { CourseVocabularyPanel } from "@/portal/pages/learning/CourseVocabularyPanel";
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
 export function CoursesView({ scope }: { scope: LearningScope }) {
   const { workspace, mode, learnerId, canTrack, canManageContent } = scope;
   const learner = workspace.students.find((student) => student.id === learnerId) ?? null;
+  const [params] = useSearchParams();
   const [selectedId, setSelectedId] = useState("");
   const [openLessonId, setOpenLessonId] = useState("");
-  const [savingLesson, setSavingLesson] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const courses = useMemo(() => (mode === "staff"
     ? workspace.courses
     : workspace.courses.filter((course) => course.class_id === learner?.class_id)), [mode, workspace.courses, learner?.class_id]);
 
-  const active = courses.find((course) => course.id === selectedId) ?? courses[0] ?? null;
+  const active = courses.find((course) => course.id === (selectedId || params.get("course"))) ?? courses[0] ?? null;
   const lessons = active
     ? workspace.lessons.filter((lesson) => lesson.course_id === active.id).sort((a, b) => a.position - b.position)
     : [];
@@ -51,20 +48,6 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
     };
   }
 
-  async function changeStatus(lessonId: string, status: LessonStatus) {
-    if (!learner || !canTrack || savingLesson) return;
-    setSavingLesson(lessonId); setError(null); setNotice(null);
-    try {
-      await saveLessonProgress(lessonId, learner.id, status);
-      setNotice(status === "completed" ? "سُجّل الدرس كمكتمل." : "حُدّثت حالة الدرس.");
-      scope.reload();
-    } catch (failure) {
-      setError(message(failure));
-    } finally {
-      setSavingLesson("");
-    }
-  }
-
   if (!courses.length) {
     return <section className="panel learn-empty">
       <h2>لا توجد مقررات متاحة</h2>
@@ -78,6 +61,7 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
     <section className="panel">
       <h2>المقررات المتاحة</h2>
       <p className="data-note">اختر مقرراً لعرض دروسه بالترتيب.</p>
+      <p className="data-note">حالات الإكمال المسجلة سابقاً غير متحققة، ولا تمثل إنجازاً معتمداً. تسجيل الإكمال معطل لحين توفر تقييم موثوق.</p>
       <div className="learn-course-grid">
         {courses.map((course) => {
           const stat = courseStat(course);
@@ -86,7 +70,7 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
             type="button"
             key={course.id}
             className={`learn-course ${active?.id === course.id ? "active" : ""}`}
-            onClick={() => { setSelectedId(course.id); setNotice(null); setError(null); }}
+            onClick={() => { setSelectedId(course.id); setOpenLessonId(""); }}
           >
             <strong>{course.title}</strong>
             <small>{cls ? `${cls.name} · ${cls.program}` : "صف غير معروف"}</small>
@@ -96,9 +80,6 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
         })}
       </div>
     </section>
-
-    {notice && <p className="success-box" role="status">{notice}</p>}
-    {error && <p className="error-box" role="alert">تعذر حفظ حالة الدرس: {error}</p>}
 
     {active && <section className="panel">
       <div className="page-heading">
@@ -134,26 +115,6 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
                   aria-expanded={openLessonId === lesson.id}
                   onClick={() => setOpenLessonId(openLessonId === lesson.id ? "" : lesson.id)}
                 >{openLessonId === lesson.id ? "إغلاق الدرس" : "فتح الدرس"}</button>
-                {canTrack && learner && <>
-                  {status !== "completed" && <button
-                    type="button"
-                    className="button primary"
-                    disabled={!!savingLesson}
-                    onClick={() => void changeStatus(lesson.id, "completed")}
-                  >{savingLesson === lesson.id ? "جارٍ الحفظ..." : "إكمال الدرس"}</button>}
-                  {status === "completed" && <button
-                    type="button"
-                    className="button secondary"
-                    disabled={!!savingLesson}
-                    onClick={() => void changeStatus(lesson.id, "not_started")}
-                  >إلغاء الإكمال</button>}
-                  {status === "not_started" && <button
-                    type="button"
-                    className="button secondary"
-                    disabled={!!savingLesson}
-                    onClick={() => void changeStatus(lesson.id, "in_progress")}
-                  >بدء الدراسة</button>}
-                </>}
               </div>
             </div>
             {openLessonId === lesson.id && <LessonContent
@@ -168,6 +129,9 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
       {!lessons.length && <p className="muted">لم تُضف دروس لهذا المقرر بعد.</p>}
 
       {canManageContent && <CourseVocabularyPanel key={active.id} course={active} lessons={lessons} />}
+      {canTrack && <Link className="button secondary" to={`/portal/modules/vocabulary?course=${encodeURIComponent(active.id)}`}>
+        مفردات هذا المقرر
+      </Link>}
     </section>}
   </>;
 }

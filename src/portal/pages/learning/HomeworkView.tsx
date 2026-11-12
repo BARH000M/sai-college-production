@@ -90,9 +90,9 @@ export function HomeworkView({ scope, seenAt }: { scope: LearningScope; seenAt: 
       ? workspace.students.filter((student) => student.class_id === courses.find((entry) => entry.id === course.course_id)?.class_id)
       : [];
     const rows = workspace.submissions.filter((entry) => entry.homework_id === homeworkId);
-    const graded = rows.filter((entry) => entry.status === "graded");
-    const average = graded.length
-      ? Math.round(graded.reduce((total, entry) => total + (entry.score ?? 0), 0) / graded.length)
+    const graded = rows.filter((entry) => entry.status === "graded" && entry.score !== null);
+    const average = graded.length && course && course.max_score > 0
+      ? Math.round(graded.reduce((total, entry) => total + (entry.score ?? 0), 0) / graded.length / course.max_score * 100)
       : null;
     return { expected: classStudents.length, submitted: rows.length, graded: graded.length, average };
   }
@@ -320,7 +320,7 @@ export function HomeworkView({ scope, seenAt }: { scope: LearningScope; seenAt: 
         <strong>{submissionStatusLabels[submission.status]}</strong>
         <p className="data-note">سُلّم في {formatDate(submission.submitted_at, true)}</p>
         {submission.status === "graded" && <>
-          <p>الدرجة: {submission.score ?? 0} من {selected.max_score}</p>
+          <p>الدرجة: {submission.score === null ? "غير متاحة" : `${submission.score} من ${selected.max_score}`}</p>
           {submission.feedback && <p className="muted">ملاحظات المعلم: {submission.feedback}</p>}
         </>}
         {submission.content && <p className="learn-answer">{submission.content}</p>}

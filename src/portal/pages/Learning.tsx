@@ -17,7 +17,7 @@ const titles: Record<LearningView, string> = {
 };
 
 const intros: Record<LearningView, string> = {
-  courses: "استعرض مقرراتك، افتح الدروس بالترتيب، وسجّل إنجازك خطوة بخطوة.",
+  courses: "استعرض مقرراتك وافتح الدروس المنشورة بالترتيب.",
   homework: "تابع الواجبات المطلوبة ومواعيد التسليم والملاحظات الصادرة عن المعلم.",
   progress: "نظرة واضحة على ما أنجزته في كل مقرر وعلى أدائك في الواجبات.",
 };
@@ -31,7 +31,7 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 const staffRoles = ["super_admin", "admin", "teacher", "content_editor"];
 const contentManagerRoles = ["super_admin", "admin", "teacher"];
 
-export function Learning({ view, roles }: { view: LearningView; roles: readonly string[] }) {
+export function Learning({ view, roles, userId }: { view: LearningView; roles: readonly string[]; userId: string | null }) {
   const [state, setState] = useState<State>({ status: "loading", data: null, error: null });
   const [version, setVersion] = useState(0);
   const [learnerId, setLearnerId] = useState("");
@@ -40,11 +40,12 @@ export function Learning({ view, roles }: { view: LearningView; roles: readonly 
   useEffect(() => {
     let active = true;
     setState((current) => (current.status === "ready" ? current : { status: "loading", data: null, error: null }));
-    loadLearningWorkspace()
+    const learnerOnly = !roles.some((role) => staffRoles.includes(role));
+    loadLearningWorkspace(learnerOnly, learnerOnly && roles.includes("student") ? userId ?? undefined : undefined)
       .then((data) => { if (active) setState({ status: "ready", data, error: null }); })
       .catch((error: unknown) => { if (active) setState({ status: "error", data: null, error: message(error) }); });
     return () => { active = false; };
-  }, [version]);
+  }, [version, roles, userId]);
 
   useEffect(() => {
     let active = true;
@@ -120,6 +121,7 @@ export function Learning({ view, roles }: { view: LearningView; roles: readonly 
 
     {state.status === "error" && <div className="panel">
       <p className="error-box" role="alert">تعذر تحميل بيانات التعلّم: {state.error}</p>
+      <p className="data-note">تحقق من اتصال الإنترنت وصلاحية الحساب، ثم أعد المحاولة.</p>
       <div className="actions" style={{ marginTop: 12 }}>
         <button className="button secondary" onClick={() => setVersion((value) => value + 1)}>إعادة المحاولة</button>
       </div>
@@ -153,8 +155,8 @@ export function Learning({ view, roles }: { view: LearningView; roles: readonly 
       </div>
       {learnerStats && <div className="learn-stats">
         <div className="learn-stat"><span>المقررات</span><strong>{learnerStats.courses}</strong></div>
-        <div className="learn-stat"><span>دروس مكتملة</span><strong>{learnerStats.lessons}</strong></div>
-        <div className="learn-stat"><span>نسبة التقدم</span><strong>{learnerStats.percent}%</strong></div>
+        <div className="learn-stat"><span>حالات إكمال سابقة غير متحققة</span><strong>{learnerStats.lessons}</strong></div>
+        <div className="learn-stat"><span>نسبة الحالات السابقة غير المتحققة</span><strong>{learnerStats.percent}%</strong></div>
         <div className="learn-stat"><span>واجبات مسلَّمة</span><strong>{learnerStats.submitted} / {learnerStats.homework}</strong></div>
       </div>}
     </section>}
