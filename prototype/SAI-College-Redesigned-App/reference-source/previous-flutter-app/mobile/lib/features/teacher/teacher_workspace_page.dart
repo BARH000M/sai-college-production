@@ -119,7 +119,9 @@ class _TeacherWorkspacePageState extends State<TeacherWorkspacePage> {
     final data = _data;
     if (data == null ||
         data.classes.isEmpty ||
-        widget.profile.teacherId == null) return;
+        widget.profile.teacherId == null) {
+      return;
+    }
     final title = TextEditingController();
     final subject = TextEditingController();
     final description = TextEditingController();
@@ -165,7 +167,7 @@ class _TeacherWorkspacePageState extends State<TeacherWorkspacePage> {
                 content: SingleChildScrollView(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
                   DropdownButtonFormField<int>(
-                      value: classId,
+                      initialValue: classId,
                       decoration: const InputDecoration(labelText: 'الفصل'),
                       items: data.classes
                           .map((item) => DropdownMenuItem(
@@ -315,7 +317,7 @@ class _TeacherWorkspacePageState extends State<TeacherWorkspacePage> {
           child: Row(children: [
             Expanded(
                 child: DropdownButtonFormField<int>(
-                    value: _classId,
+                    initialValue: _classId,
                     decoration: const InputDecoration(labelText: 'الفصل'),
                     items: data.classes
                         .map((item) => DropdownMenuItem(

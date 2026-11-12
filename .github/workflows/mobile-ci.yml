@@ -4,9 +4,8 @@ name: Mobile CI
 #
 # `--fatal-infos` is deliberate: Flutter reports deprecations as "info" level
 # diagnostics, so without it a newly deprecated API would never fail the build.
-# The workflow tracks the current stable channel so new deprecations surface as
-# soon as a toolchain upgrade lands. Pin `flutter-version` below if a rolling
-# build ever becomes disruptive.
+# Pin the last verified stable release until the app can migrate the Material
+# APIs deprecated by Flutter 3.50.
 
 on:
   push:
@@ -41,6 +40,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.47.9'
           cache: true
 
       - name: Toolchain version
