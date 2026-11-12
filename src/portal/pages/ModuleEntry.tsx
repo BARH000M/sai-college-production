@@ -11,12 +11,6 @@ import { Cms } from "./Cms";
 import { AcademicAffairs } from "./academics/AcademicAffairs";
 import { QrAttendance } from "./academics/QrAttendance";
 import { Timetable } from "./academics/Timetable";
-import { HandwritingLab } from "./labs/HandwritingLab";
-import { ListeningLab } from "./labs/ListeningLab";
-import { ReadingLab } from "./labs/ReadingLab";
-import { ReviewLab } from "./labs/ReviewLab";
-import { SpeakingLab } from "./labs/SpeakingLab";
-import { TonesLab } from "./labs/TonesLab";
 import { VocabularyPage } from "./vocabulary/VocabularyPage";
 import { NotificationsPage } from "./Notifications";
 import { Library } from "./Library";
@@ -53,18 +47,19 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   if (item.id === "admissions") return <Admissions roles={roles} userId={userId} />;
   if (item.id === "scanner") return <Scanner roles={roles} />;
   if (item.id === "attendance") return <Attendance roles={roles} userId={userId} />;
-  if (item.id === "courses") return <Learning key={`courses:${userId}`} view="courses" roles={roles} />;
-  if (item.id === "homework") return <Learning key={`homework:${userId}`} view="homework" roles={roles} />;
-  if (item.id === "progress") return <Learning key={`progress:${userId}`} view="progress" roles={roles} />;
+  if (item.id === "courses") return <Learning key={`courses:${userId}`} view="courses" roles={roles} userId={userId} />;
+  if (item.id === "homework") return <Learning key={`homework:${userId}`} view="homework" roles={roles} userId={userId} />;
+  if (item.id === "progress") return <Learning key={`progress:${userId}`} view="progress" roles={roles} userId={userId} />;
   if (item.id === "timetable") return <Timetable />;
   if (item.id === "academics") return <AcademicAffairs />;
   if (item.id === "qr") return <QrAttendance />;
-  if (item.id === "listening") return <ListeningLab />;
-  if (item.id === "speaking") return <SpeakingLab />;
-  if (item.id === "tones") return <TonesLab />;
-  if (item.id === "handwriting") return <HandwritingLab />;
-  if (item.id === "reading") return <ReadingLab />;
-  if (item.id === "review") return <ReviewLab />;
+  if (["listening", "speaking", "tones", "handwriting", "reading", "review"].includes(item.id)) {
+    return <main className="workspace"><section className="panel">
+      <h1>{item.label}</h1>
+      <p>هذا التدريب غير متاح حالياً؛ المحتوى أو التقييم الموثوق غير مربوط بعد.</p>
+      <Link to="/portal/modules/courses">العودة إلى الدروس المنشورة</Link>
+    </section></main>;
+  }
   if (item.id === "vocabulary") return <VocabularyPage roles={roles} />;
   if (item.id === "notifications") return <NotificationsPage roles={roles} />;
   if (item.id === "library") return <Library roles={roles} userId={userId} />;

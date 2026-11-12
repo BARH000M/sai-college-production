@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   loadVocabularyWorkspace, vocabularySummary, wordStatus,
   type VocabularyProgress, type VocabularyProgressStatus, type VocabularyWorkspace,
@@ -13,26 +14,29 @@ type Tab = "bank" | "cards" | "lessons";
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export function VocabularyPage({ roles }: { roles: readonly string[] }) {
+  const [params] = useSearchParams();
   const [data, setData] = useState<VocabularyWorkspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [tab, setTab] = useState<Tab>("bank");
   const [search, setSearch] = useState("");
-  const [courseId, setCourseId] = useState("");
+  const [courseId, setCourseId] = useState(() => params.get("course") ?? "");
   const [lessonId, setLessonId] = useState("");
   const [printLessonId, setPrintLessonId] = useState("");
+  const studentOnly = roles.includes("student") && !roles.some((role) =>
+    ["super_admin", "admin", "teacher", "content_editor"].includes(role));
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
-    void loadVocabularyWorkspace()
+    void loadVocabularyWorkspace(studentOnly)
       .then((workspace) => { if (active) setData(workspace); })
       .catch((failure: unknown) => { if (active) { setData(null); setError(errorText(failure)); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [retry]);
+  }, [retry, studentOnly]);
 
   const isLearner = roles.includes("student") || roles.includes("parent");
   const words = useMemo(() => data?.words ?? [], [data]);
@@ -99,7 +103,7 @@ export function VocabularyPage({ roles }: { roles: readonly string[] }) {
   return <LabPage
     eyebrow="تعلم اللغة الصينية"
     title="بنك المفردات والبطاقات"
-    intro="مفردات مرتبطة بدروس المقررات، مع بطاقات مراجعة تُسجّل ما أتقنته وتعيد المفردات الصعبة إلى قائمتك."
+    intro="مفردات مرتبطة بالمقررات وبطاقات للمراجعة الذاتية؛ التصنيف ليس تقييماً للإتقان."
     badge={`${words.length} مفردة`}
   >
     {loading && <p className="muted" role="status">جارٍ تحميل بنك المفردات...</p>}
@@ -109,7 +113,7 @@ export function VocabularyPage({ roles }: { roles: readonly string[] }) {
       <LabStats items={[
         { label: "مفردات البنك", value: String(words.length), detail: "متاحة لحسابك" },
         { label: "مرتبطة بدروس", value: String(summary.linked), detail: "داخل المقررات" },
-        { label: "أتقنتها", value: learnerId ? String(summary.known) : "—", detail: learnerId ? `من ${words.length} مفردة` : "يتطلب حساب طالب" },
+        { label: "أتذكرها ذاتياً", value: learnerId ? String(summary.known) : "—", detail: learnerId ? `من ${words.length} مفردة` : "يتطلب حساب طالب" },
         { label: "قيد المراجعة", value: learnerId ? String(summary.learning) : "—", detail: learnerId ? "بحاجة إلى تثبيت" : "يتطلب حساب طالب" },
       ]} />
 

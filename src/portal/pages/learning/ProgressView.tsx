@@ -27,9 +27,13 @@ export function ProgressView({ scope }: { scope: LearningScope }) {
         workspace.homework.filter((item) => item.course_id === course.id).map((item) => item.id),
       );
       const submissions = workspace.submissions.filter((row) => homeworkIds.has(row.homework_id));
-      const graded = submissions.filter((row) => row.status === "graded");
-      const average = graded.length
-        ? Math.round(graded.reduce((total, row) => total + (row.score ?? 0), 0) / graded.length)
+      const graded = submissions.filter((row) => row.status === "graded" && row.score !== null);
+      const percentages = graded.flatMap((row) => {
+        const homework = workspace.homework.find((item) => item.id === row.homework_id);
+        return homework && homework.max_score > 0 && row.score !== null ? [row.score / homework.max_score * 100] : [];
+      });
+      const average = percentages.length
+        ? Math.round(percentages.reduce((total, score) => total + score, 0) / percentages.length)
         : null;
       return {
         course, className: cls?.name ?? "—", program: cls?.program ?? "—",
@@ -64,10 +68,9 @@ export function ProgressView({ scope }: { scope: LearningScope }) {
       }))
     : [];
 
-  const gradedScores = learnerHomework
-    .map((entry) => entry.submission)
-    .filter((row) => row && row.status === "graded" && row.score !== null)
-    .map((row) => row?.score ?? 0);
+  const gradedScores = learnerHomework.flatMap(({ item, submission }) =>
+    submission?.status === "graded" && submission.score !== null && item.max_score > 0
+      ? [submission.score / item.max_score * 100] : []);
   const averageScore = gradedScores.length
     ? Math.round(gradedScores.reduce((total, score) => total + score, 0) / gradedScores.length)
     : null;
@@ -84,15 +87,13 @@ export function ProgressView({ scope }: { scope: LearningScope }) {
   return <>
     <section className="panel">
       <h2>{mode === "staff" ? "تقدم الصفوف في المقررات" : "التقدم في كل مقرر"}</h2>
-      <p className="data-note">{mode === "staff"
-        ? "نسبة الإنجاز محسوبة من عدد الدروس المكتملة مقابل عدد الطلبة في الصف."
-        : "نسبة الإنجاز تعتمد على الدروس التي سجّلتها كمكتملة."}</p>
+      <p className="data-note">حالات الإكمال القديمة قد تكون مسجلة ذاتياً وغير متحققة، ولا تمثل إنجازاً معتمداً.</p>
       <div className="table-scroll">
         <table className="management-table">
           <thead><tr>
             <th>المقرر</th><th>الصف</th><th>الدروس</th>
             {mode === "staff" ? <><th>الطلبة</th><th>متوسط الدرجات</th></> : <th>الحالة</th>}
-            <th>نسبة الإنجاز</th><th>الخطوة التالية</th>
+            <th>نسبة الحالات السابقة</th><th>الخطوة التالية</th>
           </tr></thead>
           <tbody>
             {rows.map((row) => <tr key={row.course.id}>
@@ -106,7 +107,7 @@ export function ProgressView({ scope }: { scope: LearningScope }) {
                 <div className="learn-bar" aria-hidden="true"><span style={{ width: `${row.percent}%` }} /></div>
                 <small className="learn-meta">{row.percent}%</small>
               </td>
-              <td>{mode === "staff" ? row.detail : row.next ?? "أكملت جميع دروس المقرر"}</td>
+              <td>{mode === "staff" ? row.detail : row.next ?? "لا توجد حالة أخرى مسجلة"}</td>
             </tr>)}
           </tbody>
         </table>
@@ -136,7 +137,7 @@ export function ProgressView({ scope }: { scope: LearningScope }) {
 
     {mode === "learner" && learner && <section className="panel">
       <h2>ملخص الدروس</h2>
-      <p className="data-note">تُحدَّث حالة الدروس عند تحديدها من صفحة المقررات.</p>
+      <p className="data-note">الإكمال معطل حتى يتوفر تقييم موثوق على الخادم.</p>
       <div className="table-scroll">
         <table className="management-table">
           <thead><tr><th>الدرس</th><th>المقرر</th><th>الحالة</th></tr></thead>

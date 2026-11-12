@@ -82,7 +82,7 @@ export function Flashcards({ words, progress, learnerId, onSaved }: {
     <div className="page-heading">
       <div>
         <h2>بطاقات المراجعة</h2>
-        <p className="data-note">اقلب البطاقة لكشف المعنى ثم صنّفها. تُحفظ قراراتك في سجل الطالب.</p>
+        <p className="data-note">اقلب البطاقة لكشف المعنى ثم صنّفها ذاتياً. هذا ليس تقييماً للإتقان.</p>
       </div>
       <button className="button secondary" type="button" onClick={shuffle}><i className="ri-shuffle-line" aria-hidden="true"></i> خلط البطاقات</button>
     </div>
@@ -100,10 +100,10 @@ export function Flashcards({ words, progress, learnerId, onSaved }: {
       <h2>أكملت المجموعة</h2>
       <p className="muted">راجعت {words.length} بطاقة في هذه الجلسة.</p>
       <div className="review-result-grid">
-        <div><span>أتقنتها</span><strong>{tally.known}</strong></div>
+        <div><span>أتذكرها ذاتياً</span><strong>{tally.known}</strong></div>
         <div><span>تحتاج مراجعة</span><strong>{tally.learning}</strong></div>
         <div><span>إجمالي المجموعة</span><strong>{words.length}</strong></div>
-        <div><span>نسبة الإتقان</span><strong>{Math.round((tally.known / words.length) * 100)}%</strong></div>
+        <div><span>نسبة التذكر الذاتي</span><strong>{Math.round((tally.known / words.length) * 100)}%</strong></div>
       </div>
       <button className="button primary" type="button" onClick={shuffle}><i className="ri-refresh-line" aria-hidden="true"></i> جلسة جديدة</button>
     </div> : <div className="flash-stage">
@@ -134,11 +134,11 @@ export function Flashcards({ words, progress, learnerId, onSaved }: {
           <i className="ri-refresh-line" aria-hidden="true"></i> تحتاج مراجعة
         </button>
         <button className="button primary" type="button" onClick={() => mark("known")} disabled={busy || !flipped}>
-          <i className="ri-check-line" aria-hidden="true"></i> أتقنتها
+          <i className="ri-check-line" aria-hidden="true"></i> أتذكرها
         </button>
       </div>
       <div className="flash-tally">
-        <span><i className="ri-checkbox-circle-line" aria-hidden="true"></i> {tally.known} متقنة</span>
+        <span><i className="ri-checkbox-circle-line" aria-hidden="true"></i> {tally.known} أتذكرها ذاتياً</span>
         <span><i className="ri-time-line" aria-hidden="true"></i> {tally.learning} للمراجعة</span>
         <button className="text-button" type="button" onClick={() => setFlipped((value) => !value)} disabled={!word}>
           {flipped ? "إخفاء المعنى" : "كشف المعنى"}
