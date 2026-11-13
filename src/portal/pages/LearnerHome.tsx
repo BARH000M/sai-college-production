@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  daysUntil, formatDate, loadLearningWorkspace, submissionStatusLabels, summarizeProgress,
+  daysUntil, formatDate, loadLearningWorkspace, statusForLesson, submissionStatusLabels, summarizeProgress,
   type LearningWorkspace,
 } from "@/portal/lib/learning";
+import { loadParentChildren, loadStudentRecord } from "../lib/home";
+import { PersonalAttendancePanel } from "./home/PersonalAttendancePanel";
 
 type State =
   | { status: "loading"; data: null; error: null }
@@ -28,8 +30,20 @@ export function LearnerHome({ roles, userId }: { roles: readonly string[]; userI
   useEffect(() => {
     let active = true;
     setState({ status: "loading", data: null, error: null });
-    loadLearningWorkspace(true, isStudent ? userId : undefined)
-      .then((data) => { if (active) setState({ status: "ready", data, error: null }); })
+    Promise.all([
+      loadLearningWorkspace(true, isStudent ? userId : undefined),
+      isStudent ? loadStudentRecord(userId) : loadParentChildren(userId),
+    ])
+      .then(([data, personalRecords]) => {
+        if (!active) return;
+        const allowedIds = new Set((Array.isArray(personalRecords) ? personalRecords : personalRecords ? [personalRecords] : [])
+          .map((record) => record.id));
+        setState({
+          status: "ready",
+          data: { ...data, students: data.students.filter((student) => allowedIds.has(student.id)) },
+          error: null,
+        });
+      })
       .catch((error: unknown) => { if (active) setState({ status: "error", data: null, error: message(error) }); });
     return () => { active = false; };
   }, [version, isStudent, userId]);
@@ -93,6 +107,22 @@ export function LearnerHome({ roles, userId }: { roles: readonly string[]; userI
     .filter((row) => row.submission?.status === "graded" && row.submission.score !== null)
     .sort((a, b) => new Date(b.submission?.graded_at ?? 0).getTime() - new Date(a.submission?.graded_at ?? 0).getTime())
     .slice(0, 6);
+  const courseIds = new Set(courses.map((course) => course.id));
+  const recentProgress = learner && workspace
+    ? workspace.progress.filter((row) => row.student_id === learner.id
+      && workspace.lessons.some((lesson) => lesson.id === row.lesson_id && courseIds.has(lesson.course_id)))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+      .slice(0, 5)
+    : [];
+  const continueLesson = learner && workspace
+    ? workspace.lessons
+      .filter((lesson) => courseIds.has(lesson.course_id) && statusForLesson(workspace.progress, lesson.id, learner.id) === "in_progress")
+      .sort((a, b) => {
+        const aTime = workspace.progress.find((row) => row.lesson_id === a.id && row.student_id === learner.id)?.updated_at ?? "";
+        const bTime = workspace.progress.find((row) => row.lesson_id === b.id && row.student_id === learner.id)?.updated_at ?? "";
+        return bTime.localeCompare(aTime);
+      })[0] ?? null
+    : null;
 
   const gradedPercentages = gradedRows
     .filter((row) => row.item.max_score > 0 && row.submission?.score != null)
@@ -173,25 +203,32 @@ export function LearnerHome({ roles, userId }: { roles: readonly string[]; userI
     {learner && <div className="learner-links">
       <Link className="button primary" to="/portal/modules/courses">فتح المقررات</Link>
       <Link className="button secondary" to="/portal/modules/homework">الواجبات</Link>
+      <a className="button secondary" href={`#personal-attendance-${learner.id}`}>الحضور الشخصي</a>
       <Link className="button secondary" to="/portal/modules/progress">التقدم والأداء</Link>
       <Link className="button secondary" to="/portal/modules/notifications">الإشعارات</Link>
     </div>}
+    {continueLesson && workspace && <section className="panel learn-continue-card">
+      <div>
+        <p className="eyebrow">استئناف التعلّم</p>
+        <h2>{continueLesson.title}</h2>
+        <p className="muted">{workspace.courses.find((course) => course.id === continueLesson.course_id)?.title ?? "المقرر"}</p>
+        <p className="data-note">استناداً إلى حالة قيد الدراسة المسجلة؛ هذه الحالة غير متحققة كإتقان.</p>
+      </div>
+      <Link className="button primary"
+        to={`/portal/modules/courses?course=${encodeURIComponent(continueLesson.course_id)}&lesson=${encodeURIComponent(continueLesson.id)}`}>
+        متابعة الدرس
+      </Link>
+    </section>}
 
-    {learner && <nav className="learner-links lab-skill-links" aria-label="تدريب مهارات اللغة الصينية">
-      <span className="lab-meta">تدريب المهارات:</span>
-      <Link className="button secondary" to="/portal/modules/listening">الاستماع</Link>
-      <Link className="button secondary" to="/portal/modules/speaking">التحدث والنطق</Link>
-      <Link className="button secondary" to="/portal/modules/tones">النغمات</Link>
+    {learner && <div className="learner-links">
       <Link className="button secondary" to="/portal/modules/vocabulary">المفردات والبطاقات</Link>
-      <Link className="button secondary" to="/portal/modules/handwriting">الكتابة اليدوية</Link>
-      <Link className="button secondary" to="/portal/modules/reading">القراءة</Link>
-      <Link className="button secondary" to="/portal/modules/review">المراجعة المتباعدة</Link>
-    </nav>}
+    </div>}
 
     {learner && !courses.length && <section className="panel learn-empty">
       <h2>لم تُسجَّل مقررات لصفك بعد</h2>
       <p className="muted">سيظهر هنا المقرر فور إضافته من إدارة الأكاديمية إلى صفك الدراسي.</p>
     </section>}
+    {learner && <PersonalAttendancePanel studentId={learner.id} />}
 
     {learner && !!courses.length && <div className="learner-grid">
       <section className="panel">
@@ -212,6 +249,19 @@ export function LearnerHome({ roles, userId }: { roles: readonly string[]; userI
       </section>
 
       <div className="learner-side">
+        <section className="panel">
+          <h2>سجل التعلّم الأخير</h2>
+          <p className="data-note">النشاط يعكس حالات التقدم المسجلة فقط، ولا يثبت الإتقان.</p>
+          {!recentProgress.length
+            ? <p className="muted">لا توجد أحداث تعلّم مسجلة بعد.</p>
+            : <ul className="home-session-list">{recentProgress.map((row) => {
+              const lesson = workspace?.lessons.find((item) => item.id === row.lesson_id);
+              return <li key={`${row.lesson_id}:${row.updated_at}`}>
+                <span>{lesson?.title ?? "درس غير معروف"}</span>
+                <small>{formatDate(row.updated_at)} · {row.status === "in_progress" ? "قيد الدراسة" : row.status === "completed" ? "إكمال سابق غير متحقق" : "لم يبدأ"}</small>
+              </li>;
+            })}</ul>}
+        </section>
         <section className="panel">
           <h2>واجبات مستحقة</h2>
           {!upcoming.length

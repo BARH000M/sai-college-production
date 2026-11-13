@@ -22,12 +22,11 @@ export function financePermissions(roles: readonly string[]) {
   const superAdmin = roles.includes("super_admin");
   const accountant = roles.includes("accountant");
   const admin = roles.includes("admin");
-  const receptionist = roles.includes("receptionist");
   return {
-    view: superAdmin || accountant || admin || receptionist || roles.includes("student") || roles.includes("parent"),
+    view: superAdmin || accountant || admin || roles.includes("student") || roles.includes("parent"),
     manageGroups: superAdmin || accountant || admin,
     assignFees: superAdmin || accountant || admin,
-    postPayment: superAdmin || accountant || admin || receptionist,
+    postPayment: superAdmin || accountant || admin,
     waive: superAdmin || accountant,
     void: superAdmin || accountant,
     refund: superAdmin,

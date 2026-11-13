@@ -12,7 +12,16 @@ void main() {
       for (final p in [PageId.staff, PageId.admissions, PageId.reports]) {
         expect(Access.allows({r}, p), false);
       }
+      expect(Access.allows({r}, PageId.classes), false);
+      expect(Access.allows({r}, PageId.attendance), false);
     }
+  });
+  test('Teachers use assigned-class access; reception remains front-office scoped', () {
+    expect(Access.allows({Role.teacher}, PageId.classes), true);
+    expect(Access.allows({Role.teacher}, PageId.admissions), false);
+    expect(Access.allows({Role.receptionist}, PageId.classes), false);
+    expect(Access.allows({Role.receptionist}, PageId.admissions), true);
+    expect(Access.allows({Role.receptionist}, PageId.finance), false);
   });
   test('Multiple roles give union of allowed destinations', () {
     expect(Access.allows({Role.librarian}, PageId.finance), false);

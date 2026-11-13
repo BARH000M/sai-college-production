@@ -31,9 +31,40 @@ export type DirectoryUser = {
   profileMissing: boolean;
 };
 
+export type SuperAdminSummary = {
+  totalUsers: number;
+  emailConfirmedUsers: number;
+  pendingEmailConfirmation: number;
+  bannedUsers: number;
+  usersWithoutRoles: number;
+  totalProfiles: number;
+  totalRoleAssignments: number;
+  teachers: number;
+  students: number;
+  activeStudents: number;
+  studentsWithoutAccounts: number;
+  activeClasses: number;
+  activeClassesWithoutTeachers: number;
+  branches: number;
+  academicSessions: number;
+  courses: number;
+  activeCourses: number;
+  lessons: number;
+  publishedLessons: number;
+  lessonsWithAssetPaths: number;
+  lessonsMissingContent: number;
+  activeEnrollments: number;
+  lessonProgressInProgress: number;
+  legacyCompletedProgress: number;
+  homeworkSubmissionsPendingReview: number;
+  homeworkSubmissionsGraded: number;
+  pendingAdmissions: number;
+};
+
 type FunctionResponse = {
   ok?: boolean;
   users?: DirectoryUser[];
+  summary?: SuperAdminSummary;
   message?: string;
 };
 
@@ -55,6 +86,12 @@ export async function loadDirectoryUsers(): Promise<DirectoryUser[]> {
   } catch (error) {
     throw new Error(failureMessage(error));
   }
+}
+
+export async function loadSuperAdminSummary(): Promise<SuperAdminSummary> {
+  const data = await call({ action: "summary" });
+  if (!data.summary) throw new Error("استجابة ملخص الإدارة العامة غير مكتملة.");
+  return data.summary;
 }
 
 export async function changeUserRole(userId: string, role: AssignableRole, grant: boolean): Promise<void> {

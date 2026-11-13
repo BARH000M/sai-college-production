@@ -25,14 +25,14 @@ export const navigation: readonly NavigationItem[] = [
   { id: "home", label: "الرئيسية", icon: "ri-home-5-line", roles: allRoles },
   { id: "profile", label: "ملفي الشخصي", icon: "ri-user-3-line", roles: allRoles },
   { id: "notifications", label: "مركز الإشعارات", icon: "ri-notification-3-line", roles: allRoles },
-  { id: "admissions", label: "القبول والتسجيل", icon: "ri-user-add-line", roles: ["super_admin", "admin", "receptionist", "teacher"] },
+  { id: "admissions", label: "القبول والتسجيل", icon: "ri-user-add-line", roles: ["super_admin", "admin", "receptionist"] },
   { id: "scanner", label: "ماسح إيصالات القبول", icon: "ri-qr-scan-2-line", roles: ["super_admin", "admin", "receptionist"] },
-  { id: "students", label: "سجلات الطلاب", icon: "ri-group-line", roles: ["super_admin", "admin", "teacher", "receptionist", "parent", "student"] },
-  { id: "classes", label: "الصفوف", icon: "ri-building-4-line", roles: ["super_admin", "admin", "teacher", "student", "parent"] },
+  { id: "students", label: "سجلات الطلاب", icon: "ri-group-line", roles: ["super_admin", "admin", "receptionist"] },
+  { id: "classes", label: "الصفوف", icon: "ri-building-4-line", roles: ["super_admin", "admin"] },
   { id: "academics", label: "الشؤون الأكاديمية", icon: "ri-book-2-line", roles: ["super_admin", "admin", "teacher"] },
   { id: "timetable", label: "الجداول والتقويم", icon: "ri-calendar-2-line", roles: ["super_admin", "admin", "teacher", "student", "parent", "receptionist"] },
   { id: "qr", label: "الحضور بالرمز QR", icon: "ri-qr-code-line", roles: ["super_admin", "admin", "teacher", "receptionist", "student"] },
-  { id: "attendance", label: "الحضور والمتابعة", icon: "ri-calendar-check-line", roles: ["super_admin", "admin", "teacher", "receptionist", "student", "parent"] },
+  { id: "attendance", label: "الحضور والمتابعة", icon: "ri-calendar-check-line", roles: ["super_admin", "admin", "teacher", "receptionist"] },
   { id: "courses", label: "المقررات والدروس", icon: "ri-file-list-3-line", roles: ["super_admin", "admin", "teacher", "student", "parent", "content_editor"] },
   { id: "listening", label: "الاستماع", icon: "ri-headphone-line", roles: ["super_admin", "admin", "teacher", "student", "content_editor"] },
   { id: "speaking", label: "التحدث والنطق", icon: "ri-mic-line", roles: ["super_admin", "admin", "teacher", "student", "content_editor"] },
@@ -51,7 +51,7 @@ export const navigation: readonly NavigationItem[] = [
   { id: "staff", label: "شؤون الموظفين", icon: "ri-team-line", roles: ["super_admin", "admin", "teacher", "accountant", "receptionist", "librarian", "content_editor"] },
   { id: "reception", label: "الاستقبال", icon: "ri-customer-service-2-line", roles: ["super_admin", "admin", "receptionist"] },
   { id: "library", label: "المكتبة", icon: "ri-book-shelf-line", roles: ["super_admin", "admin", "librarian", "teacher", "parent", "student"] },
-  { id: "finance", label: "الرسوم والمالية", icon: "ri-money-dollar-circle-line", roles: ["super_admin", "admin", "accountant", "receptionist", "parent", "student"] },
+  { id: "finance", label: "الرسوم والمالية", icon: "ri-money-dollar-circle-line", roles: ["super_admin", "admin", "accountant", "parent", "student"] },
   { id: "communications", label: "التواصل والإعلانات", icon: "ri-mail-line", roles: allRoles },
   { id: "branches", label: "الفروع والجلسات", icon: "ri-map-pin-2-line", roles: ["super_admin", "admin"] },
   { id: "sessions", label: "الجلسات الأكاديمية", icon: "ri-calendar-todo-line", roles: ["super_admin", "admin"] },
@@ -67,6 +67,7 @@ export const navigation: readonly NavigationItem[] = [
   { id: "frontCms", label: "صفحات Front CMS", icon: "ri-pages-line", roles: ["super_admin","admin","content_editor"] },
   { id: "alumni", label: "الخريجون", icon: "ri-graduation-cap-line", roles: ["super_admin","admin","receptionist"] },
   { id: "settings", label: "إعدادات النظام", icon: "ri-settings-3-line", roles: ["super_admin","admin"] },
+  { id: "systemCatalog", label: "جرد النظام والوحدات", icon: "ri-list-check-2", roles: ["super_admin"] },
 ];
 
 /**
@@ -77,9 +78,8 @@ export const navigation: readonly NavigationItem[] = [
 const availableModuleIds: readonly string[] = [
   "home", "profile", "notifications", "branches", "sessions", "classes", "students", "admissions", "scanner",
   "courses", "homework", "progress", "attendance", "roles", "reports", "cms",
-  "academics", "timetable", "qr", "listening", "speaking", "tones", "vocabulary",
-  "handwriting", "reading", "review", "library", "communications", "finance",
-  "settings",
+  "academics", "timetable", "qr", "vocabulary", "library", "communications", "finance",
+  "settings", "systemCatalog",
 ];
 
 export function isAppRole(value: string): value is AppRole {
@@ -90,6 +90,11 @@ export function isModuleAvailable(id: string): boolean {
   return availableModuleIds.includes(id);
 }
 
+export function canAccessModule(id: string, roles: readonly string[]): boolean {
+  const item = navigation.find((entry) => entry.id === id);
+  return !!item && item.roles.some((role) => roles.includes(role));
+}
+
 export function modulePath(item: NavigationItem): string {
   if (item.id === "home") return "/portal/dashboard";
   if (item.id === "profile") return "/portal/profile";
@@ -97,7 +102,7 @@ export function modulePath(item: NavigationItem): string {
 }
 
 export function visibleNavigation(roles: readonly string[]): NavigationItem[] {
-  return navigation.filter((item) => isModuleAvailable(item.id) && item.roles.some((role) => roles.includes(role)));
+  return navigation.filter((item) => isModuleAvailable(item.id) && canAccessModule(item.id, roles));
 }
 
 /**
@@ -121,6 +126,12 @@ export const pendingModules: readonly { id: string; label: string; reason: strin
   { id: "certificates", label: "الشهادات", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
   { id: "frontCms", label: "صفحات Front CMS", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
   { id: "alumni", label: "الخريجون", reason: "ينتظر اعتماد وتطبيق مخطط الجداول 029." },
+  { id: "listening", label: "الاستماع", reason: "لا توجد شاشة تدريب مكتملة؛ المحتوى الصوتي يُعرض فقط إذا أُضيف إلى درس منشور." },
+  { id: "speaking", label: "التحدث والنطق", reason: "لا يوجد تسجيل أو تقييم نطق موثوق في الخلفية الحالية." },
+  { id: "tones", label: "النغمات الصينية", reason: "لا يوجد مسار تدريب وتقييم للنغمات مرتبط بنتائج الطالب." },
+  { id: "handwriting", label: "الكتابة اليدوية", reason: "لا توجد أداة كتابة أو حفظ وتقييم لمحاولات الطالب." },
+  { id: "reading", label: "القراءة", reason: "لا توجد شاشة قراءة مستقلة أو تتبع جلسة قراءة." },
+  { id: "review", label: "المراجعة المتباعدة", reason: "لا توجد جدولة مراجعة شخصية أو سجل استدعاء موثوق." },
 ] as const;
 
 export function isModulePending(id: string): boolean {

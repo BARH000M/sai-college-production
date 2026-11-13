@@ -36,6 +36,141 @@ type AccountRow = {
   profileMissing: boolean;
 };
 
+type DashboardSummary = {
+  totalUsers: number;
+  emailConfirmedUsers: number;
+  pendingEmailConfirmation: number;
+  bannedUsers: number;
+  usersWithoutRoles: number;
+  totalProfiles: number;
+  totalRoleAssignments: number;
+  teachers: number;
+  students: number;
+  activeStudents: number;
+  studentsWithoutAccounts: number;
+  activeClasses: number;
+  activeClassesWithoutTeachers: number;
+  branches: number;
+  academicSessions: number;
+  courses: number;
+  activeCourses: number;
+  lessons: number;
+  publishedLessons: number;
+  lessonsWithAssetPaths: number;
+  lessonsMissingContent: number;
+  activeEnrollments: number;
+  lessonProgressInProgress: number;
+  legacyCompletedProgress: number;
+  homeworkSubmissionsPendingReview: number;
+  homeworkSubmissionsGraded: number;
+  pendingAdmissions: number;
+};
+
+async function loadDashboardSummary(admin: ReturnType<typeof createClient>): Promise<DashboardSummary> {
+  const accounts: { id: string; hasEmail: boolean; emailConfirmed: boolean; banned: boolean }[] = [];
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw new Error(error.message);
+    const batch = data?.users ?? [];
+    for (const user of batch) {
+      accounts.push({
+        id: user.id,
+        hasEmail: !!user.email,
+        emailConfirmed: !!user.email_confirmed_at,
+        banned: !!user.banned_until && Date.parse(user.banned_until) > Date.now(),
+      });
+    }
+    if (batch.length < 200) break;
+  }
+
+  const countQueries = {
+    profiles: admin.from("profiles").select("id", { count: "exact", head: true }),
+    roles: admin.from("user_roles").select("user_id", { count: "exact", head: true }),
+    teachers: admin.from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "teacher"),
+    students: admin.from("students").select("id", { count: "exact", head: true }),
+    activeStudents: admin.from("students").select("id", { count: "exact", head: true }).eq("status", "active"),
+    studentsWithoutAccounts: admin.from("students").select("id", { count: "exact", head: true }).is("user_id", null),
+    activeClasses: admin.from("classes").select("id", { count: "exact", head: true }).eq("is_active", true),
+    activeClassesWithoutTeachers: admin.from("classes").select("id", { count: "exact", head: true })
+      .eq("is_active", true).is("teacher_id", null),
+    branches: admin.from("branches").select("id", { count: "exact", head: true }),
+    academicSessions: admin.from("academic_sessions").select("id", { count: "exact", head: true }),
+    courses: admin.from("learning_courses").select("id", { count: "exact", head: true }),
+    activeCourses: admin.from("learning_courses").select("id", { count: "exact", head: true }).eq("is_active", true),
+    lessons: admin.from("learning_lessons").select("id", { count: "exact", head: true }),
+    publishedLessons: admin.from("learning_lessons").select("id", { count: "exact", head: true }).eq("is_published", true),
+    lessonsWithAssetPaths: admin.from("learning_lessons").select("id", { count: "exact", head: true }).not("content_path", "is", null),
+    lessonsMissingContent: admin.from("learning_lessons").select("id", { count: "exact", head: true })
+      .eq("content_kind", "none").is("content_body", null).is("content_url", null).is("content_path", null),
+    activeEnrollments: admin.from("students").select("id", { count: "exact", head: true })
+      .eq("status", "active").not("class_id", "is", null),
+    lessonProgressInProgress: admin.from("learning_lesson_progress").select("lesson_id", { count: "exact", head: true })
+      .eq("status", "in_progress"),
+    legacyCompletedProgress: admin.from("learning_lesson_progress").select("lesson_id", { count: "exact", head: true })
+      .eq("status", "completed"),
+    homeworkSubmissionsPendingReview: admin.from("learning_homework_submissions")
+      .select("id", { count: "exact", head: true }).eq("status", "submitted"),
+    homeworkSubmissionsGraded: admin.from("learning_homework_submissions")
+      .select("id", { count: "exact", head: true }).eq("status", "graded"),
+    pendingAdmissions: admin.from("admissions_enquiries").select("id", { count: "exact", head: true })
+      .eq("status", "new"),
+  };
+  const names = Object.keys(countQueries) as (keyof typeof countQueries)[];
+  const results = await Promise.all(Object.values(countQueries));
+  const counts = new Map<string, number>();
+  results.forEach((result, index) => {
+    if (result.error) throw new Error(`${names[index]}: ${result.error.message}`);
+    if (result.count === null) throw new Error(`${names[index]}: count was not returned`);
+    counts.set(names[index], result.count);
+  });
+
+  const roleUserIds = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await admin.from("user_roles").select("user_id").order("user_id").range(from, from + 999);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) roleUserIds.add(row.user_id);
+    if (!data || data.length < 1000) break;
+  }
+
+  const count = (key: string) => {
+    const value = counts.get(key);
+    if (value === undefined) throw new Error(`Missing dashboard count: ${key}`);
+    return value;
+  };
+  const confirmed = accounts.filter((account) => account.emailConfirmed).length;
+  const pendingEmail = accounts.filter((account) => account.hasEmail && !account.emailConfirmed).length;
+
+  return {
+    totalUsers: accounts.length,
+    emailConfirmedUsers: confirmed,
+    pendingEmailConfirmation: pendingEmail,
+    bannedUsers: accounts.filter((account) => account.banned).length,
+    usersWithoutRoles: accounts.filter((account) => !roleUserIds.has(account.id)).length,
+    totalProfiles: count("profiles"),
+    totalRoleAssignments: count("roles"),
+    teachers: count("teachers"),
+    students: count("students"),
+    activeStudents: count("activeStudents"),
+    studentsWithoutAccounts: count("studentsWithoutAccounts"),
+    activeClasses: count("activeClasses"),
+    activeClassesWithoutTeachers: count("activeClassesWithoutTeachers"),
+    branches: count("branches"),
+    academicSessions: count("academicSessions"),
+    courses: count("courses"),
+    activeCourses: count("activeCourses"),
+    lessons: count("lessons"),
+    publishedLessons: count("publishedLessons"),
+    lessonsWithAssetPaths: count("lessonsWithAssetPaths"),
+    lessonsMissingContent: count("lessonsMissingContent"),
+    activeEnrollments: count("activeEnrollments"),
+    lessonProgressInProgress: count("lessonProgressInProgress"),
+    legacyCompletedProgress: count("legacyCompletedProgress"),
+    homeworkSubmissionsPendingReview: count("homeworkSubmissionsPendingReview"),
+    homeworkSubmissionsGraded: count("homeworkSubmissionsGraded"),
+    pendingAdmissions: count("pendingAdmissions"),
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: false, message: "Method not allowed" }, 405);
@@ -74,6 +209,14 @@ Deno.serve(async (req) => {
     body = {};
   }
   const action = typeof body.action === "string" ? body.action : "list";
+
+  if (action === "summary") {
+    try {
+      return json({ ok: true, summary: await loadDashboardSummary(admin) });
+    } catch (error) {
+      return json({ ok: false, message: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
 
   if (action === "list") {
     const accounts: { id: string; email: string; createdAt: string; fullName: string; emailConfirmed: boolean }[] = [];
