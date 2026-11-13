@@ -12,7 +12,7 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
   const learner = workspace.students.find((student) => student.id === learnerId) ?? null;
   const [params] = useSearchParams();
   const [selectedId, setSelectedId] = useState("");
-  const [openLessonId, setOpenLessonId] = useState("");
+  const [openLessonId, setOpenLessonId] = useState(params.get("lesson") ?? "");
 
   const courses = useMemo(() => (mode === "staff"
     ? workspace.courses

@@ -61,12 +61,7 @@ class Access {
       PageId.learning ||
       PageId.courses ||
       PageId.lesson => {Role.student, Role.teacher, Role.content_editor},
-      PageId.classes => {
-        Role.teacher,
-        Role.student,
-        Role.parent,
-        Role.receptionist,
-      },
+      PageId.classes => {Role.teacher},
       PageId.admissions => {Role.receptionist},
       PageId.finance => {Role.accountant, Role.student, Role.parent},
       PageId.library => {Role.librarian, Role.student, Role.parent, Role.teacher},
@@ -97,7 +92,7 @@ class Access {
         Role.librarian,
         Role.content_editor,
       },
-      PageId.attendance ||
+      PageId.attendance => {Role.teacher},
       PageId.schedule => {Role.teacher, Role.student, Role.parent},
       PageId.assignments => {Role.teacher, Role.student, Role.parent},
       PageId.content => {Role.content_editor},

@@ -5,6 +5,13 @@ export type AttendanceStatus = keyof typeof attendanceStatuses;
 export type AttendanceClass = { id: string; name: string; branch_id: string; academic_session_id: string; teacher_id: string | null };
 export type AttendanceSession = { id: string; branch_id: string; academic_session_id: string; class_id: string; attendance_date: string; status: "open" | "closed" | "cancelled" };
 export type AttendanceRecord = { id: string; student_id: string; status: AttendanceStatus; note: string | null };
+export type PersonalAttendanceItem = {
+  id: string;
+  attendanceDate: string;
+  status: AttendanceStatus;
+  note: string | null;
+};
+export type PersonalAttendance = { total: number; recent: PersonalAttendanceItem[] };
 export type RosterEntry = { student_id: string; full_name: string; record_id: string | null; attendance_status: AttendanceStatus | null; note: string | null };
 export type AttendanceFilters = { branch: string; session: string; classId: string; date: string; page: number };
 export const attendancePageSize = 25;
@@ -56,6 +63,35 @@ async function loadDirectory<T>(name: string, args: Record<string, string>, guar
 }
 export const loadAttendanceClasses = () => loadDirectory("sai_attendance_classes", {}, isAttendanceClass);
 export const loadAttendanceRoster = (id: string) => loadDirectory("sai_attendance_roster", { wanted_session: id }, isRosterEntry);
+
+export async function loadPersonalAttendance(studentId: string): Promise<PersonalAttendance> {
+  if (!studentId) throw new Error("تعذر تحديد سجل الطالب.");
+  const records = await supabase.from("attendance_records")
+    .select("id,attendance_session_id,status,note,marked_at", { count: "exact" })
+    .eq("student_id", studentId)
+    .order("marked_at", { ascending: false })
+    .range(0, 199);
+  if (records.error) throw new Error(records.error.message);
+  if (records.count === null || !records.data) throw new Error("تعذر تحميل سجل الحضور الشخصي.");
+
+  const rows = records.data as {
+    id: string; attendance_session_id: string; status: string; note: string | null; marked_at: string;
+  }[];
+  const sessionIds = Array.from(new Set(rows.map((row) => row.attendance_session_id)));
+  if (!sessionIds.length) return { total: records.count, recent: [] };
+
+  const sessions = await supabase.from("attendance_sessions")
+    .select("id,attendance_date")
+    .in("id", sessionIds);
+  if (sessions.error) throw new Error(sessions.error.message);
+  const dates = new Map((sessions.data ?? []).map((session) => [session.id, session.attendance_date]));
+  const recent = rows.flatMap((row) => {
+    const attendanceDate = dates.get(row.attendance_session_id);
+    if (!attendanceDate || !isAttendanceStatus(row.status)) return [];
+    return [{ id: row.id, attendanceDate, status: row.status, note: row.note }];
+  });
+  return { total: records.count, recent };
+}
 
 export async function loadAttendanceSessions(filters: AttendanceFilters, classIds?: string[]) {
   if (classIds && !classIds.length) return { rows: [], count: 0 };

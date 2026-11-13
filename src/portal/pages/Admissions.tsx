@@ -8,7 +8,7 @@ import { exportAdmissionHistoryCsv, exportAdmissionRosterCsv } from "../lib/admi
 import {
   admissionDraft, admissionStatuses, admissionsPageSize, applicationStatusUrl, assignAdmission, canManageAdmissions, isAdmissionStatus,
   loadAdmissionByReference, loadAdmissions, loadAdmissionHistory, loadAdmissionSessions, loadAdmissionStaff,
-  loadAdmissionStatusCounts, setAdmissionStatus, trackedStatuses,
+  enrollAdmission, loadAdmissionStatusCounts, setAdmissionStatus, trackedStatuses,
   notifyAdmissionStatusChange, saveAdmission, validateAdmission,
   type Admission, type AdmissionDraft, type AdmissionFilters, type AdmissionHistoryEntry, type AdmissionStatusCounts, type StaffOption, type TrackedStatus,
 } from "../lib/admissions";
@@ -267,18 +267,25 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
     setFilters((current) => ({ ...current, stale: next, status: next ? "new" : current.status, page: 0 }));
   }
   const statusLabel = (status: string) => admissionStatuses[status as keyof typeof admissionStatuses] ?? status;
-  const nextStatus = (status: string): "contacted" | "enrolled" | null => {
+  const nextStatus = (status: string): "contacted" | "assessment" | "accepted" | "enrolled" | null => {
     if (status === "new") return "contacted";
-    if (["contacted", "assessment", "accepted"].includes(status)) return "enrolled";
+    if (status === "contacted") return "assessment";
+    if (status === "assessment") return "accepted";
+    if (status === "accepted") return "enrolled";
     return null;
   };
-  async function quickStatus(row: Admission, status: "contacted" | "enrolled") {
+  async function quickStatus(row: Admission, status: "contacted" | "assessment" | "accepted" | "enrolled") {
     if (quickBusy) return;
     setQuickBusy(`${row.id}:${status}`);
     setError(null); setSuccess(null);
     try {
-      await setAdmissionStatus(row.id, status);
-      setSuccess(`تم تحديث الطلب ${row.application_no} إلى «${statusLabel(status)}».`);
+      if (status === "enrolled") {
+        const student = await enrollAdmission(row.id);
+        setSuccess(`تم إنشاء سجل الطالب ${student.admission_no} للطلب ${row.application_no}.`);
+      } else {
+        await setAdmissionStatus(row.id, status);
+        setSuccess(`تم تحديث الطلب ${row.application_no} إلى «${statusLabel(status)}».`);
+      }
       setRetry((value) => value + 1);
     } catch (failure) {
       setError(`تعذر تحديث الحالة: ${errorText(failure)}`);
@@ -325,6 +332,9 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
     const target = editing;
     try {
       await saveAdmission(draft, target?.id ?? null);
+      if (target && target.status !== draft.status) {
+        await setAdmissionStatus(target.id, draft.status);
+      }
       setEditing(undefined); setSelected(null); setSuccess("تم حفظ الطلب.");
       setRetry((value) => value + 1);
       if (target && target.status !== draft.status) {
@@ -448,7 +458,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
                   className="button primary quick-action"
                   disabled={!!quickBusy}
                   onClick={() => void quickStatus(row, step)}
-                >{step === "contacted" ? "تم التواصل" : "تسجيل"}</button> : <span className="muted">—</span>}
+                >{step === "contacted" ? "تم التواصل" : step === "assessment" ? "بدء التقييم" : step === "accepted" ? "قبول الطلب" : "تسجيل"}</button> : <span className="muted">—</span>}
               </td>
               <td><button className="button secondary" disabled={saving || editing !== undefined} onClick={() => setSelected(row)}>التفاصيل</button></td>
             </tr>;
@@ -540,7 +550,7 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
         <label>الجلسة<select required value={draft.academic_session_id} disabled={sessionLoading || !!sessionError} onChange={(e) => change("academic_session_id", e.target.value)}><option value="">اختر جلسة</option>{editing?.academic_session_id && !sessions.some((item) => item.id === editing.academic_session_id) && <option value={editing.academic_session_id}>الجلسة الحالية غير متاحة في القائمة</option>}{sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         {textFields.map((field) => <label key={field.key}>{field.label}{field.key === "notes" ? <textarea value={draft.notes} onChange={(e) => change("notes", e.target.value)} /> : <input required={field.key === "applicant_full_name"} type={field.key === "email" ? "email" : field.key === "phone" ? "tel" : "text"} value={draft[field.key]} onChange={(e) => change(field.key, e.target.value)} />}</label>)}
         <label>المسند إليه<select value={draft.assigned_to} disabled={staffLoading || !!staffError} onChange={(e) => change("assigned_to", e.target.value)}><option value="">غير مسند</option>{editing?.assigned_to && !staff.some((item) => item.user_id === editing.assigned_to) && <option value={editing.assigned_to}>الموظف الحالي غير متاح في القائمة</option>}{staff.map((person) => <option key={person.user_id} value={person.user_id}>{person.full_name}</option>)}</select></label>
-        {editing && <label>الحالة<select value={draft.status} onChange={(e) => { if (isAdmissionStatus(e.target.value)) change("status", e.target.value); }} >{Object.entries(admissionStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>}
+        {editing && <label>الحالة<select value={draft.status} disabled={editing.status === "enrolled"} onChange={(e) => { if (isAdmissionStatus(e.target.value)) change("status", e.target.value); }} >{Object.entries(admissionStatuses).filter(([id]) => id !== "enrolled" || editing.status === "enrolled").map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>}
         {formError && <p className="error-box" role="alert">{formError}</p>}
         <div className="actions"><button className="button primary" disabled={saving || staffLoading || !!staffError || optionsLoading || !!optionsError || sessionLoading || !!sessionError}>{saving ? "جارٍ الحفظ..." : "حفظ"}</button><button type="button" className="button secondary" disabled={saving} onClick={() => setEditing(undefined)}>إلغاء</button></div>
       </form>

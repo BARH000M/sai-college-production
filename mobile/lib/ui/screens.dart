@@ -11,6 +11,7 @@ import 'class_screens.dart';
 import 'components.dart';
 import 'learning_screens.dart';
 import 'live_courses.dart';
+import 'live_admissions.dart';
 import 'teacher_portal.dart';
 import 'live_academic.dart';
 import 'live_modules.dart';
@@ -57,7 +58,13 @@ const _favoritePages = <Role, List<PageId>>{
     PageId.reports,
     PageId.settings,
   ],
-  Role.admin: [PageId.courses, PageId.classes, PageId.staff, PageId.reports, PageId.settings],
+  Role.admin: [
+    PageId.courses,
+    PageId.classes,
+    PageId.staff,
+    PageId.reports,
+    PageId.settings,
+  ],
   Role.teacher: [
     PageId.classes,
     PageId.attendance,
@@ -106,8 +113,10 @@ class _CollegeShellState extends State<CollegeShell> {
   Set<Role> get roles => widget.account.roles;
   DemoWorkspace? get demo => widget.demo;
   bool can(PageId target) => Access.allows(roles, target);
-  bool get teacherOnly => roles.contains(Role.teacher) &&
-      !roles.contains(Role.admin) && !roles.contains(Role.super_admin);
+  bool get teacherOnly =>
+      roles.contains(Role.teacher) &&
+      !roles.contains(Role.admin) &&
+      !roles.contains(Role.super_admin);
   String get learnerId =>
       roles.contains(Role.student) || roles.contains(Role.parent)
       ? DemoSchool.studentId
@@ -394,10 +403,7 @@ class _CollegeShellState extends State<CollegeShell> {
                   leading: const Icon(Icons.logout, color: gold),
                   title: const Text(
                     'تسجيل الخروج',
-                    style: TextStyle(
-                      color: gold,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: gold, fontWeight: FontWeight.bold),
                   ),
                   onTap: working
                       ? null
@@ -419,14 +425,17 @@ class _CollegeShellState extends State<CollegeShell> {
     return switch (page) {
       PageId.home => home(),
       PageId.systems => systems(),
-      PageId.learning || PageId.courses => demo == null
-          ? LiveCourseCatalog(roles: roles)
-          : CourseCatalog(learning: learning),
-      PageId.lesson => demo == null
-          ? LiveCourseCatalog(roles: roles)
-          : CourseCatalog(learning: learning),
+      PageId.learning || PageId.courses =>
+        demo == null
+            ? LiveCourseCatalog(roles: roles)
+            : CourseCatalog(learning: learning),
+      PageId.lesson =>
+        demo == null
+            ? LiveCourseCatalog(roles: roles)
+            : CourseCatalog(learning: learning),
       PageId.classes || PageId.assignments || PageId.attendance
-          when demo == null && teacherOnly => const TeacherPortal(),
+          when demo == null && teacherOnly =>
+        const TeacherPortal(),
       PageId.classes => ClassesScreen(
         key: const ValueKey(PageId.classes),
         roles: roles,
@@ -440,20 +449,29 @@ class _CollegeShellState extends State<CollegeShell> {
       ),
       PageId.attendance when demo == null => const LiveAttendanceScreen(),
       PageId.finance when demo == null => const LiveFinanceScreen(),
+      PageId.admissions when demo == null => LiveAdmissionsScreen(roles: roles),
       PageId.exams when demo == null => const LiveUnavailableModule(
         title: 'الاختبارات والنتائج',
-        message: 'وحدة الاختبارات غير مربوطة بعد: قاعدة البيانات الحالية لا تحتوي جداول للاختبارات أو الدرجات. أضف مخطط الاختبارات المعتمد قبل تسجيل أي نتائج.',
+        message:
+            'وحدة الاختبارات غير مربوطة بعد: قاعدة البيانات الحالية لا تحتوي جداول للاختبارات أو الدرجات. أضف مخطط الاختبارات المعتمد قبل تسجيل أي نتائج.',
       ),
       PageId.schedule when demo == null => const LiveUnavailableModule(
         title: 'الجدول الدراسي',
-        message: 'لا يوجد جدول دراسي في مخطط قاعدة البيانات الحالي. ستظهر المواعيد هنا بعد إضافة جداول الشعب والحصص وربطها بالفصل الدراسي.',
+        message:
+            'لا يوجد جدول دراسي في مخطط قاعدة البيانات الحالي. ستظهر المواعيد هنا بعد إضافة جداول الشعب والحصص وربطها بالفصل الدراسي.',
       ),
       PageId.profile => profile(),
-      PageId.settings => demo == null
-          ? LiveSystemSettingsScreen(roles: roles)
-          : list([const EmptyPanel('إعدادات النظام ليست جزءاً من المعاينة المحلية. اربط الحساب الفعلي لإدارتها من النظام المشترك.')]),
+      PageId.settings =>
+        demo == null
+            ? LiveSystemSettingsScreen(roles: roles)
+            : list([
+                const EmptyPanel(
+                  'إعدادات النظام ليست جزءاً من المعاينة المحلية. اربط الحساب الفعلي لإدارتها من النظام المشترك.',
+                ),
+              ]),
       PageId.reports when demo == null => const LiveReportsScreen(),
-      _ when demo == null && onlineModules.containsKey(page) => LiveModuleScreen(
+      _ when demo == null && onlineModules.containsKey(page) =>
+        LiveModuleScreen(
           key: ValueKey(page),
           spec: onlineModules[page]!,
           roles: roles,

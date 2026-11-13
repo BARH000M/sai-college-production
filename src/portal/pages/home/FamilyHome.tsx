@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadParentChildren, loadStudentRecord, type ChildRecord } from "../../lib/home";
 import { formatDate } from "./dateFormat";
+import { PersonalAttendancePanel } from "./PersonalAttendancePanel";
 
 type State =
   | { status: "loading"; data: null; error: null }
@@ -74,7 +75,10 @@ export function ParentHome({ userId }: { userId: string }) {
     </section>}
 
     {children && !!children.length && <div className="home-section-grid">
-      {children.map((child) => <RecordCard key={child.id} record={child} action />)}
+      {children.map((child) => <div key={child.id} style={{ display: "grid", gap: 16 }}>
+        <RecordCard record={child} action />
+        <PersonalAttendancePanel studentId={child.id} />
+      </div>)}
     </div>}
   </main>;
 }
