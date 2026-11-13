@@ -1,3 +1,6 @@
+import { canAccessModule, isModuleAvailable, modulePath, navigation } from "./navigation.ts";
+import type { InventoryReferenceEntry } from "./systemInventoryEntries";
+
 export type SystemCategory = {
   id: string;
   name: string;
@@ -41,3 +44,10 @@ export const systemCategories: readonly SystemCategory[] = [
 ];
 
 export const expectedSystemEntryCount = systemCategories.reduce((total, category) => total + category.expectedEntries, 0);
+
+export function inventoryRelatedModulePath(entry: InventoryReferenceEntry): string | null {
+  if (entry.status === "pending" || !entry.moduleId) return null;
+  const item = navigation.find((module) => module.id === entry.moduleId);
+  if (!item || !isModuleAvailable(item.id) || !canAccessModule(item.id, ["super_admin"])) return null;
+  return modulePath(item);
+}

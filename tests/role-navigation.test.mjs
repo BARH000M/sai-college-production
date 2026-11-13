@@ -37,7 +37,9 @@ test('administrative directories and admissions are hidden from student and teac
   }
   for (const role of ['student', 'parent']) {
     assert.equal(visibleFor(role).includes('attendance'), false, `${role} must not see the unscoped attendance register`);
+    assert.equal(canAccessModule('attendance', [role]), false);
   }
+  for (const role of ['teacher', 'receptionist']) assert.equal(canAccessModule('classes', [role]), false);
   assert.equal(visibleFor('teacher').includes('attendance'), true);
   assert.equal(visibleFor('receptionist').includes('admissions'), true);
   assert.equal(visibleFor('receptionist').includes('students'), true);

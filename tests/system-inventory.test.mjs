@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { canAccessModule, isModuleAvailable, navigation, visibleNavigation } from '../src/portal/lib/navigation.ts';
-import { expectedSystemEntryCount, systemCategories } from '../src/portal/lib/systemInventory.ts';
+import { expectedSystemEntryCount, inventoryRelatedModulePath, systemCategories } from '../src/portal/lib/systemInventory.ts';
+import { inventoryReference } from '../src/portal/lib/systemInventoryEntries.ts';
 
 const root = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), 'utf8');
@@ -17,6 +18,39 @@ test('system inventory matches the 32-category and 147-entry reference totals', 
       assert.ok(knownIds.has(moduleId), `${category.name} references an unknown module: ${moduleId}`);
     }
   }
+});
+
+test('all reference entries match the original Arabic inventory in category order', () => {
+  const source = read('docs/requirements/SYSTEM_MENU_INVENTORY_32_CATEGORIES.md').replace(/\r\n/g, '\n');
+  const categories = [...source.matchAll(/^## (\d\d) ـ .*\n([\s\S]*?)(?=\n## |\n---|(?![\s\S]))/gm)];
+  assert.equal(categories.length, 32);
+  assert.equal(inventoryReference.length, systemCategories.length);
+  assert.equal(inventoryReference.reduce((total, category) => total + category.entries.length, 0), 147);
+  categories.forEach((category, index) => {
+    const labels = [...category[2].matchAll(/^\d+\. (.*)$/gm)].map((match) => match[1].trim());
+    assert.equal(inventoryReference[index].entries.length, systemCategories[index].expectedEntries);
+    assert.deepEqual(inventoryReference[index].entries.map((entry) => entry.ar), labels);
+  });
+});
+
+test('inventory links are related, enabled and authorized for the existing catalog route', () => {
+  const paths = new Set(visibleNavigation(['super_admin']).map((item) =>
+    item.id === 'home' ? '/portal/dashboard' : item.id === 'profile' ? '/portal/profile' : `/portal/modules/${item.id}`));
+  for (const entry of inventoryReference.flatMap((category) => category.entries)) {
+    const path = inventoryRelatedModulePath(entry);
+    assert.ok(['implemented', 'partial', 'pending'].includes(entry.status));
+    if (entry.status === 'pending') assert.equal(path, null, `${entry.ar} must not link to an unfinished module`);
+    if (path) assert.ok(paths.has(path), `${entry.ar} links to an unavailable route: ${path}`);
+  }
+  const catalog = navigation.find((item) => item.id === 'systemCatalog');
+  assert.ok(catalog);
+  assert.ok(paths.has('/portal/modules/systemCatalog'));
+  for (const role of ['admin', 'teacher', 'accountant', 'receptionist', 'librarian', 'student', 'parent', 'content_editor']) {
+    assert.equal(canAccessModule('systemCatalog', [role]), false, role);
+  }
+  assert.match(read('src/portal/pages/ModuleEntry.tsx'), /item\.id === "systemCatalog".*<SystemInventory/);
+  assert.match(read('src/portal/pages/home/SuperAdminOverview.tsx'), /to="\/portal\/modules\/systemCatalog"/);
+  assert.match(read('src/portal/pages/SystemInventory.tsx'), /inventoryReference\.map/);
 });
 
 test('the Super Administrator can open every available module and the catalog is restricted', () => {
