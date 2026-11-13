@@ -184,13 +184,41 @@ preserved; it is not forced to equal the 147-entry functional inventory.
 - The original 147 submenu labels are not present in the checked-in report or
   source inventory, preventing a truthful per-entry audit.
 
+## Deployment readiness review
+
+- The repository's `web-ci.yml` runs dependency installation, type-check,
+  production build, and compatibility tests. `mobile-ci.yml` runs Flutter
+  analysis and tests. Neither workflow deploys.
+- No deployment script, Docker/Compose file, or Nginx configuration was found.
+  The local web build command is `npm run build` and its output is `out/`, but
+  the VPS installation directory and web-server configuration are unverified.
+- The user identified Hostinger VPS and Supabase as the production targets, but
+  the approved deploy process remains unconfirmed. Deno and Supabase CLIs are
+  unavailable in this environment. No deployment was attempted and no
+  existing Edge Function was modified.
+- The PR Supabase Preview check currently fails because the preview database
+  lacks `public.cms_programs` when a CMS policy is applied. This is not being
+  bypassed by applying or editing database objects.
+
+## Authoritative 147-entry source
+
+The referenced Section 28.01–28.32 is not available in the conversation
+context or the checked-in `docs/requirements/MASTER_BUILD_PROMPT_SUBMITTED_20261111.md`;
+the intended
+`docs/requirements/SYSTEM_MENU_INVENTORY_32_CATEGORIES.md` file also does not
+exist. This implementation therefore keeps only the 32 category names and
+counts already present in the report. It does not create that requested
+requirements file or invent, translate, or infer submenu labels. The
+Super Administrator catalog clearly marks its mapping as category-level and
+incomplete pending the authoritative source.
+
 ## Remaining work
 
 - Provide the original submenu labels to complete the 147-entry audit and map
   each item to its authorized route, data scope, CRUD support, and status.
-- Deploy the `manage-roles` Edge Function and web application using the
-  approved production target, then validate the dashboard with an authorized
-  Super Administrator account.
+- Confirm the approved deployment method, VPS install path and web-server
+  configuration; then deploy the web app and Edge Function only after the
+  Supabase Preview blocker is resolved and explicit approval is given.
 - Obtain authorized Student and Parent test accounts for live RLS checks of
   personal attendance and verified-child scoping.
 - Verify actual Storage object availability if the product needs a
