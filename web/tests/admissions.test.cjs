@@ -25,7 +25,14 @@ function client(response) {
     insert(...args) { calls.push(["insert", ...args]); return Promise.resolve(response); },
     then(resolve, reject) { return Promise.resolve(response).then(resolve, reject); },
   };
-  return { calls, from(table) { calls.push(["from", table]); return builder; } };
+  return {
+    calls,
+    from(table) { calls.push(["from", table]); return builder; },
+    rpc(name, args) {
+      calls.push(["rpc", name, args]);
+      return Promise.resolve(response);
+    },
+  };
 }
 const filters = { branch: "", session: "", status: "", assignee: "", search: "", page: 0 };
 
@@ -51,7 +58,32 @@ test("status validation and immutable edit fields", async () => {
   for (const field of ["id", "branch_id", "application_no", "created_by", "created_at", "updated_at", "closed_at"]) {
     assert.equal(field in edit, false);
   }
+  assert.equal("status" in edit, false);
   assert.equal("status" in api.admissionPayload(draft, false), false);
+});
+
+test("status changes and enrollment use their guarded RPCs", async () => {
+  const db = client({ data: null, error: null });
+  const api = await load("status-rpcs", db);
+  await api.setAdmissionStatus("enquiry", "accepted");
+  assert.deepEqual(db.calls.at(-1), ["rpc", "sai_admissions_set_status", {
+    p_enquiry_id: "enquiry",
+    p_status: "accepted",
+  }]);
+  await assert.rejects(api.setAdmissionStatus("enquiry", "enrolled"), /التسجيل الآمن/);
+
+  db.rpc = (name, args) => {
+    db.calls.push(["rpc", name, args]);
+    return Promise.resolve({
+      data: { student_id: "student", admission_no: "SAI-APP-1042" },
+      error: null,
+    });
+  };
+  assert.deepEqual(await api.enrollAdmission("enquiry"), {
+    student_id: "student",
+    admission_no: "SAI-APP-1042",
+  });
+  assert.equal(db.calls.at(-1)[1], "sai_admissions_enroll");
 });
 
 test("enquiries require both branch and session", async () => {

@@ -14,7 +14,7 @@ begin;
 -- prerequisites before 022 runs.
 create schema if not exists private;
 revoke all on schema private from public, anon;
-grant usage on schema private to authenticated;
+grant usage on schema private to authenticated, service_role;
 
 create or replace function private.sai_security_has_role(wanted_role public.app_role)
 returns boolean language sql stable security definer
@@ -259,18 +259,21 @@ grant execute on function
   private.sai_learning_can_grade_homework(uuid),
   private.sai_learning_own_student(uuid)
 to authenticated;
+grant execute on function private.sai_security_has_role(public.app_role)
+to service_role;
 
--- These are the minimum columns read or written by the checked-in CMS client.
--- CREATE TABLE IF NOT EXISTS never replaces deployed tables or their data.
+-- Match the verified Production CMS column contract used by the checked-in
+-- clients. CREATE TABLE IF NOT EXISTS preserves deployed tables and data; it
+-- does not repair partial tables.
 create table if not exists public.cms_programs (
   id uuid primary key default gen_random_uuid(),
-  title_ar text not null default '',
+  title_ar text not null,
   title_en text not null default '',
   summary_ar text not null default '',
   summary_en text not null default '',
   duration_ar text not null default '',
   duration_en text not null default '',
-  icon text not null default '',
+  icon text not null default 'ri-book-open-line',
   is_published boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -279,12 +282,12 @@ create table if not exists public.cms_programs (
 
 create table if not exists public.cms_news (
   id uuid primary key default gen_random_uuid(),
-  title_ar text not null default '',
+  title_ar text not null,
   title_en text not null default '',
   summary_ar text not null default '',
   summary_en text not null default '',
-  tag_ar text not null default '',
-  tag_en text not null default '',
+  tag_ar text not null default 'أخبار',
+  tag_en text not null default 'News',
   image_url text,
   published_at date not null default current_date,
   is_published boolean not null default true,
@@ -295,8 +298,8 @@ create table if not exists public.cms_news (
 
 create table if not exists public.cms_site_content (
   key text primary key,
-  section text not null default '',
-  label_ar text not null default '',
+  section text not null default 'general',
+  label_ar text not null,
   value_ar text not null default '',
   value_en text not null default '',
   sort_order integer not null default 0,
@@ -304,24 +307,21 @@ create table if not exists public.cms_site_content (
   updated_by uuid references auth.users(id) on delete set null
 );
 
-create index if not exists cms_programs_sort_created_idx
-  on public.cms_programs (sort_order, created_at);
-create index if not exists cms_news_sort_published_idx
-  on public.cms_news (sort_order, published_at desc);
-create index if not exists cms_site_content_sort_idx
-  on public.cms_site_content (sort_order);
-
 alter table public.cms_programs enable row level security;
 alter table public.cms_news enable row level security;
 alter table public.cms_site_content enable row level security;
 
+-- Supabase projects may grant broad default table privileges in public; reset
+-- these tables before granting only the CMS operations used by each role.
+revoke all privileges on table
+  public.cms_programs, public.cms_news, public.cms_site_content
+from public, anon, authenticated, service_role;
 grant select on table
   public.cms_programs, public.cms_news, public.cms_site_content
-to anon, authenticated;
-grant insert, update, delete on table
-  public.cms_programs, public.cms_news
-to authenticated;
-grant update on table public.cms_site_content to authenticated;
+to anon;
+grant select, insert, update, delete on table
+  public.cms_programs, public.cms_news, public.cms_site_content
+to authenticated, service_role;
 
 do $cms$
 begin

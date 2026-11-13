@@ -90,12 +90,31 @@ $cms$;
 -- ---------------------------------------------------------------------------
 -- 2. Public application-status page.
 --    sai_public_admission_submit is already executable by anon; the two read
---    functions used by the status page were missed.
+--    functions used by the status page were missed. These RPC definitions are
+--    not created by the tracked migrations, so grant only functions that exist.
 -- ---------------------------------------------------------------------------
 
-grant execute on function public.sai_public_admission_status(text) to anon, authenticated;
-grant execute on function public.sai_public_admission_history(text) to anon, authenticated;
-grant execute on function public.sai_public_admission_submit(text, text, text, text, text) to authenticated;
+do $rpc$
+begin
+  if to_regprocedure('public.sai_public_admission_status(text)') is not null then
+    execute 'grant execute on function public.sai_public_admission_status(text) to anon, authenticated';
+  else
+    raise notice 'Admission status RPC is not installed; execute grant deferred';
+  end if;
+
+  if to_regprocedure('public.sai_public_admission_history(text)') is not null then
+    execute 'grant execute on function public.sai_public_admission_history(text) to anon, authenticated';
+  else
+    raise notice 'Admission history RPC is not installed; execute grant deferred';
+  end if;
+
+  if to_regprocedure('public.sai_public_admission_submit(text, text, text, text, text)') is not null then
+    execute 'grant execute on function public.sai_public_admission_submit(text, text, text, text, text) to authenticated';
+  else
+    raise notice 'Admission submit RPC is not installed; execute grant deferred';
+  end if;
+end
+$rpc$;
 
 commit;
 

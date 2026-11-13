@@ -40,7 +40,7 @@ export function admissionDraft(row: Admission | null, branch: string, session: s
 export function admissionPayload(draft: AdmissionDraft, editing: boolean) {
   const optional = (value: string) => value.trim() || null;
   return {
-    ...(editing ? { status: draft.status } : { branch_id: draft.branch_id }),
+    ...(editing ? {} : { branch_id: draft.branch_id }),
     academic_session_id: draft.academic_session_id,
     applicant_full_name: draft.applicant_full_name.trim(),
     guardian_name: optional(draft.guardian_name), phone: optional(draft.phone), email: optional(draft.email),
@@ -300,10 +300,33 @@ export async function loadAdmissionStatusCounts(branch: string, session: string)
 }
 
 export async function setAdmissionStatus(enquiryId: string, status: AdmissionStatus): Promise<void> {
-  const result = await supabase.from("admissions_enquiries")
-    .update({ status }).eq("id", enquiryId).select("id");
+  if (status === "enrolled") {
+    throw new Error("يجب إنشاء سجل الطالب عبر إجراء التسجيل الآمن.");
+  }
+  const result = await supabase.rpc("sai_admissions_set_status", {
+    p_enquiry_id: enquiryId,
+    p_status: status,
+  });
   if (result.error) throw new Error(result.error.message);
-  if (!result.data?.length) throw new Error("لم تُحدّث الحالة؛ قد لا تملك الصلاحية أو لم يعد الطلب متاحاً.");
+}
+
+export type AdmissionEnrollment = { student_id: string; admission_no: string };
+
+function isAdmissionEnrollment(value: unknown): value is AdmissionEnrollment {
+  return typeof value === "object" && value !== null
+    && "student_id" in value && typeof value.student_id === "string"
+    && "admission_no" in value && typeof value.admission_no === "string";
+}
+
+export async function enrollAdmission(enquiryId: string): Promise<AdmissionEnrollment> {
+  const result = await supabase.rpc("sai_admissions_enroll", {
+    p_enquiry_id: enquiryId,
+  });
+  if (result.error) throw new Error(result.error.message);
+  if (!isAdmissionEnrollment(result.data)) {
+    throw new Error("لم تُنشئ قاعدة البيانات سجل الطالب المتوقع.");
+  }
+  return result.data;
 }
 
 export async function assignAdmission(enquiryId: string, userId: string | null): Promise<void> {
