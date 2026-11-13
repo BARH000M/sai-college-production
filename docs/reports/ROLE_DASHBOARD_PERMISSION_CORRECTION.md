@@ -173,6 +173,9 @@ preserved; it is not forced to equal the 147-entry functional inventory.
 - The new Edge Function summary action must be deployed before the new
   Super Administrator dashboard can load in production. Deno CLI was not
   available here, and no deployment target/workflow was identified.
+- The PR's Supabase Preview check currently fails while applying a CMS policy:
+  `relation "public.cms_programs" does not exist`. No database or migration
+  changes were made to bypass this preview failure.
 - Storage object existence, exam-attempt statistics, achievements, and
   certificate issuance/verification are not supported by a verified backend
   contract in this repository.
@@ -220,6 +223,7 @@ preserved; it is not forced to equal the 147-entry functional inventory.
 ## Verification
 
 - `node --test tests/role-navigation.test.mjs tests/student-learning.test.mjs tests/teacher-portal.test.mjs tests/system-inventory.test.mjs` — passed, 14 tests, including the 32-category/147-count invariant and scoped attendance-query checks.
+- From `web\`, `npm test` — passed, 39 compatibility and unit tests after aligning legacy role expectations with the access corrections.
 - `npm run type-check` — passed.
 - `npm run lint` — passed.
 - `npm run build` — passed. Vite reported the existing large JavaScript chunk warning (about 1.29 MB minified).

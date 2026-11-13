@@ -59,7 +59,7 @@ test("finance controls reflect role decisions without widening unrelated roles",
     view: true, manageGroups: true, assignFees: true, postPayment: true, waive: false, void: false, refund: false,
   });
   assert.deepEqual(financePermissions(["receptionist"]), {
-    view: true, manageGroups: false, assignFees: false, postPayment: true, waive: false, void: false, refund: false,
+    view: false, manageGroups: false, assignFees: false, postPayment: false, waive: false, void: false, refund: false,
   });
   for (const role of ["student", "parent"]) {
     const permissions = financePermissions([role]);
