@@ -14,6 +14,11 @@
 -- Nothing here widens what an anonymous visitor can see: published rows only.
 -- On a clean migration replay, the CMS schema and private helpers are installed
 -- by migration 020. Defer only this CMS block when those prerequisites are absent.
+--
+-- Migration-history consequence: production has already recorded migration 014.
+-- Editing this file only changes clean replays and databases that have not yet
+-- applied it. It does not rerun or repair an applied migration; any correction
+-- needed on an already-migrated database must be delivered in a new migration.
 
 begin;
 

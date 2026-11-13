@@ -300,7 +300,8 @@ create table if not exists public.cms_site_content (
   value_ar text not null default '',
   value_en text not null default '',
   sort_order integer not null default 0,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  updated_by uuid references auth.users(id) on delete set null
 );
 
 create index if not exists cms_programs_sort_created_idx
