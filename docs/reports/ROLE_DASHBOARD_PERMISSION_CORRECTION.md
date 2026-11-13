@@ -171,8 +171,10 @@ preserved; it is not forced to equal the 147-entry functional inventory.
 - Parent finance and homework visibility continue to rely on their existing
   RLS policies; this change adds no broader access.
 - The new Edge Function summary action must be deployed before the new
-  Super Administrator dashboard can load in production. Deno CLI was not
-  available here, and no deployment target/workflow was identified.
+  Super Administrator dashboard can load in production. Hostinger VPS and
+  Supabase are identified as targets, but the approved deployment mechanism
+  and server deployment configuration are not confirmed. Deno and Supabase
+  CLIs are not installed here.
 - The PR's Supabase Preview check currently fails while applying a CMS policy:
   `relation "public.cms_programs" does not exist`. No database or migration
   changes were made to bypass this preview failure.
