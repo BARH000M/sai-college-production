@@ -86,6 +86,11 @@ export type FinanceInvoice = {
   student_id: string; class_id: string | null; branch_id: string; due_date: string;
   status: string; final_amount: number; balance: number;
 };
+
+export function canPayFinanceInvoice(invoice: FinanceInvoice | undefined): boolean {
+  return !!invoice && (invoice.status === "unpaid" || invoice.status === "partial")
+    && Number.isFinite(invoice.balance) && invoice.balance > 0;
+}
 export type FinanceFilters = { search: string; classId: string; branch: string; status: string; from: string; to: string };
 
 export function filterFinanceInvoices<T extends FinanceInvoice>(rows: readonly T[], filters: FinanceFilters,

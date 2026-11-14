@@ -315,17 +315,19 @@ class _LiveFinanceScreenState extends State<LiveFinanceScreen> {
                   'المستحق: ${money(outstanding)} ر.ي · المتأخر: ${money(late)} ر.ي',
               preview: false,
               columns: const [
-                PrintColumn('الطالب'),
+                PrintColumn('الفاتورة / الطالب', flex: 2),
                 PrintColumn('الرسوم'),
                 PrintColumn('الاستحقاق'),
+                PrintColumn('الحالة'),
                 PrintColumn('الرصيد'),
               ],
               rows: [
                 for (final row in visible)
                   [
-                    '${row['student_name']}',
+                    '${row['student_name']}\n${row['admission_no'] ?? ''}\n${row['id'] ?? ''}',
                     '${row['group_name']}',
                     '${row['due_date']}',
+                    statuses[row['status']] ?? '${row['status']}',
                     '${row['balance']} ر.ي',
                   ],
               ],

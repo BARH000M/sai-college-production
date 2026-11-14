@@ -8,6 +8,19 @@ const source = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/financ
 const code = stripTypeScriptTypes(source, { mode: "strip" });
 const finance = import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 
+test("payment entry requires an available invoice with a finite positive balance", async () => {
+  const { canPayFinanceInvoice } = await finance;
+  assert.equal(canPayFinanceInvoice(undefined), false);
+  for (const balance of [0, -1, NaN, Infinity]) {
+    assert.equal(canPayFinanceInvoice({ status: "partial", balance }), false);
+  }
+  for (const status of ["cancelled", "waived", "paid", "unknown"]) {
+    assert.equal(canPayFinanceInvoice({ status, balance: 10 }), false);
+  }
+  assert.equal(canPayFinanceInvoice({ status: "unpaid", balance: 10 }), true);
+  assert.equal(canPayFinanceInvoice({ status: "partial", balance: 0.01 }), true);
+});
+
 test("invoice filters combine student, historical class, branch, due dates and overdue state", async () => {
   const { filterFinanceInvoices, financeSummary } = await finance;
   const rows = [
