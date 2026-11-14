@@ -26,24 +26,30 @@ test("startup errors are explicit and configured authentication options are pres
       .replaceAll("import.meta.env", "globalThis.__startupEnv"));
     return import(`${url}#${Math.random()}`);
   };
+  const validEnv = { VITE_PUBLIC_SUPABASE_URL: "https://aeryusbrulqdxjdynwfh.supabase.co", VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test" };
   try {
     await assert.rejects(loadSupabase({}, () => assert.fail("must not create a client")), SupabaseInitializationError);
     const cause = new Error("invalid URL");
     await assert.rejects(
-      loadSupabase(      { VITE_PUBLIC_SUPABASE_URL: "invalid", VITE_PUBLIC_SUPABASE_ANON_KEY: "key" }, () => { throw cause; }),
+      loadSupabase(validEnv, () => { throw cause; }),
       (error) => error instanceof SupabaseInitializationError && error.cause === cause,
     );
     const client = {};
     const result = await loadSupabase(
-      { VITE_PUBLIC_SUPABASE_URL: "https://example.invalid", VITE_PUBLIC_SUPABASE_ANON_KEY: "key" },
+      validEnv,
       (url, key, options) => {
-        assert.equal(url, "https://example.invalid");
-        assert.equal(key, "key");
+        assert.equal(url, validEnv.VITE_PUBLIC_SUPABASE_URL);
+        assert.equal(key, validEnv.VITE_PUBLIC_SUPABASE_ANON_KEY);
         assert.deepEqual(options.auth, { autoRefreshToken: true, detectSessionInUrl: true, persistSession: true });
         return client;
       },
     );
     assert.equal(result.supabase, client);
+    for (const env of [
+      { ...validEnv, VITE_PUBLIC_SUPABASE_URL: "https://other.supabase.co" },
+      { ...validEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_private" },
+      { ...validEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: `x.${Buffer.from(JSON.stringify({ role: "service_role", ref: "aeryusbrulqdxjdynwfh" })).toString("base64url")}.x` },
+    ]) await assert.rejects(loadSupabase(env, () => assert.fail("must reject before client creation")), SupabaseInitializationError);
   } finally {
     delete globalThis.__startupEnv;
     delete globalThis.__startupCreateClient;

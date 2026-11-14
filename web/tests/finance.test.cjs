@@ -8,6 +8,21 @@ const source = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/financ
 const code = stripTypeScriptTypes(source, { mode: "strip" });
 const finance = import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 
+test("invoice filters combine student, historical class, branch, due dates and overdue state", async () => {
+  const { filterFinanceInvoices, financeSummary } = await finance;
+  const rows = [
+    { student_id: "s", class_id: "old-class", branch_id: "b", due_date: "2026-11-14", status: "partial", final_amount: 100.01, balance: 60.01 },
+    { student_id: "s", class_id: "old-class", branch_id: "b", due_date: "2026-11-15", status: "unpaid", final_amount: 20, balance: 20 },
+    { student_id: "other", class_id: "other-class", branch_id: "other-branch", due_date: "2026-11-01", status: "cancelled", final_amount: 900, balance: 0 },
+  ];
+  const students = [{ id: "s", full_name: "Student Name", admission_no: "SAI-123" }];
+  const filters = { search: " sai-123 ", classId: "old-class", branch: "b", status: "overdue", from: "2026-11-01", to: "2026-11-15" };
+  assert.deepEqual(filterFinanceInvoices(rows, filters, students, "2026-11-15"), [rows[0]]);
+  assert.deepEqual(financeSummary(rows, "2026-11-15"), { invoiced: "120.01", outstanding: "80.01", overdue: "60.01" });
+  assert.equal(filterFinanceInvoices(rows, { ...filters, from: "2026-11-16" }, students, "2026-11-15").length, 0);
+  assert.equal(financeSummary(Array(100).fill({ ...rows[0], final_amount: 0.1, balance: 0.1 }), "2026-11-15").outstanding, "10.00");
+});
+
 test("YER rounding is decimal half-up and respects numeric(12,2)", async () => {
   const { normalizeYER, formatYER } = await finance;
   assert.equal(normalizeYER("2.345"), "2.35");

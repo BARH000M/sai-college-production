@@ -81,3 +81,35 @@ export function formatYER(value: string): string {
   const [whole, fraction] = normalized.split(".");
   return fraction === "00" ? `${whole} ر.ي` : `${whole}.${fraction.replace(/0$/, "")} ر.ي`;
 }
+
+export type FinanceInvoice = {
+  student_id: string; class_id: string | null; branch_id: string; due_date: string;
+  status: string; final_amount: number; balance: number;
+};
+export type FinanceFilters = { search: string; classId: string; branch: string; status: string; from: string; to: string };
+
+export function filterFinanceInvoices<T extends FinanceInvoice>(rows: readonly T[], filters: FinanceFilters,
+  students: readonly { id: string; full_name: string; admission_no: string }[], today: string): T[] {
+  const names = new Map(students.map((student) => [student.id, `${student.full_name} ${student.admission_no}`.toLocaleLowerCase()]));
+  const search = filters.search.trim().toLocaleLowerCase();
+  return rows.filter((row) => (!search || names.get(row.student_id)?.includes(search))
+    && (!filters.classId || row.class_id === filters.classId)
+    && (!filters.branch || row.branch_id === filters.branch)
+    && (!filters.status || (filters.status === "overdue"
+      ? row.status !== "cancelled" && row.balance > 0 && row.due_date < today : row.status === filters.status))
+    && (!filters.from || row.due_date >= filters.from) && (!filters.to || row.due_date <= filters.to));
+}
+
+// Sum integer cents so reports do not accumulate binary floating point errors.
+export function financeSummary(rows: readonly FinanceInvoice[], today: string) {
+  const cents = (value: number) => BigInt(normalizeYER(String(value)).replace(".", ""));
+  let invoiced = 0n, outstanding = 0n, overdue = 0n;
+  for (const row of rows) {
+    if (row.status === "cancelled") continue;
+    invoiced += cents(row.final_amount);
+    outstanding += cents(row.balance);
+    if (row.balance > 0 && row.due_date < today) overdue += cents(row.balance);
+  }
+  const decimal = (value: bigint) => `${value / 100n}.${String(value % 100n).padStart(2, "0")}`;
+  return { invoiced: decimal(invoiced), outstanding: decimal(outstanding), overdue: decimal(overdue) };
+}

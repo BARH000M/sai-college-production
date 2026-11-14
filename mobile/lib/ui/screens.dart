@@ -448,7 +448,7 @@ class _CollegeShellState extends State<CollegeShell> {
         attendance: true,
       ),
       PageId.attendance when demo == null => const LiveAttendanceScreen(),
-      PageId.finance when demo == null => const LiveFinanceScreen(),
+      PageId.finance when demo == null => LiveFinanceScreen(roles: roles),
       PageId.admissions when demo == null => LiveAdmissionsScreen(roles: roles),
       PageId.exams when demo == null => const LiveUnavailableModule(
         title: 'الاختبارات والنتائج',

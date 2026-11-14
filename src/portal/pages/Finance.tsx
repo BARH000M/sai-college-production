@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  financePermissions, formatYER, normalizeYER, parsePendingFinancePayment, parsePendingFinanceRefund, validateFinancePayment,
+  financePermissions, financeSummary, filterFinanceInvoices, formatYER, normalizeYER, parsePendingFinancePayment, parsePendingFinanceRefund, validateFinancePayment,
   type FinancePaymentMethod, type PendingFinancePayment, type PendingFinanceRefund,
 } from "../lib/finance";
 import {
@@ -11,6 +11,7 @@ import {
   type FeeAssignment, type FeeGroup, type FinanceAudit, type FinancePayment, type FinanceRefund, type FinanceStudent, type FinanceOption,
 } from "../lib/financeApi";
 import { loadReportBranches, type ReportOption } from "../lib/reports";
+import { FinanceStatement } from "./finance/FinanceStatement";
 import { PaymentReceipt } from "./finance/PaymentReceipt";
 
 const methods: { value: FinancePaymentMethod; label: string }[] = [
@@ -25,6 +26,8 @@ function message(error: unknown) { return error instanceof Error ? error.message
 function amount(value: number) { return formatYER(String(value)); }
 
 export function Finance({ roles, userId }: { roles: readonly string[]; userId: string | null }) {
+  const [filters, setFilters] = useState({ search: "", classId: "", branch: "", status: "", from: "", to: "" });
+  const [statement, setStatement] = useState(false);
   const permissions = financePermissions(roles);
   const staff = permissions.postPayment;
   const [groups, setGroups] = useState<FeeGroup[]>([]);
@@ -232,6 +235,11 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     event.preventDefault(); setAudit([]); setError(null);
     void loadFinanceAudit(auditBranch).then(setAudit).catch((failure: unknown) => setError(message(failure)));
   }
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const visibleAssignments = filterFinanceInvoices(assignments, filters, students, today);
+  const totals = financeSummary(visibleAssignments, today);
+  const classIds = [...new Set(assignments.map((row) => row.class_id).filter((id): id is string => !!id))];
   const selectedGroup = groups.find((row) => row.id === assignmentGroup) ?? null;
   const eligibleStudents = selectedGroup
     ? students.filter((row) => row.branch_id === selectedGroup.branch_id && row.status === "active"
@@ -289,12 +297,28 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
       </form>
     </section>}
     <section className="panel management-detail"><h2>الأرصدة والرسوم المسندة</h2>
+      <div className="management-form">
+        <label>بحث بالاسم أو الرقم الأكاديمي<input value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} /></label>
+        <label>الفرع<select value={filters.branch} onChange={(e) => setFilters({ ...filters, branch: e.target.value })}><option value="">كل الفروع المتاحة</option>{branches.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+        <label>معرّف الصف<select value={filters.classId} onChange={(e) => setFilters({ ...filters, classId: e.target.value })}><option value="">كل الصفوف المتاحة</option>{classIds.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+        <label>حالة السداد<select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}><option value="">كل الحالات</option><option value="overdue">متأخر</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+        <label>الاستحقاق من<input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} /></label>
+        <label>الاستحقاق إلى<input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} /></label>
+      </div>
+      {filters.from && filters.to && filters.from > filters.to && <p role="alert">تاريخ البداية بعد تاريخ النهاية.</p>}
+      {!loading && !error && <>
+        <p>عدد الفواتير: {visibleAssignments.length} · صافي الرسوم: {totals.invoiced} ر.ي · المستحق: {totals.outstanding} ر.ي · المتأخر: {totals.overdue} ر.ي</p>
+        <p className="muted">الملخص حسب الفلاتر وتاريخ الاستحقاق ويستبعد الملغى. صافي الرسوم بعد الخصم وقبل الإعفاءات.</p>
+        <button type="button" className="button secondary" disabled={!visibleAssignments.length} onClick={() => setStatement(true)}>طباعة كشف الفواتير</button>
+        {!visibleAssignments.length && assignments.length > 0 && <p>لا توجد نتائج تطابق البحث.</p>}
+      </>}
       {!loading && !error && assignments.length === 0 && <p>لا توجد رسوم متاحة.</p>}
       <div className="table-scroll"><table className="management-table"><thead><tr><th>الطالب</th><th>المجموعة</th><th>الاستحقاق</th><th>الحالة</th><th>الرصيد</th><th>التفاصيل</th></tr></thead>
-        <tbody>{assignments.map((row) => <tr key={row.id}><td>{studentById(row.student_id)?.full_name ?? "طالب"}<span className="learn-meta">{studentById(row.student_id)?.admission_no ?? ""}</span></td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? groupLabels.find((entry) => entry.id === row.fee_group_id)?.name ?? "رسوم دراسية"}</td>
-          <td>{row.due_date}</td><td>{statuses[row.status] ?? row.status}</td><td>{amount(row.balance)}</td>
+        <tbody>{visibleAssignments.map((row) => <tr key={row.id}><td>{studentById(row.student_id)?.full_name ?? "طالب"}<span className="learn-meta">{studentById(row.student_id)?.admission_no ?? ""}</span></td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? groupLabels.find((entry) => entry.id === row.fee_group_id)?.name ?? "رسوم دراسية"}</td>
+          <td>{row.due_date}{row.balance > 0 && row.status !== "cancelled" && row.due_date < today && <strong className="learn-meta">متأخر</strong>}</td><td>{statuses[row.status] ?? row.status}</td><td>{amount(row.balance)}</td>
           <td><button className="text-button" type="button" disabled={(!!pendingPayment && pendingPayment.assignment !== row.id) || (!!pendingRefund && pendingRefund.assignment !== row.id)} onClick={() => setSelected(row.id)}>عرض الدفعات</button></td></tr>)}</tbody></table></div>
     </section>
+    {statement && <FinanceStatement rows={visibleAssignments} students={students} groups={[...groupLabels, ...groups]} totals={totals} filters={filters} onClose={() => setStatement(false)} />}
     {selected && <section className="panel management-detail"><h2>الدفعات والإيصالات</h2>
       {paymentsLoading && <p role="status">جارٍ تحميل الدفعات...</p>}
       {paymentsError && <p className="error-box" role="alert">تعذر تحميل الدفعات: {paymentsError} <button type="button" className="text-button" onClick={() => setVersion((value) => value + 1)}>إعادة المحاولة</button></p>}
@@ -316,8 +340,8 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
           {permissions.waive && <button className="button secondary" disabled={busy || !!pendingPayment || !!pendingRefund || !reason.trim()} onClick={() => void perform(() => waiveFee(selected, reason), "تم الإعفاء من الرصيد المتبقي.")}>إعفاء الرصيد</button>}
           {permissions.assignFees && <button className="button secondary" disabled={busy || !!pendingPayment || !!pendingRefund || !reason.trim()} onClick={() => void perform(() => cancelFee(selected, reason), "تم إلغاء الرسوم المسندة.")}>إلغاء الإسناد</button>}
         </div></div>}
-      <div className="table-scroll"><table className="management-table"><thead><tr><th>الإيصال</th><th>المبلغ</th><th>الطريقة</th><th>المرجع</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
-        <tbody>{payments.map((row) => <tr key={row.id}><td>{row.receipt_number}</td><td>{amount(row.amount)}</td><td>{methods.find((m) => m.value === row.method)?.label}</td>
+      <div className="table-scroll"><table className="management-table"><thead><tr><th>الإيصال</th><th>تاريخ السداد</th><th>المبلغ</th><th>الطريقة</th><th>المرجع</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+        <tbody>{payments.map((row) => <tr key={row.id}><td>{row.receipt_number}</td><td>{new Date(row.posted_at).toLocaleString("ar-YE")}</td><td>{amount(row.amount)}</td><td>{methods.find((m) => m.value === row.method)?.label}</td>
           <td>{row.transaction_reference ?? "—"}</td><td>{row.voided_at ? `ملغاة: ${row.void_reason}` : "مرحلة"}</td>
           <td><div className="homework-admin">
             <button className="button secondary quick-action" type="button" onClick={() => {

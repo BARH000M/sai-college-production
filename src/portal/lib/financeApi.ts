@@ -7,7 +7,7 @@ export type FeeGroup = {
 };
 export type FeeAssignment = {
   id: string; fee_group_id: string; student_id: string; branch_id: string;
-  academic_session_id: string; class_id: string; original_amount: number;
+  academic_session_id: string; class_id: string | null; original_amount: number;
   discount_amount: number; final_amount: number; due_date: string; status: string; balance: number;
 };
 export type FinanceStudent = {
