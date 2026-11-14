@@ -25,7 +25,7 @@ begin
   insert into auth.users (id) values (super_id), (admin_id), (teacher_id), (other_teacher_id), (reception_id), (student_user), (parent_id), (unverified_parent_id);
   update auth.users set email_confirmed_at = now() where id in (parent_id, student_user);
   insert into public.user_roles (user_id, role) values (super_id, 'super_admin'), (admin_id, 'admin'),
-    (teacher_id, 'teacher'), (other_teacher_id, 'teacher'), (reception_id, 'receptionist'), (student_user, 'student'),
+    (teacher_id, 'teacher'), (other_teacher_id, 'teacher'), (reception_id, 'receptionist'),
     (parent_id, 'parent'), (unverified_parent_id, 'parent');
   perform set_config('request.jwt.claim.sub', super_id::text, true);
   insert into public.branches (id, name, code) values
@@ -43,10 +43,30 @@ begin
     values (student_a, branch_a, 'WAVE1_TEST_' || run_id || '_a', 'WAVE1_TEST_a', class_a),
       (student_b, branch_a, 'WAVE1_TEST_' || run_id || '_b', 'WAVE1_TEST_b', null),
       (other_student, branch_b, 'WAVE1_TEST_' || run_id || '_c', 'WAVE1_TEST_c', class_b);
+  denied := false;
+  begin
+    update public.students set user_id = student_user where id = student_a;
+  exception when insufficient_privilege then
+    if sqlerrm <> 'Use the authorized student-account linking workflow' then raise; end if;
+    denied := true;
+  end;
+  if not denied then raise exception 'Direct student account link bypassed the guard'; end if;
   execute 'set local role authenticated';
+  denied := false;
+  begin
+    update public.students set user_id = student_user where id = student_a;
+  exception when insufficient_privilege then denied := true; end;
+  if not denied then raise exception 'Authenticated direct student account link succeeded'; end if;
   perform public.admissions_link_student_account(student_a, student_user);
   perform public.admissions_verify_parent_student(student_a, parent_id);
   execute 'reset role';
+  if not exists (select 1 from public.students where id = student_a and user_id = student_user)
+    or not exists (select 1 from public.user_roles where user_id = student_user and role = 'student')
+    or not exists (select 1 from public.parent_student_links
+      where student_id = student_a and parent_user_id = parent_id
+        and verified_at is not null and verified_by = super_id) then
+    raise exception 'Authorized student or parent account setup failed';
+  end if;
   -- Model a legacy unverified link predating the Admissions verification guard.
   if exists (select 1 from pg_trigger where tgrelid = 'public.parent_student_links'::regclass
       and tgname = 'parent_student_links_guard_verification' and not tgisinternal) then

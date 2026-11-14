@@ -10,9 +10,8 @@ $target = '20261115014149_protected_admission_status_events.sql'
 $migrations = @(Get-ChildItem (Join-Path $repo 'supabase/migrations') -Filter '*.sql' | Sort-Object Name)
 $targetIndex = [array]::IndexOf(@($migrations.Name), $target)
 if ($targetIndex -lt 1) { throw 'Protected-events migration missing' }
-$migrations = @($migrations | Select-Object -First ($targetIndex + 1))
 $tests = @('security_invariants.sql','helper_execute_permissions.sql','admissions_behavior.sql',
-  'admissions_tracking_behavior.sql','admission_event_integrity.sql','student_parent_access.sql')
+  'admissions_tracking_behavior.sql','admission_event_integrity.sql','student_parent_access.sql','attendance_behavior.sql')
 foreach ($file in @('bootstrap.sql','seed_snapshot.sql','verify_snapshot.sql')) {
   if (!(Test-Path (Join-Path $PSScriptRoot $file))) { throw "Missing fixture: $file" }
 }
@@ -20,7 +19,7 @@ foreach ($test in $tests) {
   if (!(Test-Path (Join-Path $repo "supabase/tests/$test"))) { throw "Missing test: $test" }
 }
 if (!$Run) {
-  Write-Output "VALIDATION ONLY: $($migrations.Count) migrations through $target; six SQL suites; three fixtures. No server started."
+  Write-Output "VALIDATION ONLY: $($migrations.Count) migrations; $($tests.Count) SQL suites; three fixtures. No server started."
   return
 }
 if (!$PgBin) { throw '-PgBin must name PostgreSQL 18 bin directory' }
@@ -45,11 +44,22 @@ $psql = Join-Path $PgBin 'psql.exe'
 $pgctl = Join-Path $PgBin 'pg_ctl.exe'
 $utf8 = [Text.UTF8Encoding]::new($false)
 function Log([string]$message) { [IO.File]::AppendAllText($log, $message + "`n", $utf8) }
+function Invoke-Psql([string[]]$arguments) {
+  $previousPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = @(& $psql -X -h 127.0.0.1 -p 55439 -U postgres -v ON_ERROR_STOP=1 @arguments 2>&1)
+    $code = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousPreference
+  }
+  [pscustomobject]@{ Output = $output; ExitCode = $code }
+}
 function Sql([string]$db, [string[]]$arguments, [string]$label) {
   Log(">>> $label")
-  $result = & $psql -X -h 127.0.0.1 -p 55439 -U postgres -d $db -v ON_ERROR_STOP=1 @arguments 2>&1
-  $code = $LASTEXITCODE
-  foreach ($line in $result) { Log($line.ToString()) }
+  $result = Invoke-Psql (@('-d', $db, '-b') + $arguments)
+  $code = $result.ExitCode
+  foreach ($line in $result.Output) { Log($line.ToString()) }
   if ($code -ne 0) { Log("FAIL exit=$code"); throw "$label failed; see $log" }
   Log('PASS'); Write-Output "PASS $label"
 }
@@ -93,8 +103,9 @@ try {
   & $pgctl -D $data -l (Join-Path $state 'server.log') -o '-h 127.0.0.1 -p 55439' -w -t 60 start
   if ($LASTEXITCODE -ne 0) { throw 'pg_ctl start failed' }
   $started = $true
-  $actual = & $psql -X -h 127.0.0.1 -p 55439 -U postgres -d postgres -At -c 'SHOW data_directory'
-  if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($actual.Trim()) -ine $data) {
+  $identity = Invoke-Psql @('-d','postgres','-At','-c','SHOW data_directory')
+  $actual = ($identity.Output | ForEach-Object { $_.ToString() }) -join "`n"
+  if ($identity.ExitCode -ne 0 -or [IO.Path]::GetFullPath($actual.Trim()) -ine $data) {
     throw 'SHOW data_directory does not match task-owned cluster'
   }
   Log("VERIFIED data_directory=$actual")
@@ -102,15 +113,20 @@ try {
     Sql postgres @('-c',"CREATE DATABASE $db") "Create $db"
     Sql $db @('-f',(Join-Path $PSScriptRoot 'bootstrap.sql')) "Bootstrap $db"
   }
-  foreach ($migration in $migrations[0..($migrations.Count - 2)]) {
+  foreach ($migration in $migrations[0..($targetIndex - 1)]) {
     foreach ($db in @('snapshot_replay','regression_test')) { MigrationFile $migration $db }
   }
   Sql snapshot_replay @('-f',(Join-Path $PSScriptRoot 'seed_snapshot.sql')) 'Seed existing enquiry and forged audit'
-  foreach ($db in @('snapshot_replay','regression_test')) { MigrationFile $migrations[-1] $db }
+  foreach ($migration in $migrations[$targetIndex..($migrations.Count - 1)]) {
+    foreach ($db in @('snapshot_replay','regression_test')) { MigrationFile $migration $db }
+  }
   Sql snapshot_replay @('-f',(Join-Path $PSScriptRoot 'verify_snapshot.sql')) 'Verify snapshot without forged audit backfill'
   foreach ($test in $tests) {
     $sql = [IO.File]::ReadAllText((Join-Path $repo "supabase/tests/$test"))
     $sql = [regex]::Replace($sql, '(?im)^begin;', "begin;`nset local sai.wave1_isolated_test = 'yes';")
+    if ($test -eq 'attendance_behavior.sql') {
+      $sql = [regex]::Replace($sql, '(?im)^begin;', "begin;`nset local sai.attendance_isolated_test = 'yes';")
+    }
     $file = Join-Path $state $test
     [IO.File]::WriteAllText($file, $sql, $utf8)
     Sql regression_test @('-f',$file) "SQL TEST $test"
