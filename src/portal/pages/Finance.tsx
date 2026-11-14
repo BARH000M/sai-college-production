@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  financePermissions, financeSummary, filterFinanceInvoices, formatYER, normalizeYER, parsePendingFinancePayment, parsePendingFinanceRefund, validateFinancePayment,
+  canPayFinanceInvoice, financePermissions, financeSummary, filterFinanceInvoices, formatYER, normalizeYER, parsePendingFinancePayment, parsePendingFinanceRefund, validateFinancePayment,
   type FinancePaymentMethod, type PendingFinancePayment, type PendingFinanceRefund,
 } from "../lib/finance";
 import {
@@ -28,6 +28,7 @@ function amount(value: number) { return formatYER(String(value)); }
 export function Finance({ roles, userId }: { roles: readonly string[]; userId: string | null }) {
   const [filters, setFilters] = useState({ search: "", classId: "", branch: "", status: "", from: "", to: "" });
   const [statement, setStatement] = useState(false);
+  const [invoiceId, setInvoiceId] = useState("");
   const permissions = financePermissions(roles);
   const staff = permissions.postPayment;
   const [groups, setGroups] = useState<FeeGroup[]>([]);
@@ -160,6 +161,9 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   function submitPayment(event: FormEvent) {
     event.preventDefault();
     if (!recoveryReady || !userId || busyRef.current || pendingRefund) return;
+    if (loading || paymentsLoading || paymentsError || (!pendingPayment && !canPayFinanceInvoice(assignments.find((row) => row.id === selected)))) {
+      setError("تحقق من تحميل الفاتورة وسجل الدفعات ووجود رصيد مستحق قبل تسجيل الدفع."); return;
+    }
     const validation = validateFinancePayment(paymentAmount, paymentMethod, reference);
     if (validation) { setError(validation); return; }
     const request = pendingPayment ?? {
@@ -239,6 +243,7 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const visibleAssignments = filterFinanceInvoices(assignments, filters, students, today);
   const totals = financeSummary(visibleAssignments, today);
+  const invoiceRows = assignments.filter((row) => row.id === invoiceId);
   const classIds = [...new Set(assignments.map((row) => row.class_id).filter((id): id is string => !!id))];
   const selectedGroup = groups.find((row) => row.id === assignmentGroup) ?? null;
   const eligibleStudents = selectedGroup
@@ -316,9 +321,10 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
       <div className="table-scroll"><table className="management-table"><thead><tr><th>الطالب</th><th>المجموعة</th><th>الاستحقاق</th><th>الحالة</th><th>الرصيد</th><th>التفاصيل</th></tr></thead>
         <tbody>{visibleAssignments.map((row) => <tr key={row.id}><td>{studentById(row.student_id)?.full_name ?? "طالب"}<span className="learn-meta">{studentById(row.student_id)?.admission_no ?? ""}</span></td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? groupLabels.find((entry) => entry.id === row.fee_group_id)?.name ?? "رسوم دراسية"}</td>
           <td>{row.due_date}{row.balance > 0 && row.status !== "cancelled" && row.due_date < today && <strong className="learn-meta">متأخر</strong>}</td><td>{statuses[row.status] ?? row.status}</td><td>{amount(row.balance)}</td>
-          <td><button className="text-button" type="button" disabled={(!!pendingPayment && pendingPayment.assignment !== row.id) || (!!pendingRefund && pendingRefund.assignment !== row.id)} onClick={() => setSelected(row.id)}>عرض الدفعات</button></td></tr>)}</tbody></table></div>
+          <td><button className="text-button" type="button" onClick={() => setInvoiceId(row.id)}>طباعة الفاتورة</button><button className="text-button" type="button" disabled={(!!pendingPayment && pendingPayment.assignment !== row.id) || (!!pendingRefund && pendingRefund.assignment !== row.id)} onClick={() => setSelected(row.id)}>عرض الدفعات</button></td></tr>)}</tbody></table></div>
     </section>
     {statement && <FinanceStatement rows={visibleAssignments} students={students} groups={[...groupLabels, ...groups]} totals={totals} filters={filters} onClose={() => setStatement(false)} />}
+    {invoiceRows.length > 0 && <FinanceStatement invoice rows={invoiceRows} students={students} groups={[...groupLabels, ...groups]} totals={financeSummary(invoiceRows, today)} filters={filters} onClose={() => setInvoiceId("")} />}
     {selected && <section className="panel management-detail"><h2>الدفعات والإيصالات</h2>
       {paymentsLoading && <p role="status">جارٍ تحميل الدفعات...</p>}
       {paymentsError && <p className="error-box" role="alert">تعذر تحميل الدفعات: {paymentsError} <button type="button" className="text-button" onClick={() => setVersion((value) => value + 1)}>إعادة المحاولة</button></p>}
@@ -327,7 +333,7 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
         <label>المبلغ<input required disabled={!!pendingPayment} inputMode="decimal" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} /></label>
         <label>طريقة الدفع{methodSelect(paymentMethod, setPaymentMethod, !!pendingPayment)}</label>
         <label>مرجع المعاملة<input required={paymentMethod !== "cash"} disabled={!!pendingPayment} value={reference} onChange={(e) => setReference(e.target.value)} /></label>
-        <div className="actions"><button className="button primary" disabled={busy || !recoveryReady || !!pendingRefund}>{pendingPayment ? "إعادة محاولة الدفع" : "تسجيل الدفعة"}</button></div>
+        <div className="actions"><button className="button primary" disabled={busy || !recoveryReady || !!pendingRefund || loading || paymentsLoading || !!paymentsError || (!pendingPayment && !canPayFinanceInvoice(assignments.find((row) => row.id === selected)))}>{pendingPayment ? "إعادة محاولة الدفع" : "تسجيل الدفعة"}</button></div>
         <p className="data-note">تُحفظ محاولة الدفع في هذا التبويب لإعادة المحاولة بالمفتاح والبيانات نفسها بعد فقدان الاتصال أو تحديث الصفحة.</p>
       </form>}
       {pendingPayment && <div className="notice"><p>توجد محاولة دفع غير مؤكدة لهذا الإسناد. تحقق من الإيصالات قبل حذف المحاولة.</p>
