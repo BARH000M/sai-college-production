@@ -42,7 +42,7 @@ Scoped finance directories provide the minimum student and session data
 needed by branch accountants, and fee labels for authorized families.
 The mobile Finance view displays the ledger's outstanding balance rather than
 the original assignment amount; payment entry and receipt printing remain
-web workflows. Receptionist payment posting remains unavailable.
+web workflows. Receptionist-only accounts cannot read or post Finance data.
 
 The forward Finance migration restores restricted ledger-owner privileges
 and RLS without granting browser clients direct ledger writes. Its isolated
