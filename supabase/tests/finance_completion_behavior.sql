@@ -9,8 +9,8 @@ end;
 $$;
 do $$
 declare
-  supervisor uuid := gen_random_uuid(); accountant uuid := gen_random_uuid();
-  outsider uuid := gen_random_uuid(); teacher uuid := gen_random_uuid();
+  supervisor uuid := gen_random_uuid(); admin_id uuid := gen_random_uuid(); accountant uuid := gen_random_uuid();
+  outsider uuid := gen_random_uuid(); teacher uuid := gen_random_uuid(); receptionist uuid := gen_random_uuid();
   learner uuid := gen_random_uuid(); parent uuid := gen_random_uuid();
   unverified uuid := gen_random_uuid();
   branch_a uuid := gen_random_uuid(); branch_b uuid := gen_random_uuid();
@@ -21,16 +21,16 @@ declare
   other_role text; other_user uuid;
 begin
   insert into auth.users (id, email_confirmed_at) values
-    (supervisor, now()), (accountant, now()), (outsider, now()), (teacher, now()),
+    (supervisor, now()), (admin_id, now()), (accountant, now()), (outsider, now()), (teacher, now()), (receptionist, now()),
     (learner, now()), (parent, now()), (unverified, now());
   insert into public.user_roles (user_id, role) values
-    (supervisor, 'super_admin'), (accountant, 'accountant'), (outsider, 'accountant'),
-    (teacher, 'teacher'), (learner, 'student'), (parent, 'parent'), (unverified, 'parent');
+    (supervisor, 'super_admin'), (admin_id, 'admin'), (accountant, 'accountant'), (outsider, 'accountant'),
+    (teacher, 'teacher'), (receptionist, 'receptionist'), (learner, 'student'), (parent, 'parent'), (unverified, 'parent');
   perform set_config('request.jwt.claim.sub', supervisor::text, true);
   insert into public.branches (id, name, code) values
     (branch_a, prefix || 'a', prefix || 'a'), (branch_b, prefix || 'b', prefix || 'b');
   insert into public.branch_memberships (user_id, branch_id) values
-    (accountant, branch_a), (outsider, branch_b), (teacher, branch_a);
+    (admin_id, branch_a), (accountant, branch_a), (outsider, branch_b), (teacher, branch_a), (receptionist, branch_a);
   insert into public.academic_sessions (id, name, starts_on, ends_on, is_active)
     values (academic, prefix, current_date, current_date + 10, true);
   insert into public.classes (id, branch_id, session_id, name, program)
@@ -65,10 +65,22 @@ begin
   payment := public.sai_finance_pay(assignment, 30, 'cash', null, key);
   if payment <> public.sai_finance_pay(assignment, 30, 'cash', null, key)
     then raise exception 'Payment retry not idempotent'; end if;
+  denied := false;
+  begin perform public.sai_finance_pay(assignment, 31, 'cash', null, key);
+  exception when unique_violation then denied := true; end;
+  if not denied then raise exception 'Conflicting payment retry accepted'; end if;
+  denied := false;
+  begin perform public.sai_finance_pay(assignment, 61, 'cash', null, gen_random_uuid());
+  exception when check_violation then denied := true; end;
+  if not denied then raise exception 'Overpayment accepted'; end if;
   select a.balance into balance from public.sai_finance_assignments() a where a.id = assignment;
   if balance <> 60 then raise exception 'Incorrect outstanding balance %', balance; end if;
   if not exists (select 1 from public.sai_finance_payments(assignment) p where p.id = payment and p.receipt_number <> '')
     then raise exception 'Receipt missing'; end if;
+  perform set_config('request.jwt.claim.sub', admin_id::text, true);
+  if not exists (select 1 from public.sai_finance_students() where id = student_a)
+    or exists (select 1 from public.sai_finance_students() where id = student_b)
+    then raise exception 'Admin finance scope incorrect'; end if;
   perform set_config('request.jwt.claim.sub', outsider::text, true);
   if exists (select 1 from public.sai_finance_students() where id = student_a)
     or exists (select 1 from public.sai_finance_assignments() where id = assignment)
@@ -78,6 +90,15 @@ begin
   begin perform public.sai_finance_pay(assignment, 1, 'cash', null, gen_random_uuid());
   exception when insufficient_privilege then denied := true; end;
   if not denied then raise exception 'Cross-branch payment accepted'; end if;
+  perform set_config('request.jwt.claim.sub', receptionist::text, true);
+  if exists (select 1 from public.sai_finance_assignments() where id = assignment)
+    or exists (select 1 from public.fee_groups where id = fee)
+    or exists (select 1 from public.sai_finance_group_labels() where id = fee)
+    then raise exception 'Receptionist can view finance data'; end if;
+  denied := false;
+  begin perform public.sai_finance_pay(assignment, 1, 'cash', null, gen_random_uuid());
+  exception when insufficient_privilege then denied := true; end;
+  if not denied then raise exception 'Receptionist posted a payment'; end if;
   perform set_config('request.jwt.claim.sub', learner::text, true);
   if not exists (select 1 from public.sai_finance_assignments() where id = assignment)
     or not exists (select 1 from public.sai_finance_students() where id = student_a)

@@ -1,6 +1,31 @@
 -- Migration 019 replaced the ledger functions but retained their restricted
 -- owner from 007. Give only that NOLOGIN owner the public-ledger access they
 -- need, and keep row scope enforced independently of the function checks.
+create or replace function private.sai_finance_can_read_student(wanted_student uuid, wanted_branch uuid)
+returns boolean language sql stable security definer
+set search_path = pg_catalog, public, private
+as $$
+  select exists (
+    select 1 from public.user_roles r
+    where r.user_id = (select auth.uid()) and (
+      r.role = 'super_admin'
+      or (r.role in ('admin', 'accountant') and exists (
+        select 1 from public.branch_memberships m
+        where m.user_id = (select auth.uid()) and m.branch_id = wanted_branch and m.is_active
+      ))
+    )
+  ) or exists (
+    select 1 from public.students s where s.id = wanted_student and (
+      (s.user_id = (select auth.uid()) and private.sai_finance_has_role(array['student']))
+      or (private.sai_finance_has_role(array['parent']) and exists (
+        select 1 from public.parent_student_links l where l.student_id = s.id
+          and l.parent_user_id = (select auth.uid()) and l.verified_at is not null
+      ))
+    )
+  );
+$$;
+alter policy fee_groups_read on public.fee_groups
+  using (private.sai_finance_staff(branch_id, array['admin', 'accountant']));
 grant usage on schema private to sai_finance_owner;
 grant execute on function private.sai_finance_staff(uuid, text[]), private.sai_finance_has_role(text[]),
   private.sai_finance_can_read_student(uuid, uuid) to sai_finance_owner;
@@ -13,7 +38,7 @@ grant usage on sequence public.finance_receipt_seq, public.finance_refund_seq,
   public.finance_audit_log_id_seq to sai_finance_owner;
 
 create policy finance_owner_groups_read on public.fee_groups for select to sai_finance_owner
-  using (private.sai_finance_staff(branch_id, array['admin', 'accountant', 'receptionist']));
+  using (private.sai_finance_staff(branch_id, array['admin', 'accountant']));
 create policy finance_owner_groups_write on public.fee_groups for all to sai_finance_owner
   using (private.sai_finance_staff(branch_id, array['admin', 'accountant']))
   with check (private.sai_finance_staff(branch_id, array['admin', 'accountant']));
@@ -22,13 +47,13 @@ create policy finance_owner_assignments_read on public.fee_assignments for selec
 create policy finance_owner_assignments_insert on public.fee_assignments for insert to sai_finance_owner
   with check (private.sai_finance_staff(branch_id, array['admin', 'accountant']));
 create policy finance_owner_assignments_update on public.fee_assignments for update to sai_finance_owner
-  using (private.sai_finance_staff(branch_id, array['admin', 'accountant', 'receptionist']))
-  with check (private.sai_finance_staff(branch_id, array['admin', 'accountant', 'receptionist']));
+  using (private.sai_finance_staff(branch_id, array['admin', 'accountant']))
+  with check (private.sai_finance_staff(branch_id, array['admin', 'accountant']));
 create policy finance_owner_payments_read on public.fee_payments for select to sai_finance_owner
   using (exists (select 1 from public.fee_assignments a where a.id = assignment_id
     and private.sai_finance_can_read_student(a.student_id, a.branch_id)));
 create policy finance_owner_payments_insert on public.fee_payments for insert to sai_finance_owner
-  with check (private.sai_finance_staff(branch_id, array['admin', 'accountant', 'receptionist']));
+  with check (private.sai_finance_staff(branch_id, array['admin', 'accountant']));
 create policy finance_owner_payments_update on public.fee_payments for update to sai_finance_owner
   using (private.sai_finance_staff(branch_id, array['accountant']))
   with check (private.sai_finance_staff(branch_id, array['accountant']));
@@ -46,7 +71,7 @@ create policy finance_owner_audit_read on public.finance_audit_log for select to
   using (private.sai_finance_staff(branch_id, array['accountant']));
 create policy finance_owner_audit_insert on public.finance_audit_log for insert to sai_finance_owner
   with check (actor_id = (select auth.uid())
-    and private.sai_finance_staff(branch_id, array['admin', 'accountant', 'receptionist']));
+    and private.sai_finance_staff(branch_id, array['admin', 'accountant']));
 
 alter table public.fee_groups add constraint fee_groups_amount_finite check (amount <> 'NaN'::numeric);
 alter table public.fee_assignments add constraint fee_assignments_amounts_finite
