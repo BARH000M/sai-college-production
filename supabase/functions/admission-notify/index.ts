@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { trustedClientIp } from "../_shared/client-ip.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,7 @@ const cors = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...cors, "Content-Type": "application/json" },
+    headers: { ...cors, "Cache-Control": "no-store", "Content-Type": "application/json" },
   });
 }
 
@@ -30,13 +31,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function safeUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!/^https?:\/\/[^\s]+$/i.test(trimmed)) return null;
-  return trimmed.slice(0, 500);
 }
 
 function formatDate(value: string | null): string {
@@ -65,7 +59,6 @@ type StatusContext = {
   applicant_full_name: string;
   email: string | null;
   status: string;
-  previous_status: string | null;
   preferred_program: string | null;
   preferred_level: string | null;
   branch_name: string | null;
@@ -88,9 +81,17 @@ function layout(options: { accent: string; kicker: string; title: string; body: 
   </div>`;
 }
 
-function trackButton(statusUrl: string | null): string {
-  if (!statusUrl) return "";
-  return `<p style="margin:20px 0 0"><a href="${escapeHtml(statusUrl)}" style="display:inline-block;background:#0f5132;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:8px;font-size:14px">متابعة حالة الطلب</a></p>`;
+async function rateKey(ip: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(ip)));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 Deno.serve(async (req) => {
@@ -104,15 +105,22 @@ Deno.serve(async (req) => {
     return json({ ok: false, message: "إعداد الخادم غير مكتمل." }, 500);
   }
 
-  let body: Record<string, unknown> = {};
+  let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    const parsed: unknown = await req.json();
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return json({ ok: false, message: "Invalid request body" }, 400);
+    }
+    body = parsed as Record<string, unknown>;
   } catch {
-    body = {};
+    return json({ ok: false, message: "Invalid JSON request body" }, 400);
   }
 
-  const mode = body.mode === "status_update" ? "status_update" : "submitted";
-  const statusUrl = safeUrl(body.statusUrl);
+  const mode = body.mode;
+  if (mode !== "submitted" && mode !== "status_update" && mode !== "tracking_token") {
+    return json({ ok: false, message: "Unknown notification mode" }, 400);
+  }
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
   const apiKey = Deno.env.get("RESEND_API_KEY");
   const fromDomain = Deno.env.get("RESEND_FROM_DOMAIN");
@@ -126,14 +134,28 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ from, to: [to], subject, html }),
     });
     if (!response.ok) {
-      const detail = await response.text();
-      console.error("Resend error", response.status, detail.slice(0, 300));
+      await response.body?.cancel();
+      console.error("Resend error", response.status);
       return false;
     }
     return true;
   }
 
-  if (mode === "status_update") {
+  async function rateLimited(secret: string): Promise<boolean | null> {
+    const ip = trustedClientIp(req.headers);
+    if (!ip) return null;
+    const { data, error } = await admin.rpc("admissions_public_rate_limit", {
+      p_client_key: await rateKey(ip, secret),
+      p_scope: "email",
+    });
+    if (error) {
+      console.error("Admission email rate limit failed", error.code);
+      return null;
+    }
+    return data === true;
+  }
+
+  if (mode === "status_update" || mode === "tracking_token") {
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace(/^Bearer\s+/i, "").trim();
     if (!token || !anonKey) return json({ ok: false, message: "الجلسة غير صالحة." }, 401);
@@ -165,8 +187,38 @@ Deno.serve(async (req) => {
     if (!record.email) return json({ ok: true, sent: false, reason: "NO_EMAIL" });
     if (!apiKey || !fromDomain) return json({ ok: true, sent: false, reason: "EMAIL_NOT_CONFIGURED" });
 
+    if (mode === "tracking_token") {
+      const trackingToken = typeof body.trackingToken === "string" ? body.trackingToken.trim() : "";
+      if (!/^[0-9a-f]{64}$/.test(trackingToken)) {
+        return json({ ok: false, sent: false, reason: "INVALID_TOKEN" }, 400);
+      }
+      const limit = await rateLimited(serviceKey);
+      if (limit === null) return json({ ok: false, sent: false, reason: "SERVICE_UNAVAILABLE" }, 503);
+      if (!limit) return json({ ok: false, sent: false, reason: "RATE_LIMITED" }, 429);
+
+      const { data: status, error: tokenError } = await admin.rpc("admissions_public_status", {
+        p_reference: record.application_no,
+        p_tracking_token: trackingToken,
+      });
+      if (tokenError) return json({ ok: false, sent: false, reason: "LOOKUP_FAILED" }, 500);
+      if (!status) return json({ ok: false, sent: false, reason: "INVALID_TOKEN" }, 400);
+
+      const tokenHtml = layout({
+        accent: "#a61e32",
+        kicker: "كلية ساي التعليمية اليمنية الصينية — مكتب القبول",
+        title: "رمز متابعة طلب القبول",
+        body: `
+          <p style="margin:0">مرحباً ${escapeHtml(record.applicant_full_name)}،</p>
+          <p style="margin:10px 0 0">استخدم رقم الطلب والرمز الخاص أدناه لمتابعة الحالة. لا تشارك الرمز مع أي شخص غير موثوق.</p>
+          <p style="margin:14px 0;font-size:17px;font-weight:700;direction:ltr;text-align:center;background:#f8e9eb;border-radius:8px;padding:12px">${escapeHtml(record.application_no)}</p>
+          <p style="margin:14px 0;font-size:16px;font-weight:700;letter-spacing:1px;direction:ltr;text-align:center;background:#f8e9eb;border-radius:8px;padding:12px;word-break:break-all">${escapeHtml(trackingToken)}</p>
+          <p style="margin:20px 0 0;color:#5b6159;font-size:12px">إذا لم تطلب هذا الرمز، تواصل مع مكتب القبول.</p>`,
+      });
+      const sent = await sendEmail(record.email, `رمز متابعة طلبك ${record.application_no}`, tokenHtml);
+      return json({ ok: true, sent, reason: sent ? undefined : "SEND_FAILED" });
+    }
+
     const statusLabel = STATUS_LABELS[record.status] ?? record.status;
-    const previousLabel = record.previous_status ? (STATUS_LABELS[record.previous_status] ?? record.previous_status) : null;
     const ref = escapeHtml(record.application_no);
     const name = escapeHtml(record.applicant_full_name);
 
@@ -178,14 +230,12 @@ Deno.serve(async (req) => {
         <p style="margin:0">مرحباً ${name}،</p>
         <p style="margin:10px 0 0">نود إبلاغك بأنه تم تحديث حالة طلبك رقم <strong style="direction:ltr;display:inline-block">${ref}</strong>.</p>
         <p style="margin:16px 0;font-size:18px;font-weight:700;text-align:center;background:#eef3ee;border-radius:8px;padding:14px;color:#0f5132">${escapeHtml(statusLabel)}</p>
-        ${previousLabel ? `<p style="margin:0;font-size:12px;color:#5b6159">الحالة السابقة: ${escapeHtml(previousLabel)}</p>` : ""}
         <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px">
           <tr><td style="padding:8px 0;color:#5b6159">البرنامج</td><td style="padding:8px 0;font-weight:600">${escapeHtml(record.preferred_program ?? "—")}</td></tr>
           <tr><td style="padding:8px 0;color:#5b6159">الفرع</td><td style="padding:8px 0;font-weight:600">${escapeHtml(record.branch_name ?? "—")}</td></tr>
           <tr><td style="padding:8px 0;color:#5b6159">الجلسة</td><td style="padding:8px 0;font-weight:600">${escapeHtml(record.session_name ?? "—")}</td></tr>
-          <tr><td style="padding:8px 0;color:#5b6159">تاريخ التحديث</td><td style="padding:8px 0;font-weight:600">${escapeHtml(formatDate(record.occurrence))}</td></tr>
+          <tr><td style="padding:8px 0;color:#5b6159">آخر تحديث للطلب</td><td style="padding:8px 0;font-weight:600">${escapeHtml(formatDate(record.occurrence))}</td></tr>
         </table>
-        ${trackButton(statusUrl)}
         <p style="margin:20px 0 0;color:#5b6159;font-size:12px">هذا البريد يُرسل تلقائيًا عند كل تغيير على حالة طلبك. للاستفسار تواصل مع مكتب القبول.</p>`,
     });
 
@@ -194,17 +244,30 @@ Deno.serve(async (req) => {
   }
 
   const reference = typeof body.reference === "string" ? body.reference.trim() : "";
-  if (reference.length < 6 || reference.length > 80) {
+  const trackingToken = typeof body.trackingToken === "string" ? body.trackingToken.trim() : "";
+  if (reference.length < 6 || reference.length > 80 || !/^[0-9a-f]{64}$/.test(trackingToken)) {
     return json({ ok: false, message: "الرقم المرجعي غير صالح." }, 400);
   }
 
-  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  const limit = await rateLimited(serviceKey);
+  if (limit === null) return json({ ok: false, reason: "SERVICE_UNAVAILABLE" }, 503);
+  if (!limit) return json({ ok: false, reason: "RATE_LIMITED" }, 429);
+  const { data: status, error: tokenError } = await admin.rpc("admissions_public_status", {
+    p_reference: reference,
+    p_tracking_token: trackingToken,
+  });
+  if (tokenError) return json({ ok: false, message: "تعذر التحقق من طلبك." }, 500);
+  if (!status) return json({ ok: true, sent: false, reason: "NO_MATCH" });
+
   const { data: enquiry, error: enquiryError } = await admin
     .from("admissions_enquiries")
     .select("application_no,applicant_full_name,guardian_name,phone,email,preferred_program,preferred_level,status,created_at,branch_id,academic_session_id")
-    .ilike("application_no", reference)
+    .eq("application_no", reference.toUpperCase())
     .maybeSingle<Enquiry>();
-  if (enquiryError) return json({ ok: false, message: enquiryError.message }, 500);
+  if (enquiryError) {
+    console.error("Admission notification enquiry lookup failed", enquiryError.code);
+    return json({ ok: false, message: "تعذر تحميل بيانات الطلب." }, 500);
+  }
   if (!enquiry) return json({ ok: false, message: "الطلب غير موجود." }, 404);
   if (!enquiry.email) return json({ ok: true, sent: false, reason: "NO_EMAIL" });
   if (!apiKey || !fromDomain) return json({ ok: true, sent: false, reason: "EMAIL_NOT_CONFIGURED" });
@@ -215,6 +278,14 @@ Deno.serve(async (req) => {
     admin.from("branches").select("name").eq("id", enquiry.branch_id).maybeSingle(),
     admin.from("academic_sessions").select("name").eq("id", enquiry.academic_session_id).maybeSingle(),
   ]);
+  if (branchResult.error || sessionResult.error) {
+    console.error(
+      "Admission notification directory lookup failed",
+      branchResult.error?.code,
+      sessionResult.error?.code,
+    );
+    return json({ ok: false, message: "تعذر تحميل بيانات الفرع والجلسة." }, 500);
+  }
   const branchName = (branchResult.data as { name?: string } | null)?.name ?? "—";
   const sessionName = (sessionResult.data as { name?: string } | null)?.name ?? "—";
 
@@ -231,8 +302,9 @@ Deno.serve(async (req) => {
     title: "تم استلام طلب القبول",
     body: `
       <p style="margin:0">مرحباً ${name}،</p>
-      <p style="margin:10px 0 0">شكراً لتقديمك على كلية ساي. تم تسجيل طلبك رسمياً، وهذا رقم الطلب المرجعي الذي ستحتاجه لمتابعة حالتك:</p>
+      <p style="margin:10px 0 0">شكراً لتقديمك على كلية ساي. احتفظ برقم الطلب ورمز المتابعة أدناه لاستخدامهما معًا عند الاطلاع على حالتك:</p>
       <p style="margin:14px 0;font-size:22px;font-weight:700;letter-spacing:1px;direction:ltr;text-align:center;background:#eef3ee;border-radius:8px;padding:12px">${ref}</p>
+      <p style="margin:14px 0;font-size:16px;font-weight:700;letter-spacing:1px;direction:ltr;text-align:center;background:#eef3ee;border-radius:8px;padding:12px;word-break:break-all">${escapeHtml(trackingToken)}</p>
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
         <tr><td style="padding:8px 0;color:#5b6159">البرنامج</td><td style="padding:8px 0;font-weight:600">${escapeHtml(String(program))}</td></tr>
         <tr><td style="padding:8px 0;color:#5b6159">المستوى</td><td style="padding:8px 0;font-weight:600">${escapeHtml(String(level))}</td></tr>
@@ -241,8 +313,7 @@ Deno.serve(async (req) => {
         <tr><td style="padding:8px 0;color:#5b6159">تاريخ التقديم</td><td style="padding:8px 0;font-weight:600">${escapeHtml(submitted)}</td></tr>
         <tr><td style="padding:8px 0;color:#5b6159">حالة الطلب</td><td style="padding:8px 0;font-weight:600">${escapeHtml(statusLabel)}</td></tr>
       </table>
-      ${trackButton(statusUrl)}
-      <p style="margin:20px 0 0;color:#5b6159;font-size:12px">سيتواصل معك فريق القبول خلال أيام العمل القادمة. يرجى الاحتفاظ بهذا الرقم.</p>`,
+      <p style="margin:20px 0 0;color:#5b6159;font-size:12px">سيتواصل معك فريق القبول خلال أيام العمل القادمة. لا تشارك رمز المتابعة.</p>`,
   });
 
   const teamHtml = layout({

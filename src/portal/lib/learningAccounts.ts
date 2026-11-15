@@ -16,10 +16,10 @@ export type ProvisionKind = "student" | "parent";
 
 export type CreatedAccount = {
   email: string;
-  password: string;
   role: ProvisionKind;
   fullName: string;
   studentName: string;
+  inviteSent: boolean;
 };
 
 type OverviewResponse = { ok?: boolean; students?: ProvisionStudent[]; message?: string };
@@ -46,11 +46,12 @@ export async function provisionLearningAccount(input: {
   studentId: string;
   kind: ProvisionKind;
   email: string;
-  password: string;
   parentName?: string;
 }): Promise<CreatedAccount> {
   const data = await invoke<CreateResponse>({ action: "create", ...input });
-  if (!data.account) throw new Error("لم تُرجع الخدمة بيانات الحساب المنشأ.");
+  if (!data.account || data.account.inviteSent !== true) {
+    throw new Error("لم تؤكد الخدمة إرسال دعوة الحساب.");
+  }
   return data.account;
 }
 

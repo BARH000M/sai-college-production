@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -66,7 +66,7 @@ type DashboardSummary = {
   pendingAdmissions: number;
 };
 
-async function loadDashboardSummary(admin: ReturnType<typeof createClient>): Promise<DashboardSummary> {
+async function loadDashboardSummary(admin: SupabaseClient): Promise<DashboardSummary> {
   const accounts: { id: string; hasEmail: boolean; emailConfirmed: boolean; banned: boolean }[] = [];
   for (let page = 1; ; page += 1) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });

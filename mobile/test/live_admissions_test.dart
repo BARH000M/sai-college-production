@@ -8,6 +8,8 @@ class _FakeAdmissionsRepository implements AdmissionsData {
   String currentStatus = 'new';
   String? savedStatus;
   String? enrolledId;
+  String? linkedUserId;
+  List<Map<String, dynamic>> linkableAccounts = [];
 
   @override
   Future<List<Map<String, dynamic>>> loadBranches() async => [
@@ -48,6 +50,15 @@ class _FakeAdmissionsRepository implements AdmissionsData {
     enrolledId = enquiryId;
     currentStatus = 'enrolled';
     return {'student_id': 'student-1', 'admission_no': 'SAI-APP-1042'};
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> loadLinkableAccounts() async =>
+      linkableAccounts;
+
+  @override
+  Future<void> linkStudentAccount(String studentId, String userId) async {
+    linkedUserId = userId;
   }
 }
 
@@ -116,6 +127,52 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.enrolledId, 'enquiry-1');
     expect(find.textContaining('مسجل'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('enrollment can link an existing account without creating one', (
+    tester,
+  ) async {
+    final repository = _FakeAdmissionsRepository()
+      ..linkableAccounts = [
+        {
+          'id': 'user-1',
+          'fullName': 'Student Account',
+          'email': 'student@example.test',
+          'roles': ['student'],
+          'linkedStudentId': null,
+        },
+      ];
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('ar'),
+        home: Scaffold(
+          body: LiveAdmissionsScreen(
+            roles: {Role.admin},
+            repository: repository,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('تحديث الحالة'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('مقبول'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إنشاء سجل طالب'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('تأكيد التسجيل'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ربط حساب قائم'), findsOneWidget);
+    expect(find.text('student@example.test'), findsOneWidget);
+    await tester.tap(find.text('student@example.test'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ربط الحساب المحدد'));
+    await tester.pumpAndSettle();
+
+    expect(repository.enrolledId, 'enquiry-1');
+    expect(repository.linkedUserId, 'user-1');
     expect(tester.takeException(), isNull);
   });
 }

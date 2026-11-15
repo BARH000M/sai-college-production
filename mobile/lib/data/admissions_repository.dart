@@ -33,6 +33,10 @@ abstract interface class AdmissionsData {
   Future<void> updateStatus(String enquiryId, String status);
 
   Future<Map<String, dynamic>> enroll(String enquiryId);
+
+  Future<List<Map<String, dynamic>>> loadLinkableAccounts();
+
+  Future<void> linkStudentAccount(String studentId, String userId);
 }
 
 class AdmissionsRepository implements AdmissionsData {
@@ -97,5 +101,57 @@ class AdmissionsRepository implements AdmissionsData {
       throw StateError('The enrollment RPC returned an incomplete response.');
     }
     return response;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> loadLinkableAccounts() async {
+    final response = await _client.functions.invoke(
+      'link-student-account',
+      body: {'action': 'list'},
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw StateError(
+        'Could not load verified Auth accounts (${response.status}).',
+      );
+    }
+    if (response.data is! Map ||
+        response.data['ok'] != true ||
+        response.data['users'] is! List) {
+      throw StateError(
+        'The account-link service returned an invalid response.',
+      );
+    }
+    final users = response.data['users'] as List;
+    return users.map((user) {
+      if (user is! Map ||
+          user['id'] is! String ||
+          user['fullName'] is! String ||
+          user['email'] is! String ||
+          user['roles'] is! List ||
+          user['linkedStudentId'] != null &&
+              user['linkedStudentId'] is! String) {
+        throw StateError(
+          'The account-link service returned an invalid account.',
+        );
+      }
+      return Map<String, dynamic>.from(user);
+    }).toList();
+  }
+
+  @override
+  Future<void> linkStudentAccount(String studentId, String userId) async {
+    final response = await _client.functions.invoke(
+      'link-student-account',
+      body: {'action': 'link', 'studentId': studentId, 'userId': userId},
+    );
+    if (response.status < 200 ||
+        response.status >= 300 ||
+        response.data is! Map ||
+        response.data['ok'] != true) {
+      final message = response.data is Map && response.data['message'] is String
+          ? response.data['message'] as String
+          : 'Could not link the verified account (${response.status}).';
+      throw StateError(message);
+    }
   }
 }

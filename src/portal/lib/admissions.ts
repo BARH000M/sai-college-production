@@ -329,6 +329,30 @@ export async function enrollAdmission(enquiryId: string): Promise<AdmissionEnrol
   return result.data;
 }
 
+export type TrackingTokenDelivery = { sent: boolean; trackingToken: string; reason: string | null };
+
+export async function issueAndEmailAdmissionTrackingToken(enquiryId: string): Promise<TrackingTokenDelivery> {
+  const issued = await supabase.rpc("admissions_issue_tracking_token", {
+    p_enquiry_id: enquiryId,
+  });
+  if (issued.error) throw new Error(issued.error.message);
+  if (typeof issued.data !== "string" || !/^[0-9a-f]{64}$/.test(issued.data)) {
+    throw new Error("لم تُصدر قاعدة البيانات رمز متابعة صالحًا.");
+  }
+
+  const { data, error } = await supabase.functions.invoke("admission-notify", {
+    body: { mode: "tracking_token", enquiryId, trackingToken: issued.data },
+  });
+  if (error) {
+    return { sent: false, trackingToken: issued.data, reason: error.message };
+  }
+  return {
+    sent: data?.sent === true,
+    trackingToken: issued.data,
+    reason: typeof data?.reason === "string" ? data.reason : null,
+  };
+}
+
 export async function assignAdmission(enquiryId: string, userId: string | null): Promise<void> {
   const result = await supabase.from("admissions_enquiries")
     .update({ assigned_to: userId }).eq("id", enquiryId).select("id");

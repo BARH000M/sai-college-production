@@ -6,20 +6,21 @@ import Footer from '@/components/feature/Footer';
 import { supabase } from '@/portal/lib/supabase';
 
 type ApplicationStatus = {
-  application_no: string;
-  applicant_name: string;
-  program: string | null;
-  level: string | null;
   status: string;
-  branch_name: string | null;
-  session_name: string | null;
   submitted_at: string;
   status_updated_at: string;
 };
 
 const steps = ['new', 'contacted', 'assessment', 'accepted', 'enrolled'] as const;
 
-type StatusHistoryRow = { action: string; new_status: string; occurred_at: string };
+type StatusHistoryRow = { action: 'insert' | 'status_change' | 'current_status_snapshot'; status: string; occurred_at: string };
+
+function isStatusHistoryRow(value: unknown): value is StatusHistoryRow {
+  if (typeof value !== 'object' || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return (row.action === 'insert' || row.action === 'status_change' || row.action === 'current_status_snapshot')
+    && typeof row.status === 'string' && typeof row.occurred_at === 'string';
+}
 
 const stepCopy: Record<string, { ar: string; en: string }> = {
   new: { ar: 'تم استلام الطلب', en: 'Enquiry received' },
@@ -43,6 +44,7 @@ export default function ApplicationStatusPage() {
   const { isAr } = useLang();
   const [searchParams] = useSearchParams();
   const [reference, setReference] = useState('');
+  const [trackingToken, setTrackingToken] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'found' | 'missing' | 'error'>('idle');
   const [result, setResult] = useState<ApplicationStatus | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -51,11 +53,14 @@ export default function ApplicationStatusPage() {
   const [historyError, setHistoryError] = useState('');
   const autoLookupDone = useRef(false);
 
-  const lookup = useCallback(async (raw: string) => {
-    const value = raw.trim();
-    if (value.length < 6) {
+  const lookup = useCallback(async (rawReference: string, rawToken: string) => {
+    const value = rawReference.trim();
+    const token = rawToken.trim();
+    if (value.length < 6 || !/^[0-9a-f]{64}$/.test(token)) {
       setStatus('error');
-      setErrorMessage(isAr ? 'أدخل الرقم المرجعي كاملًا كما ورد في رسالة التأكيد (يبدأ بـ SAI-APP-).' : 'Enter the full reference number from your confirmation email (it starts with SAI-APP-).');
+      setErrorMessage(isAr
+        ? 'أدخل رقم الطلب ورمز المتابعة المكوّن من 64 خانة كما وصلاك.'
+        : 'Enter your application reference and the 64-character tracking code.');
       setResult(null);
       return;
     }
@@ -63,15 +68,20 @@ export default function ApplicationStatusPage() {
     setErrorMessage('');
     setResult(null);
     try {
-      const { data, error } = await supabase.rpc('sai_public_admission_status', { p_reference: value });
+      const { data, error } = await supabase.functions.invoke('admission-tracking', {
+        body: { mode: 'status', reference: value, trackingToken: token },
+      });
       if (error) {
         setStatus('error');
-        setErrorMessage(isAr ? 'تعذر البحث عن الطلب الآن. حاول مرة أخرى بعد قليل.' : 'We could not look up your application right now. Please try again shortly.');
+        setErrorMessage(data?.code === 'RATE_LIMITED'
+          ? (isAr ? 'تم إرسال طلبات كثيرة. انتظر قليلًا ثم حاول مجددًا.' : 'Too many requests. Please wait a moment and try again.')
+          : (isAr ? 'تعذر البحث عن الطلب الآن. حاول مرة أخرى بعد قليل.' : 'We could not look up your application right now. Please try again shortly.'));
         return;
       }
-      const rows = Array.isArray(data) ? data : [];
-      const row = rows[0] as ApplicationStatus | undefined;
-      if (!row) {
+      const row = data?.ok === true && data.result && typeof data.result === 'object'
+        ? data.result as ApplicationStatus
+        : null;
+      if (!row?.status || !row.submitted_at || !row.status_updated_at) {
         setStatus('missing');
         return;
       }
@@ -85,16 +95,13 @@ export default function ApplicationStatusPage() {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await lookup(reference);
+    await lookup(reference, trackingToken);
   };
 
   useEffect(() => {
     if (autoLookupDone.current) return;
     autoLookupDone.current = true;
-    const preset = (searchParams.get('ref') ?? '').trim();
-    if (preset.length < 6) return;
-    setReference(preset);
-    void lookup(preset);
+    setReference((searchParams.get('ref') ?? '').trim());
   }, [lookup, searchParams]);
 
   useEffect(() => {
@@ -110,25 +117,19 @@ export default function ApplicationStatusPage() {
     setHistoryLoading(true);
     void (async () => {
       try {
-        const { data, error } = await supabase.rpc('sai_public_admission_history', {
-          p_reference: result.application_no,
+        const { data, error } = await supabase.functions.invoke('admission-tracking', {
+          body: { mode: 'history', reference, trackingToken },
         });
         if (!active) return;
         if (error) {
           setHistory([]);
           setHistoryError(isAr ? 'تعذر تحميل سجل التحديثات حاليًا.' : 'We could not load the update history right now.');
         } else {
-          const rows = Array.isArray(data) ? data : [];
-          setHistory(
-            rows
-              .filter((row): row is StatusHistoryRow =>
-                typeof row === 'object' && row !== null && 'new_status' in row && 'occurred_at' in row)
-              .map((row) => ({
-                action: typeof row.action === 'string' ? row.action : 'status_change',
-                new_status: String((row as StatusHistoryRow).new_status),
-                occurred_at: String((row as StatusHistoryRow).occurred_at),
-              })),
-          );
+          if (!Array.isArray(data?.history) || !data.history.every(isStatusHistoryRow)) {
+            setHistoryError(isAr ? 'تعذر تحميل سجل التحديثات حاليًا.' : 'We could not load the update history right now.');
+          } else {
+            setHistory(data.history);
+          }
         }
       } catch {
         if (active) {
@@ -142,7 +143,7 @@ export default function ApplicationStatusPage() {
     return () => {
       active = false;
     };
-  }, [result, isAr]);
+  }, [result, reference, trackingToken, isAr]);
 
   const currentIndex = result ? steps.indexOf(result.status as (typeof steps)[number]) : -1;
   const closed = result ? ['rejected', 'withdrawn'].includes(result.status) : false;
@@ -175,8 +176,8 @@ export default function ApplicationStatusPage() {
             </h1>
             <p className="mt-3 text-sm md:text-base text-background-100/85 max-w-2xl leading-relaxed">
               {isAr
-                ? 'أدخل الرقم المرجعي الذي وصلك عند تقديم الطلب (مثال: SAI-APP-1042) لعرض آخر تحديث على طلبك.'
-                : 'Enter the reference number you received when you applied (for example SAI-APP-1042) to see the latest update.'}
+                ? 'أدخل رقم الطلب ورمز المتابعة الخاص الذي وصلك بعد التقديم. لا تعرض هذه الصفحة معلوماتك الشخصية.'
+                : 'Enter your application reference and private tracking code. This page does not display personal details.'}
             </p>
           </div>
         </section>
@@ -187,16 +188,39 @@ export default function ApplicationStatusPage() {
               <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4">
                 <div className="min-w-0">
                   <label htmlFor="adm-reference" className="text-xs text-foreground-700">
-                    {isAr ? 'الرقم المرجعي للطلب' : 'Application reference'}
+                    {isAr ? 'رقم الطلب' : 'Application reference'}
                   </label>
                   <input
                     id="adm-reference"
                     name="reference"
                     value={reference}
-                    onChange={(e) => setReference(e.target.value)}
+                    onChange={(e) => {
+                      setReference(e.target.value);
+                      setResult(null);
+                      setStatus('idle');
+                    }}
                     placeholder="SAI-APP-1042"
                     dir="ltr"
                     autoComplete="off"
+                    className="mt-1 w-full box-border rounded-md border border-background-300 bg-background-50 px-3 py-2.5 text-sm text-foreground-900 font-mono tracking-wide focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <label htmlFor="adm-tracking-token" className="text-xs text-foreground-700">
+                    {isAr ? 'رمز المتابعة الخاص' : 'Private tracking code'}
+                  </label>
+                  <input
+                    id="adm-tracking-token"
+                    name="trackingToken"
+                    value={trackingToken}
+                    onChange={(e) => {
+                      setTrackingToken(e.target.value);
+                      setResult(null);
+                      setStatus('idle');
+                    }}
+                    autoComplete="off"
+                    spellCheck={false}
+                    dir="ltr"
                     className="mt-1 w-full box-border rounded-md border border-background-300 bg-background-50 px-3 py-2.5 text-sm text-foreground-900 font-mono tracking-wide focus:outline-none focus:ring-2 focus:ring-primary-400"
                   />
                 </div>
@@ -214,7 +238,7 @@ export default function ApplicationStatusPage() {
                   <p className="text-sm text-accent-950">
                     {isAr
                       ? 'لم نعثر على طلب بهذا الرقم. تأكد من كتابة الرقم كما ورد في رسالة التأكيد، أو تواصل مع مكتب القبول.'
-                      : 'No application matches this number. Check the reference from your confirmation email, or contact the admissions office.'}
+                      : 'The reference and tracking code did not match. Check both codes or contact the admissions office.'}
                   </p>
                 </div>
               )}
@@ -229,7 +253,7 @@ export default function ApplicationStatusPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-xs text-foreground-600">{isAr ? 'رقم الطلب' : 'Reference'}</p>
-                      <p className="font-heading text-base md:text-lg text-foreground-950 break-all" dir="ltr">{result.application_no}</p>
+                      <p className="font-heading text-base md:text-lg text-foreground-950 break-all" dir="ltr">{reference}</p>
                     </div>
                     <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs whitespace-nowrap ${badgeTone}`}>
                       {statusCopy[result.status]?.[isAr ? 'ar' : 'en'] ?? result.status}
@@ -237,10 +261,6 @@ export default function ApplicationStatusPage() {
                   </div>
 
                   <dl className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div className="min-w-0"><dt className="text-xs text-foreground-600">{isAr ? 'اسم المتقدم' : 'Applicant'}</dt><dd className="text-foreground-900">{result.applicant_name}</dd></div>
-                    <div className="min-w-0"><dt className="text-xs text-foreground-600">{isAr ? 'البرنامج' : 'Programme'}</dt><dd className="text-foreground-900">{result.program || '—'}</dd></div>
-                    <div className="min-w-0"><dt className="text-xs text-foreground-600">{isAr ? 'الفرع' : 'Branch'}</dt><dd className="text-foreground-900">{result.branch_name || '—'}</dd></div>
-                    <div className="min-w-0"><dt className="text-xs text-foreground-600">{isAr ? 'الجلسة' : 'Session'}</dt><dd className="text-foreground-900">{result.session_name || '—'}</dd></div>
                     <div className="min-w-0"><dt className="text-xs text-foreground-600">{isAr ? 'تاريخ التقديم' : 'Submitted'}</dt><dd className="text-foreground-900">{submittedDate}</dd></div>
                     <div className="min-w-0"><dt className="text-xs text-foreground-600">{isAr ? 'آخر تحديث' : 'Last update'}</dt><dd className="text-foreground-900">{updatedDate}</dd></div>
                   </dl>
@@ -286,8 +306,8 @@ export default function ApplicationStatusPage() {
                     </h3>
                     <p className="mt-1 text-xs text-foreground-600">
                       {isAr
-                        ? 'كل تغيير على طلبك يُسجّل بالتاريخ هنا، من الاستلام حتى التسجيل.'
-                        : 'Every change to your application is recorded here with its date, from receipt to enrolment.'}
+                        ? 'يعرض السجل التغييرات الموثوقة. للطلبات السابقة قد يبدأ السجل بالحالة المسجلة عند تفعيل سجل الحالة الموثوق.'
+                        : 'This shows verified changes. Older applications may begin with the status recorded when trusted history was enabled.'}
                     </p>
 
                     {historyLoading && (
@@ -312,8 +332,13 @@ export default function ApplicationStatusPage() {
                             </div>
                             <div className="min-w-0 pb-4">
                               <p className="text-sm text-foreground-900">
-                                {statusCopy[row.new_status]?.[isAr ? 'ar' : 'en'] ?? row.new_status}
+                                {statusCopy[row.status]?.[isAr ? 'ar' : 'en'] ?? row.status}
                               </p>
+                              {row.action === 'current_status_snapshot' && (
+                                <p className="mt-0.5 text-xs text-foreground-600">
+                                  {isAr ? 'الحالة المسجلة عند تفعيل سجل الحالة الموثوق، وليست تاريخ تغيير الحالة.' : 'Status recorded when trusted history was enabled, not the date of the status change.'}
+                                </p>
+                              )}
                               <p className="mt-0.5 text-xs text-foreground-600">
                                 {new Date(row.occurred_at).toLocaleString(isAr ? 'ar-EG' : 'en-GB', {
                                   year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -333,8 +358,8 @@ export default function ApplicationStatusPage() {
               <div className="rounded-lg border border-background-200 bg-background-100 p-5">
                 <h2 className="font-heading text-sm md:text-base text-foreground-950">{isAr ? 'كيف يعمل هذا؟' : 'How it works'}</h2>
                 <ul className="mt-3 space-y-2 text-xs md:text-sm text-foreground-700">
-                  <li className="flex gap-2"><i className="ri-mail-check-line text-primary-600"></i>{isAr ? 'يُرسل رقم الطلب إلى بريدك بعد التقديم مباشرة.' : 'Your reference is emailed to you right after you apply.'}</li>
-                  <li className="flex gap-2"><i className="ri-search-line text-primary-600"></i>{isAr ? 'استخدم نفس الرقم في أي وقت لعرض الحالة.' : 'Use the same number at any time to see your status.'}</li>
+                  <li className="flex gap-2"><i className="ri-mail-check-line text-primary-600"></i>{isAr ? 'يُرسل رقم الطلب ورمز المتابعة إلى بريدك بعد التقديم.' : 'Your reference and tracking code are emailed after submission.'}</li>
+                  <li className="flex gap-2"><i className="ri-search-line text-primary-600"></i>{isAr ? 'يلزم إدخال الرقم والرمز معًا؛ لا تشارك الرمز.' : 'Both codes are required; do not share the tracking code.'}</li>
                   <li className="flex gap-2"><i className="ri-user-heart-line text-primary-600"></i>{isAr ? 'يُحدّث فريق القبول الحالة بعد كل تواصل أو تقييم.' : 'Our team updates the status after each contact or assessment.'}</li>
                 </ul>
               </div>
@@ -342,8 +367,8 @@ export default function ApplicationStatusPage() {
                 <h2 className="font-heading text-sm md:text-base text-foreground-950">{isAr ? 'فقدت رقمك؟' : 'Lost your number?'}</h2>
                 <p className="mt-2 text-xs md:text-sm text-foreground-700">
                   {isAr
-                    ? 'تواصل مع مكتب القبول مع ذكر اسمك ورقم هاتفك، وسنعيد إرسال الرقم المرجعي إليك.'
-                    : 'Contact the admissions office with your name and phone number and we will resend your reference.'}
+                    ? 'تواصل مع مكتب القبول للتحقق من هويتك وإصدار رمز متابعة جديد. لا ترسل معلوماتك الشخصية عبر هذه الصفحة.'
+                    : 'Contact the admissions office to verify your identity and issue a new tracking code. Do not send personal details through this page.'}
                 </p>
                 <a href="mailto:admissions@saicollege.edu.ye" className="mt-3 inline-flex items-center gap-1 text-xs md:text-sm text-primary-700 underline whitespace-nowrap cursor-pointer">
                   admissions@saicollege.edu.ye

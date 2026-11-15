@@ -22,23 +22,42 @@ declare
   run_id text := replace(gen_random_uuid()::text, '-', '');
   visible_count bigint;
 begin
-  insert into auth.users (id)
-  values (super_id), (student_a), (student_b), (parent_a), (parent_b);
+  insert into auth.users (id, email_confirmed_at)
+  values
+    (super_id, now()), (student_a, now()), (student_b, now()),
+    (parent_a, now()), (parent_b, now());
   insert into public.user_roles (user_id, role)
   values (super_id, 'super_admin'), (student_a, 'student'), (student_b, 'student'),
          (parent_a, 'parent'), (parent_b, 'parent');
   perform set_config('request.jwt.claim.sub', super_id::text, true);
   insert into public.branches (id, name, code)
   values (branch_id, 'RLS_TEST_' || run_id, 'RLS_TEST_' || run_id);
-  insert into public.students (id, user_id, branch_id, admission_no, full_name)
+  insert into public.students (id, branch_id, admission_no, full_name)
   values
-    (student_record_a, student_a, branch_id, 'RLS_TEST_A_' || run_id, 'RLS_TEST_student_a'),
-    (student_record_b, student_b, branch_id, 'RLS_TEST_B_' || run_id, 'RLS_TEST_student_b');
-  insert into public.parent_student_links (parent_user_id, student_id, verified_at)
+    (student_record_a, branch_id, 'RLS_TEST_A_' || run_id, 'RLS_TEST_student_a'),
+    (student_record_b, branch_id, 'RLS_TEST_B_' || run_id, 'RLS_TEST_student_b');
+  insert into public.profiles (id, full_name, email)
   values
-    (parent_a, student_record_a, now()),
-    (parent_a, student_record_b, null),
-    (parent_b, student_record_b, now());
+    (parent_a, 'RLS_TEST_parent_a', 'RLS_TEST_parent_a@example.test'),
+    (parent_b, 'RLS_TEST_parent_b', 'RLS_TEST_parent_b@example.test');
+
+  execute 'set local role authenticated';
+  perform public.admissions_link_student_account(student_record_a, student_a);
+  perform public.admissions_link_student_account(student_record_b, student_b);
+  perform public.admissions_verify_parent_student(student_record_a, parent_a);
+  perform public.admissions_verify_parent_student(student_record_b, parent_b);
+  execute 'reset role';
+
+  perform set_config('request.jwt.claim.sub', student_a::text, true);
+  execute 'set local role authenticated';
+  begin
+    insert into public.parent_student_links (parent_user_id, student_id, verified_at)
+    values (parent_a, student_record_b, now());
+    raise exception 'Direct parent-link insertion unexpectedly succeeded';
+  exception when insufficient_privilege then
+    null;
+  end;
+  execute 'reset role';
 
   perform set_config('request.jwt.claim.sub', student_a::text, true);
   execute 'set local role authenticated';

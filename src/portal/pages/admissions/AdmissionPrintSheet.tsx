@@ -105,12 +105,12 @@ export function AdmissionPrintSheet({ kind, scope, onClose }: {
         ]
       : [];
 
-  const title = kind === "roster" ? "كشف طلبات القبول والتسجيل" : "سجل تغييرات حالات القبول";
+  const title = kind === "roster" ? "كشف طلبات القبول والتسجيل" : "سجل تدقيق القبول غير المتحقق منه";
   const archive = loadLastArchive() ?? undefined;
 
   return <ReportSheet
     title={title}
-    subtitle={`${scope.branchLabel} · تقرير رسمي معتمد للطباعة`}
+    subtitle={kind === "roster" ? `${scope.branchLabel} · تقرير رسمي معتمد للطباعة` : `${scope.branchLabel} · سجلات غير متحقق منها وقد تكون مزورة؛ ليست دليلاً على تغيير الحالة`}
     summary={summary}
     loading={loading}
     error={error}

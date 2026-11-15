@@ -163,10 +163,137 @@ class _LiveAdmissionsScreenState extends State<LiveAdmissionsScreen> {
           ),
         );
       }
+      if (widget.roles.contains(Role.super_admin) ||
+          widget.roles.contains(Role.admin)) {
+        await _offerAccountLink('${student['student_id']}');
+      }
     } on Object catch (error) {
       if (mounted) setState(() => _error = _errorMessage(error));
     } finally {
       if (mounted) setState(() => _updatingId = null);
+    }
+  }
+
+  Future<void> _offerAccountLink(String studentId) async {
+    List<Map<String, dynamic>> accounts;
+    try {
+      accounts = await _repository.loadLinkableAccounts();
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تم التسجيل، وتعذر تحميل الحسابات: $error')),
+        );
+      }
+      return;
+    }
+
+    final available = accounts
+        .where(
+          (account) =>
+              account['linkedStudentId'] == null ||
+              account['linkedStudentId'] == studentId,
+        )
+        .toList();
+    if (!mounted) return;
+    if (available.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تم التسجيل. لا توجد حسابات موثقة متاحة للربط؛ لم يُنشأ حساب تلقائيًا.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final searchController = TextEditingController();
+    Map<String, dynamic>? selected;
+    final account = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final term = searchController.text.trim().toLowerCase();
+          final matches = available.where((entry) {
+            final searchable = '${entry['fullName']} ${entry['email']}'
+                .toLowerCase();
+            return searchable.contains(term);
+          }).toList();
+          return AlertDialog(
+            title: const Text('ربط حساب قائم'),
+            content: SizedBox(
+              width: 440,
+              height: 360,
+              child: Column(
+                children: [
+                  const Text(
+                    'تم التسجيل. اختر حساب دخول موثقًا لربطه اختياريًا؛ لن يُنشأ حساب جديد.',
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: searchController,
+                    decoration: const InputDecoration(
+                      labelText: 'بحث بالاسم أو البريد الإلكتروني',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: matches.isEmpty
+                        ? const Center(child: Text('لا توجد حسابات مطابقة.'))
+                        : ListView(
+                            children: [
+                              for (final entry in matches)
+                                ListTile(
+                                  selected: selected?['id'] == entry['id'],
+                                  title: Text('${entry['fullName']}'),
+                                  subtitle: Text('${entry['email']}'),
+                                  onTap: () => setDialogState(() {
+                                    selected = entry;
+                                  }),
+                                ),
+                            ],
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('لاحقًا'),
+              ),
+              FilledButton(
+                onPressed: selected == null
+                    ? null
+                    : () => Navigator.pop(context, selected),
+                child: const Text('ربط الحساب المحدد'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    searchController.dispose();
+    if (account == null || !mounted) return;
+
+    try {
+      await _repository.linkStudentAccount(studentId, '${account['id']}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم ربط الحساب الموثق ${account['email']} بسجل الطالب.',
+            ),
+          ),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تم التسجيل لكن تعذر ربط الحساب: $error')),
+        );
+      }
     }
   }
 

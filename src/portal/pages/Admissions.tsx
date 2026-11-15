@@ -8,7 +8,7 @@ import { exportAdmissionHistoryCsv, exportAdmissionRosterCsv } from "../lib/admi
 import {
   admissionDraft, admissionStatuses, admissionsPageSize, applicationStatusUrl, assignAdmission, canManageAdmissions, isAdmissionStatus,
   loadAdmissionByReference, loadAdmissions, loadAdmissionHistory, loadAdmissionSessions, loadAdmissionStaff,
-  enrollAdmission, loadAdmissionStatusCounts, setAdmissionStatus, trackedStatuses,
+  enrollAdmission, issueAndEmailAdmissionTrackingToken, loadAdmissionStatusCounts, setAdmissionStatus, trackedStatuses,
   notifyAdmissionStatusChange, saveAdmission, validateAdmission,
   type Admission, type AdmissionDraft, type AdmissionFilters, type AdmissionHistoryEntry, type AdmissionStatusCounts, type StaffOption, type TrackedStatus,
 } from "../lib/admissions";
@@ -96,6 +96,8 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
   const [counts, setCounts] = useState<AdmissionStatusCounts>({ new: 0, contacted: 0, enrolled: 0, rejected: 0 });
   const [countsError, setCountsError] = useState<string | null>(null);
   const [quickBusy, setQuickBusy] = useState<string | null>(null);
+  const [trackingTokenBusy, setTrackingTokenBusy] = useState(false);
+  const [trackingTokenNotice, setTrackingTokenNotice] = useState<string | null>(null);
   const [history, setHistory] = useState<AdmissionHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -307,6 +309,22 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
       setQuickBusy(null);
     }
   }
+  async function reissueTrackingToken() {
+    if (!selected || trackingTokenBusy
+      || !window.confirm("سيؤدي إصدار رمز جديد إلى إلغاء الرمز السابق. هل تريد المتابعة؟")) return;
+    setTrackingTokenBusy(true);
+    setTrackingTokenNotice(null);
+    try {
+      const delivery = await issueAndEmailAdmissionTrackingToken(selected.id);
+      setTrackingTokenNotice(delivery.sent
+        ? "تم إرسال رمز متابعة جديد إلى البريد المسجل. أصبح الرمز السابق غير صالح."
+        : `تعذر إرسال البريد (${delivery.reason ?? "SEND_FAILED"}). بعد التحقق من هوية المتقدم، شاركه يدويًا: ${delivery.trackingToken}`);
+    } catch (failure) {
+      setTrackingTokenNotice(`تعذر إصدار رمز المتابعة: ${errorText(failure)}`);
+    } finally {
+      setTrackingTokenBusy(false);
+    }
+  }
   function openForm(row: Admission | null) {
     const branch = row?.branch_id ?? filters.branch;
     if (saving || editing !== undefined || !canEditBranch(branch)) return;
@@ -470,8 +488,8 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
         {textFields.map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{selected[field.key] || "—"}</dd></div>)}
         <div><dt>الحالة</dt><dd>{admissionStatuses[selected.status] ?? selected.status}</dd></div><div><dt>المسند إليه</dt><dd>{assigneeName(selected.assigned_to)}</dd></div><div><dt>تاريخ الإنشاء</dt><dd>{new Date(selected.created_at).toLocaleString("ar")}</dd></div><div><dt>تاريخ الإغلاق</dt><dd>{selected.closed_at ? new Date(selected.closed_at).toLocaleString("ar") : "—"}</dd></div></dl>
       <section className="audit-panel" aria-label="سجل تغييرات حالة الطلب">
-        <h3 className="history-title">سجل الحالة والتحديثات</h3>
-        <p className="data-note">كل تغيير في الحالة أو الإسناد يُسجّل تلقائيًا مع اسم الموظف ووقت التغيير.</p>
+        <h3 className="history-title">سجل التدقيق غير المتحقق منه</h3>
+        <p className="data-note">قد تحتوي هذه السجلات على معلومات غير موثوقة أو مزورة، بما فيها الحالة والموظف والتاريخ. لا تُعد دليلاً على تغيير فعلي؛ الحالة الحالية معروضة في تفاصيل الطلب أعلاه.</p>
         {historyLoading && <p role="status">جارٍ تحميل السجل...</p>}
         {historyError && <p className="error-box" role="alert">تعذر تحميل سجل الطلب: {historyError} <button className="text-button" onClick={() => setRetry((v) => v + 1)}>إعادة المحاولة</button></p>}
         {!historyLoading && !historyError && !history.length && <p className="muted">لا توجد تعديلات مسجّلة بعد.</p>}
@@ -487,6 +505,12 @@ export function Admissions({ roles, userId }: { roles: readonly string[]; userId
         </ol>}
       </section>
       {canEditBranch(selected.branch_id) && <button className="button primary" onClick={() => openForm(selected)}>تعديل الطلب والحالة</button>}
+      {canEditBranch(selected.branch_id) && (isSuper || roles.includes("admin")) && <>
+        <button className="button secondary" type="button" disabled={trackingTokenBusy} onClick={() => void reissueTrackingToken()}>
+          {trackingTokenBusy ? "جارٍ إصدار الرمز..." : "إصدار رمز متابعة وإرساله"}
+        </button>
+        {trackingTokenNotice && <p className="notice" role="status">{trackingTokenNotice}</p>}
+      </>}
       <div className="actions receipt-actions">
         <button className="button secondary" onClick={() => setApplicationOpen(true)}>طباعة نموذج الطلب</button>
         <button className="button secondary" onClick={() => setReceiptOpen(true)}>طباعة إيصال الاستلام</button>

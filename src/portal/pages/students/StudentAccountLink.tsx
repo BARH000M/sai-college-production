@@ -82,8 +82,8 @@ export function StudentAccountLink({
       {error && <p className="error-box" role="alert">{error}</p>}
       {!loading && !error && <>
         {!selectable.length && <p className="notice">
-          لا يوجد حساب جاهز للربط. أنشئ حساب دخول للطالب من صفحة «الأدوار» ← «حسابات بوابة التعلّم»
-          بزر «حساب طالب»؛ فهي تُنشئ الحساب وتربطه بالسجل وتُمنحه دور الطالب في خطوة واحدة.
+          لا يوجد حساب موثق جاهز للربط. يمكن إرسال دعوة من صفحة «الأدوار» ← «حسابات بوابة التعلّم»؛
+          بعد أن يؤكد صاحب الحساب بريده، حدّث القائمة ثم اربطه بهذا السجل.
         </p>}
         <label>اختر حساب الدخول
           <select value={selected} onChange={(e) => setSelected(e.target.value)} disabled={working}>

@@ -6,11 +6,12 @@ import { admissionSteps, programs } from '@/mocks/home';
 
 const errorCopy: Record<string, { ar: string; en: string }> = {
   INVALID_NAME: { ar: 'يرجى إدخال الاسم الكامل بشكل صحيح.', en: 'Please enter a valid full name.' },
-  INVALID_PHONE: { ar: 'يرجى إدخال رقم هاتف صحيح.', en: 'Please enter a valid phone number.' },
+  INVALID_CONTACT: { ar: 'يرجى إدخال رقم هاتف أو بريد إلكتروني صحيح.', en: 'Please enter a valid phone number or email address.' },
   INVALID_EMAIL: { ar: 'يرجى إدخال بريد إلكتروني صحيح.', en: 'Please enter a valid email address.' },
   MESSAGE_TOO_LONG: { ar: 'الرسالة أطول من 500 حرف.', en: 'Message exceeds 500 characters.' },
   NO_ACTIVE_TERM: { ar: 'القبول غير مفتوح حالياً. تواصل مع مكتب القبول.', en: 'Admissions are not open right now. Please contact the admissions office.' },
   NO_ADMISSIONS_OWNER: { ar: 'تعذر تسجيل الطلب حالياً. تواصل مع مكتب القبول.', en: 'We could not register the enquiry. Please contact the admissions office.' },
+  RATE_LIMITED: { ar: 'تم إرسال طلبات كثيرة. انتظر قليلًا ثم حاول مجددًا.', en: 'Too many requests. Please wait a moment and try again.' },
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -21,7 +22,9 @@ export default function Admissions() {
   const [formError, setFormError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [reference, setReference] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [trackingToken, setTrackingToken] = useState('');
+  const [copiedReference, setCopiedReference] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
   const [emailNote, setEmailNote] = useState<'idle' | 'pending' | 'sent' | 'unconfigured' | 'failed'>('idle');
   const [msgLen, setMsgLen] = useState(0);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -75,34 +78,41 @@ export default function Admissions() {
     setStatus('sending');
     setFormError('');
     setReference('');
-    setCopied(false);
+    setTrackingToken('');
+    setCopiedReference(false);
+    setCopiedToken(false);
     setEmailNote('idle');
     try {
-      const { data, error } = await supabase.rpc('sai_public_admission_submit', {
-        p_full_name: fullName,
-        p_phone: phone,
-        p_email: email,
-        p_program: String(fd.get('program') || '').trim(),
-        p_message: message,
+      const { data, error } = await supabase.functions.invoke('admission-tracking', {
+        body: {
+          mode: 'submit',
+          fullName,
+          phone,
+          email,
+          program: String(fd.get('program') || '').trim(),
+          message,
+        },
       });
       if (error) {
-        const key = Object.keys(errorCopy).find((code) => (error.message || '').includes(code));
+        const code = typeof data?.code === 'string' ? data.code : error.message;
+        const key = Object.keys(errorCopy).find((item) => code.includes(item));
         setFormError(key ? errorCopy[key][isAr ? 'ar' : 'en'] : copyRef.generic);
         setStatus('error');
         return;
       }
-      const ref = Array.isArray(data) ? data[0] : data;
-      if (typeof ref === 'string' && ref.trim()) {
-        const trimmedRef = ref.trim();
+      const ref = data && typeof data.reference === 'string' ? data.reference.trim() : '';
+      const token = data && typeof data.trackingToken === 'string' ? data.trackingToken.trim() : '';
+      if (data?.ok === true && ref && /^[0-9a-f]{64}$/.test(token)) {
+        const trimmedRef = ref;
         setReference(trimmedRef);
+        setTrackingToken(token);
         setStatus('ok');
         form.reset();
         setMsgLen(0);
         setFieldErrors({});
         setEmailNote('pending');
-        const base = __BASE_PATH__.replace(/\/$/, '');
         void supabase.functions.invoke('admission-notify', {
-          body: { reference: trimmedRef, statusUrl: `${window.location.origin}${base}/application-status` },
+          body: { mode: 'submitted', reference: trimmedRef, trackingToken: token },
         }).then(({ data: notifyData, error: notifyError }) => {
           if (notifyError) { setEmailNote('failed'); return; }
           const result = notifyData as { sent?: boolean; reason?: string } | null;
@@ -123,17 +133,29 @@ export default function Admissions() {
   async function copyReference() {
     try {
       await navigator.clipboard.writeText(reference);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2200);
+      setCopiedReference(true);
+      window.setTimeout(() => setCopiedReference(false), 2200);
     } catch {
-      setCopied(false);
+      setCopiedReference(false);
+    }
+  }
+
+  async function copyToken() {
+    try {
+      await navigator.clipboard.writeText(trackingToken);
+      setCopiedToken(true);
+      window.setTimeout(() => setCopiedToken(false), 2200);
+    } catch {
+      setCopiedToken(false);
     }
   }
 
   function submitAnother() {
     setStatus('idle');
     setReference('');
-    setCopied(false);
+    setTrackingToken('');
+    setCopiedReference(false);
+    setCopiedToken(false);
     setEmailNote('idle');
     setFormError('');
     setFieldErrors({});
@@ -164,8 +186,8 @@ export default function Admissions() {
           <div className="mt-8 rounded-lg border border-background-200 bg-background-50 p-4">
             <p className="text-xs md:text-sm text-foreground-700 leading-relaxed">
               {isAr
-                ? 'بعد الإرسال تحصل على رقم طلب مرجعي يمكنك استخدامه لمتابعة الحالة أو التواصل مع مكتب القبول. لا حاجة لتسجيل الدخول لتقديم الطلب.'
-                : 'After submitting you receive a reference number you can use to track the status or speak with the admissions office. No sign-in is needed to apply.'}
+                ? 'بعد الإرسال تحصل على رقم الطلب ورمز متابعة خاص. احتفظ بهما معًا، ولا حاجة لتسجيل الدخول لتقديم الطلب.'
+                : 'After submitting you receive an application reference and a private tracking code. Keep both; no sign-in is needed to apply.'}
             </p>
             <Link to="/application-status" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 underline cursor-pointer whitespace-nowrap">
               {isAr ? 'متابعة حالة طلب سابق' : 'Track an existing application'}
@@ -256,7 +278,7 @@ export default function Admissions() {
             {status === 'ok' && (reference ? (
               <div className="mt-3 rounded-md border border-secondary-300 bg-secondary-100 px-4 py-3">
                 <p className="text-xs text-secondary-900">
-                  {isAr ? 'تم استلام طلبك وتسجيله في نظام القبول. رقم الطلب المرجعي:' : 'Your enquiry is registered in our admissions system. Reference number:'}
+                  {isAr ? 'تم تسجيل طلبك. احتفظ برقم الطلب ورمز المتابعة الخاص معًا:' : 'Your enquiry is registered. Keep the application reference and private tracking code together:'}
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <p className="font-heading text-lg text-foreground-950" dir="ltr">{reference}</p>
@@ -265,18 +287,27 @@ export default function Admissions() {
                     onClick={() => void copyReference()}
                     className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-secondary-300 bg-background-50 px-2.5 py-1.5 text-xs text-secondary-900 hover:bg-background-100 cursor-pointer"
                   >
-                    <i className={copied ? 'ri-check-line' : 'ri-file-copy-line'}></i>
-                    {copied ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ الرقم' : 'Copy number')}
+                    <i className={copiedReference ? 'ri-check-line' : 'ri-file-copy-line'}></i>
+                    {copiedReference ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ الرقم' : 'Copy reference')}
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-foreground-700">
-                  {isAr ? 'احتفظ بهذا الرقم لمتابعة طلبك مع مكتب القبول.' : 'Keep this number to follow up with the admissions office.'}
+                  <span>{isAr ? 'رمز المتابعة الخاص:' : 'Private tracking code:'}</span>
+                  <span className="mt-1 block break-all font-mono tracking-wide" dir="ltr">{trackingToken}</span>
+                  <button
+                    type="button"
+                    onClick={() => void copyToken()}
+                    className="mt-2 inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-secondary-300 bg-background-50 px-2.5 py-1.5 text-xs text-secondary-900 hover:bg-background-100 cursor-pointer"
+                  >
+                    <i className={copiedToken ? 'ri-check-line' : 'ri-file-copy-line'}></i>
+                    {copiedToken ? (isAr ? 'تم نسخ الرمز' : 'Code copied') : (isAr ? 'نسخ رمز المتابعة' : 'Copy tracking code')}
+                  </button>
                 </p>
                 <p className="mt-2 text-xs text-foreground-700">
-                  {emailNote === 'pending' && (isAr ? 'جارٍ إرسال رسالة التأكيد إلى بريدك الإلكتروني...' : 'Sending your confirmation email...')}
-                  {emailNote === 'sent' && (isAr ? 'أرسلنا رقم الطلب إلى بريدك الإلكتروني، وأبلغنا فريق القبول بالطلب الجديد.' : 'We emailed your reference number and alerted the admissions team.')}
-                  {emailNote === 'failed' && (isAr ? 'تم تسجيل طلبك، لكن تعذر إرسال رسالة التأكيد الآن. احتفظ بالرقم أعلاه.' : 'Your enquiry is registered, but the confirmation email could not be sent. Keep the number above.')}
-                  {emailNote === 'unconfigured' && (isAr ? 'احتفظ بالرقم أعلاه؛ سيتواصل معك فريق القبول.' : 'Keep the number above; our admissions team will contact you.')}
+                  {emailNote === 'pending' && (isAr ? 'جارٍ إرسال رقم الطلب ورمز المتابعة إلى بريدك الإلكتروني...' : 'Sending the reference and tracking code to your email...')}
+                  {emailNote === 'sent' && (isAr ? 'أرسلنا رقم الطلب ورمز المتابعة إلى بريدك الإلكتروني، وأبلغنا فريق القبول.' : 'We emailed your reference and tracking code, and notified admissions.')}
+                  {emailNote === 'failed' && (isAr ? 'تم تسجيل طلبك، لكن تعذر إرسال البريد. انسخ الرقم والرمز واحفظهما.' : 'Your enquiry is registered, but the email could not be sent. Copy and save both codes.')}
+                  {emailNote === 'unconfigured' && (isAr ? 'انسخ الرقم والرمز واحفظهما؛ سيتواصل معك فريق القبول.' : 'Copy and save both codes; the admissions team will contact you.')}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <button
