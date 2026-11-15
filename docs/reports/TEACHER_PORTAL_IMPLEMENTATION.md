@@ -22,9 +22,9 @@ were changed.
   the existing grading interface. Past completion records are explicitly
   labelled unverified, not established achievement.
 - Web: teacher-only attendance displays sessions and rosters for assigned
-  classes. Attendance writes are disabled for teacher-only accounts pending
-  verification of live authorization. Existing administrative and
-  receptionist capabilities are retained.
+  classes and permits opening and marking sessions within existing database
+  permissions. Hosted authorization remains unverified. Existing administrative
+  and receptionist capabilities are retained.
 - Flutter: the live teacher dashboard and class pages show assigned classes,
   active student rosters, active courses and lesson links, available
   homework/submissions and progress records, and attendance sessions and
@@ -45,8 +45,8 @@ views may also read existing learning content and vocabulary.
 Repository migration history contains assigned-class read policies, attendance
 write policies and homework grading policies. It is not proof of the current
 deployed grants or RLS: previous reports identify migration-history drift.
-Teacher-only attendance mutation is therefore disabled. The pre-existing web
-grading operation is reused but has not been verified against live grants or
+Teacher attendance mutation is enabled locally but must not be treated as
+verified against hosted grants. The pre-existing web grading operation is reused but has not been verified against live grants or
 negative-role cases. Flutter displays submissions and existing scores but
 does not grade. Live RLS validation is required before release.
 

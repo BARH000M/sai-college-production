@@ -85,10 +85,10 @@ export async function loadPersonalAttendance(studentId: string): Promise<Persona
     .in("id", sessionIds);
   if (sessions.error) throw new Error(sessions.error.message);
   const dates = new Map((sessions.data ?? []).map((session) => [session.id, session.attendance_date]));
-  const recent = rows.flatMap((row) => {
+  const recent = rows.map((row) => {
     const attendanceDate = dates.get(row.attendance_session_id);
-    if (!attendanceDate || !isAttendanceStatus(row.status)) return [];
-    return [{ id: row.id, attendanceDate, status: row.status, note: row.note }];
+    if (!attendanceDate || !isAttendanceStatus(row.status)) throw new Error("تعذر قراءة تاريخ أو حالة سجل الحضور.");
+    return { id: row.id, attendanceDate, status: row.status, note: row.note };
   });
   return { total: records.count, recent };
 }
@@ -158,7 +158,10 @@ export async function saveAttendanceBatch(sessionId: string, items: readonly Att
   let saved = 0;
   const failures: string[] = [];
   for (const item of items) {
-    if (!isAttendanceStatus(item.status)) continue;
+    if (!isAttendanceStatus(item.status)) {
+      failures.push(`${item.row.full_name || item.row.student_id}: حالة الحضور غير صالحة.`);
+      continue;
+    }
     try {
       await saveAttendance(sessionId, item.row, item.status, item.note);
       saved += 1;

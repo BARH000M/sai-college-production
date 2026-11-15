@@ -548,6 +548,11 @@ class _CollegeShellState extends State<CollegeShell> {
       const SectionHeading('مقرراتي المتاحة'),
       SizedBox(height: 300, child: LiveCourseCatalog(roles: roles)),
     ],
+    if (demo == null &&
+        (roles.contains(Role.student) || roles.contains(Role.parent))) ...[
+      const SectionHeading('الحضور الشخصي'),
+      const SizedBox(height: 300, child: LiveAttendanceScreen(personalOnly: true)),
+    ],
     if (demo == null && teacherOnly) ...[
       const SectionHeading('بوابة المعلم'),
       SizedBox(height: 300, child: TeacherPortal()),

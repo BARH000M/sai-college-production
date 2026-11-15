@@ -27,7 +27,8 @@ The web navigation and direct module-route role map now:
 Flutter applies equivalent restrictions to its generic class and attendance
 screens. Teachers retain the assigned-class entry point. The web Student and
 verified-Parent dashboards now show only personal/verified-child attendance;
-Flutter still has no corresponding personal attendance panel. Hiding the
+Flutter also shows a personal attendance panel on those dashboards, filtered
+to the signed-in student's record and verified parent links. Hiding the
 unscoped register remains safer than exposing class-wide records.
 
 These are client-side navigation and route guards. They do **not** prove or

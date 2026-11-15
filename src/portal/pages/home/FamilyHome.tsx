@@ -127,7 +127,7 @@ export function StudentHome({ userId }: { userId: string }) {
       <p className="data-note">تواصل مع شؤون الطلاب لربط حساب الدخول بسجل الطالب.</p>
     </section>}
 
-    {record && <RecordCard record={record} action />}
+    {record && <><RecordCard record={record} action /><PersonalAttendancePanel studentId={record.id} /></>}
 
     {record && <div className="learner-links">
       <Link className="button primary" to="/portal/modules/courses">فتح المقررات</Link>

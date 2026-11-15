@@ -63,6 +63,31 @@ test("future creation and duplicate or denied writes never report success", asyn
   await assert.rejects(api.saveAttendance("session", { ...row, record_id: "record" }, "present", ""), /لم يُحدّث/);
 });
 
+test("batch rejects invalid statuses instead of reporting success", async () => {
+  const api = await load("invalid-batch", {});
+  const row = { student_id: "s", full_name: "Student", record_id: null, attendance_status: null, note: null };
+  await assert.rejects(api.saveAttendanceBatch("session", [{ row, status: "invalid", note: "" }]), /حالة الحضور غير صالحة/);
+});
+
+test("personal attendance filters student and rejects missing session dates", async () => {
+  const calls = [];
+  const client = {
+    from(table) {
+      const builder = {
+        select() { return this; },
+        eq(...args) { calls.push(args); return this; },
+        order() { return this; },
+        range: async () => ({ data: [{ id: "r", attendance_session_id: "a", status: "present", note: null }], count: 1, error: null }),
+        in: async () => ({ data: [], error: null }),
+      };
+      return builder;
+    },
+  };
+  const api = await load("personal", client);
+  await assert.rejects(api.loadPersonalAttendance("student"), /تاريخ أو حالة/);
+  assert.deepEqual(calls, [["student_id", "student"]]);
+});
+
 test("attendance implementation exposes no destructive operations", () => {
   for (const file of ["../../src/portal/lib/attendance.ts", "../../src/portal/pages/Attendance.tsx", "../../supabase/migrations/006_attendance.sql"]) {
     assert.doesNotMatch(fs.readFileSync(path.join(__dirname, file), "utf8"), /\.delete\s*\(|\btruncate\b|\bdelete\s+from\b|\bdrop\b/i);
