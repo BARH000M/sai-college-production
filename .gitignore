@@ -40,3 +40,9 @@ supabase/.temp/
 
 # Generated Android APK files
 mobile/APK-OUTPUT/
+
+**/.gradle/
+**/.dart_tool/
+**/build/
+*.bak
+*.bak-*
