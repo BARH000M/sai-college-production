@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { functionFailure } from "./functionErrors";
 
 export type ProvisionAccount = { userId: string; email: string; fullName: string };
 
@@ -31,7 +32,7 @@ async function invoke<T extends { ok?: boolean; message?: string }>(
   body: Record<string, unknown>,
 ): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>("provision-learning-account", { body });
-  if (error) throw new Error(error.message || NOT_CONFIGURED);
+  if (error) throw await functionFailure(error, "provision-learning-account");
   if (!data) throw new Error(NOT_CONFIGURED);
   if (data.ok !== true) throw new Error(data.message ?? "تعذر تنفيذ الطلب.");
   return data;

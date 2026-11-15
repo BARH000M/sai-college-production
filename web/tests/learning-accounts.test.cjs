@@ -5,7 +5,8 @@ const path = require("node:path");
 const { stripTypeScriptTypes } = require("node:module");
 
 const source = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/learningAccounts.ts"), "utf8")
-  .replace('import { supabase } from "./supabase";', "const supabase = globalThis.__learningAccountsTestSupabase;");
+  .replace('import { supabase } from "./supabase";', "const supabase = globalThis.__learningAccountsTestSupabase;")
+  .replace('"./functionErrors"', JSON.stringify(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(fs.readFileSync(path.join(__dirname, "../../src/portal/lib/functionErrors.ts"), "utf8"), { mode: "strip" })).toString("base64")}`));
 const code = stripTypeScriptTypes(source, { mode: "strip" });
 
 async function load(suffix, supabase) {

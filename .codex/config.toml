@@ -1,0 +1,3 @@
+[mcp_servers.supabase-preview]
+url = "https://mcp.supabase.com/mcp?project_ref=mgibjusuglafbnlrkbep&read_only=true&features=database,development,debugging"
+enabled = true

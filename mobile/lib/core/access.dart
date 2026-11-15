@@ -103,6 +103,8 @@ class Access {
 
   static bool manages(Set<Role> roles, PageId page) {
     if (!allows(roles, page)) return false;
+    // UI permissions only; backend authorization remains authoritative.
+    if (page == PageId.settings) return roles.contains(Role.super_admin);
     if (roles.contains(Role.super_admin) || roles.contains(Role.admin)) {
       return true;
     }

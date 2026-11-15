@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { functionFailure } from "./functionErrors";
 
 export type LinkableAccount = {
   id: string;
@@ -28,7 +29,7 @@ export async function loadLinkableAccounts(): Promise<LinkableAccount[]> {
     const { data, error } = await supabase.functions.invoke<ListResponse>("link-student-account", {
       body: { action: "list" },
     });
-    if (error) throw new Error(error.message);
+    if (error) throw await functionFailure(error, "link-student-account");
     if (!data || data.ok !== true) throw new Error(data?.message ?? "تعذر تحميل قائمة الحسابات.");
     return data.users ?? [];
   } catch (error) {
@@ -40,7 +41,7 @@ export async function linkStudentAccount(studentId: string, userId: string): Pro
   const { data, error } = await supabase.functions.invoke<ActionResponse>("link-student-account", {
     body: { action: "link", studentId, userId },
   });
-  if (error) throw new Error(error.message);
+  if (error) throw await functionFailure(error, "link-student-account");
   if (!data || data.ok !== true) throw new Error(data?.message ?? "تعذر ربط الحساب.");
   return data.email ?? null;
 }
@@ -49,7 +50,7 @@ export async function unlinkStudentAccount(studentId: string): Promise<void> {
   const { data, error } = await supabase.functions.invoke<ActionResponse>("link-student-account", {
     body: { action: "unlink", studentId },
   });
-  if (error) throw new Error(error.message);
+  if (error) throw await functionFailure(error, "link-student-account");
   if (!data || data.ok !== true) throw new Error(data?.message ?? "تعذر فك ربط الحساب.");
 }
 

@@ -6,6 +6,7 @@ build/
 coverage/
 
 # Secrets and environment files
+.codex/config-backups/
 .env
 .env.*
 !.env.example

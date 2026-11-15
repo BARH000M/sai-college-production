@@ -18,19 +18,23 @@ export function SystemSettings({ roles }: { roles: readonly string[] }) {
   const [error,setError] = useState<string|null>(null);
   const [notice,setNotice] = useState<string|null>(null);
   const [retry,setRetry] = useState(0);
+  const [loadedCategory,setLoadedCategory] = useState<string|null>(null);
+  const ready = loadedCategory === section.category && !loading && !error;
   useEffect(()=>{
     if (!allowed || (section.superOnly && !privileged)) return;
     let active = true;
-    setLoading(true); setError(null); setNotice(null); setValues({});
+    setLoading(true); setError(null); setNotice(null); setValues({}); setLoadedCategory(null);
     void loadSettings(section.category).then(rows=>{
       if (!active) return;
       setValues(Object.fromEntries(rows.map(r=>[r.setting_key,r.value_text])));
+      setLoadedCategory(section.category);
     }).catch((e:unknown)=>{if(active)setError(e instanceof Error?e.message:String(e));})
       .finally(()=>{if(active)setLoading(false);});
     return ()=>{active=false;};
   },[section,allowed,privileged,retry]);
   if (!allowed) return <main className="workspace"><section className="panel"><h1>إعدادات النظام</h1><p role="alert">لا تملك صلاحية إدارة إعدادات الكلية.</p></section></main>;
   async function save(field: SettingField) {
+    if (!privileged || !ready || saving !== null) return;
     setError(null);setNotice(null);setSaving(field.key);
     try { await saveSetting(section,field,values[field.key]??"");setNotice(`حُفظ «${field.label}» في قاعدة البيانات المشتركة.`);setRetry(x=>x+1); }
     catch(e){setError(e instanceof Error?e.message:String(e));}
@@ -38,7 +42,8 @@ export function SystemSettings({ roles }: { roles: readonly string[] }) {
   }
   return <main className="workspace" dir="rtl"><section className="panel">
     <p className="eyebrow">Yemen SAI · Supabase</p><h1>إعدادات النظام</h1>
-    <p className="muted">هذه إعدادات حقيقية محفوظة في Supabase ومحمية بسياسات RLS. المدير العام فقط يستطيع تغيير الإعدادات العامة للكلية؛ يستطيع المدير الاطلاع على الفئات غير الحساسة. لا تحفظ كلمات مرور هنا.</p>
+    <p className="data-note">الحفظ متاح للمدير العام فقط بعد تحميل الإعدادات بنجاح من الخادم. عند عدم توفر الخدمة تبقى عمليات الحفظ معطلة.</p>
+    <p className="muted">تعرض هذه الشاشة الإعدادات التي يتيحها الخادم عند توفرها. المدير العام فقط يستطيع تغيير الإعدادات العامة؛ يستطيع المدير الاطلاع على الفئات المسموح بها. لا تحفظ كلمات مرور هنا.</p>
     <div className="actions" style={{display:"flex",gap:8,flexWrap:"wrap",marginBlock:16}}>
       {settingsSections.filter(s=>!s.superOnly||privileged).map(s=><button key={s.category}
         type="button" className={`button ${section.category===s.category?"":"secondary"}`} onClick={()=>setSection(s)}>{s.title}</button>)}
@@ -47,8 +52,9 @@ export function SystemSettings({ roles }: { roles: readonly string[] }) {
     {section.note && <p className="data-note">{section.note}</p>}
     {loading && <p role="status">جارٍ تحميل الإعدادات...</p>}
     {error && <p className="error-box" role="alert">{error}</p>}
+    {error && <button className="button secondary" type="button" onClick={()=>setRetry(x=>x+1)}>إعادة تحميل الإعدادات</button>}
     {notice && <p role="status">{notice}</p>}
-    {!loading && <div style={{display:"grid",gap:14,gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))"}}>
+    {ready && <div style={{display:"grid",gap:14,gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))"}}>
       {section.fields.map(field=><div className="panel" key={field.key}>
         <label htmlFor={`setting-${field.key}`}>{field.label}</label>
         {field.type==="boolean" ? <select id={`setting-${field.key}`} className="input" value={values[field.key]??"false"}

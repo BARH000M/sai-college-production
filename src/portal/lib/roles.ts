@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { functionFailure } from "./functionErrors";
 
 // Every role the super administrator can grant, with its Arabic label and
 // whether it joins the campus team (staff) or not (families).
@@ -74,7 +75,7 @@ function failureMessage(error: unknown): string {
 
 async function call(body: Record<string, unknown>): Promise<FunctionResponse> {
   const { data, error } = await supabase.functions.invoke<FunctionResponse>("manage-roles", { body });
-  if (error) throw new Error(error.message);
+  if (error) throw await functionFailure(error, "manage-roles");
   if (!data || data.ok !== true) throw new Error(data?.message ?? "تعذر تنفيذ الطلب.");
   return data;
 }
