@@ -1,4 +1,4 @@
--- Run only against an explicitly authorized isolated staging database after 006.
+-- Run only against a disposable database with the full completion migration chain.
 -- Set sai.attendance_isolated_test = 'yes' in the same connection before execution.
 begin;
 do $$
@@ -23,7 +23,7 @@ declare
   today date := (now() at time zone 'Asia/Aden')::date;
 begin
   insert into auth.users (id) values (super_id), (admin_id), (teacher_id), (other_teacher_id), (reception_id), (student_user), (parent_id), (unverified_parent_id);
-  update auth.users set email_confirmed_at = now() where id = parent_id;
+  update auth.users set email_confirmed_at = now() where id in (parent_id, student_user);
   insert into public.user_roles (user_id, role) values (super_id, 'super_admin'), (admin_id, 'admin'),
     (teacher_id, 'teacher'), (other_teacher_id, 'teacher'), (reception_id, 'receptionist'), (student_user, 'student'),
     (parent_id, 'parent'), (unverified_parent_id, 'parent');
@@ -39,14 +39,14 @@ begin
     values (class_a, branch_a, session_id, 'WAVE1_TEST_a', 'test', teacher_id),
       (class_b, branch_b, session_id, 'WAVE1_TEST_b', 'test', null),
       (class_unassigned, branch_a, session_id, 'WAVE1_TEST_unassigned', 'test', null);
-  insert into public.students (id, user_id, branch_id, admission_no, full_name, class_id)
-    values (student_a, student_user, branch_a, 'WAVE1_TEST_' || run_id || '_a', 'WAVE1_TEST_a', class_a),
-      (student_b, null, branch_a, 'WAVE1_TEST_' || run_id || '_b', 'WAVE1_TEST_b', null),
-      (other_student, null, branch_b, 'WAVE1_TEST_' || run_id || '_c', 'WAVE1_TEST_c', class_b);
-  perform set_config('sai.parent_link_verification', 'on', true);
-  insert into public.parent_student_links (parent_user_id, student_id, verified_at, verified_by)
-    values (parent_id, student_a, now(), super_id);
-  perform set_config('sai.parent_link_verification', 'off', true);
+  insert into public.students (id, branch_id, admission_no, full_name, class_id)
+    values (student_a, branch_a, 'WAVE1_TEST_' || run_id || '_a', 'WAVE1_TEST_a', class_a),
+      (student_b, branch_a, 'WAVE1_TEST_' || run_id || '_b', 'WAVE1_TEST_b', null),
+      (other_student, branch_b, 'WAVE1_TEST_' || run_id || '_c', 'WAVE1_TEST_c', class_b);
+  execute 'set local role authenticated';
+  perform public.admissions_link_student_account(student_a, student_user);
+  perform public.admissions_verify_parent_student(student_a, parent_id);
+  execute 'reset role';
   -- Model a legacy unverified link predating the Admissions verification guard.
   if exists (select 1 from pg_trigger where tgrelid = 'public.parent_student_links'::regclass
       and tgname = 'parent_student_links_guard_verification' and not tgisinternal) then
@@ -93,7 +93,9 @@ begin
   exception when insufficient_privilege then denied := true; end;
   if not denied then raise exception 'Teacher managed another class in own branch'; end if;
   insert into public.attendance_sessions (branch_id, academic_session_id, class_id, attendance_date)
-    values (branch_a, session_id, class_a, today) returning id into attendance_id;
+    values (branch_a, session_id, class_a, today);
+  select id into strict attendance_id from public.attendance_sessions
+    where class_id = class_a and attendance_date = today;
   insert into public.attendance_records (attendance_session_id, student_id, status)
     values (attendance_id, student_a, 'present') returning id into record_a;
   update public.attendance_records set status = 'late' where id = record_a;
@@ -188,7 +190,9 @@ begin
   exception when insufficient_privilege then denied := true; end;
   if not denied then raise exception 'Admin managed another branch'; end if;
   insert into public.attendance_sessions (branch_id, academic_session_id, class_id, attendance_date)
-    values (branch_a, session_id, class_a, today - 1) returning id into cancelled_id;
+    values (branch_a, session_id, class_a, today - 1);
+  select id into strict cancelled_id from public.attendance_sessions
+    where class_id = class_a and attendance_date = today - 1;
   update public.attendance_sessions set status = 'cancelled' where id = cancelled_id;
   update public.attendance_sessions set status = 'closed' where id = attendance_id;
   get diagnostics affected = row_count;

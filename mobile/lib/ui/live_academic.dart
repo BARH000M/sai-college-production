@@ -99,7 +99,9 @@ class _LiveAttendanceScreenState extends State<LiveAttendanceScreen> {
 }
 
 class LiveFinanceScreen extends StatefulWidget {
-  const LiveFinanceScreen({super.key});
+  const LiveFinanceScreen({super.key, this.loader});
+
+  final Future<List<Map<String, dynamic>>> Function()? loader;
 
   @override
   State<LiveFinanceScreen> createState() => _LiveFinanceScreenState();
@@ -115,12 +117,36 @@ class _LiveFinanceScreenState extends State<LiveFinanceScreen> {
   }
 
   void _reload() {
-    _assignments = Supabase.instance.client
-        .from('fee_assignments')
-        .select('id,fee_group_id,student_id,original_amount,discount_amount,final_amount,due_date,cancelled_at')
-        .isFilter('cancelled_at', null)
-        .order('due_date', ascending: true)
-        .limit(200);
+    _assignments = (widget.loader ?? _loadAssignments)();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadAssignments() async {
+    final client = Supabase.instance.client;
+    Future<List<Map<String, dynamic>>> loadPages(String name) async {
+      final result = <Map<String, dynamic>>[];
+      while (true) {
+        final page = await client.rpc(name).range(result.length, result.length + 999);
+        final rows = List<Map<String, dynamic>>.from(page);
+        result.addAll(rows);
+        if (rows.length < 1000) return result;
+      }
+    }
+
+    final results = await Future.wait([
+      loadPages('sai_finance_assignments'),
+      loadPages('sai_finance_students'),
+      loadPages('sai_finance_group_labels'),
+    ]);
+    final students = {for (final row in results[1]) row['id']: row['full_name']};
+    final groups = {for (final row in results[2]) row['id']: row['name']};
+    return results[0].map((row) {
+      final student = students[row['student_id']];
+      final group = groups[row['fee_group_id']];
+      if (student is! String || group is! String || row['balance'] is! num) {
+        throw StateError('تعذر قراءة بيانات الرسوم أو الرصيد.');
+      }
+      return {...row, 'student_name': student, 'group_name': group};
+    }).toList();
   }
 
   @override
@@ -133,14 +159,8 @@ class _LiveFinanceScreenState extends State<LiveFinanceScreen> {
       if (rows.isEmpty) {
         return EmptyPanel('الاتصال المالي يعمل، لكن لا توجد استحقاقات رسوم مسجلة أو مرئية لهذا الحساب. لا نعرض مبالغ تجريبية.', retry: () => setState(_reload));
       }
-      final ids = rows.map((r) => r['fee_group_id']).whereType<String>().toSet().toList();
-      return FutureBuilder<List<Map<String, dynamic>>>(
-        future: Supabase.instance.client.from('fee_groups').select('id,name,currency').inFilter('id', ids),
-        builder: (context, groupsSnapshot) {
-          final groups = <String, Map<String, dynamic>>{
-            for (final row in groupsSnapshot.data ?? const <Map<String, dynamic>>[]) '${row['id']}': row,
-          };
-          return ListView(
+      const statuses = {'unpaid': 'غير مدفوع', 'partial': 'مدفوع جزئياً', 'paid': 'مدفوع', 'waived': 'معفى', 'cancelled': 'ملغى'};
+      return ListView(
             padding: const EdgeInsets.all(14),
             children: [
               Row(children: [const Expanded(child: SectionHeading('الاستحقاقات المالية')), IconButton(onPressed: () => setState(_reload), icon: const Icon(Icons.refresh, color: gold))]),
@@ -148,15 +168,13 @@ class _LiveFinanceScreenState extends State<LiveFinanceScreen> {
                 SaiCard(
                   child: ListTile(
                     leading: const Icon(Icons.receipt_long_outlined, color: gold),
-                    title: Text('${groups['${row['fee_group_id']}']?['name'] ?? 'استحقاق رسوم'}'),
-                    subtitle: Text('موعد الاستحقاق: ${row['due_date'] ?? 'غير محدد'}'),
-                    trailing: Text('${row['final_amount'] ?? 0} ${groups['${row['fee_group_id']}']?['currency'] ?? ''}', style: const TextStyle(color: ink, fontWeight: FontWeight.bold)),
+                    title: Text('${row['group_name']} · ${row['student_name']}'),
+                    subtitle: Text('موعد الاستحقاق: ${row['due_date']} · ${statuses[row['status']] ?? row['status']}'),
+                    trailing: Text('المتبقي: ${row['balance']} ر.ي', style: const TextStyle(color: ink, fontWeight: FontWeight.bold)),
                   ),
                 ),
               const Text('هذه الشاشة للعرض فقط. تسجيل الدفعات أو الإعفاءات يجب أن يتم عبر إجراءات المالية المعتمدة ذات التدقيق والصلاحيات.', textAlign: TextAlign.center),
             ],
-          );
-        },
       );
     },
   );

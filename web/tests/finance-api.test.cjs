@@ -66,3 +66,15 @@ test("missing mutation identifiers never report success", async () => {
   await assert.rejects(api.postFinancePayment("assignment", "1", "cash", "", "key"), /استجابة العملية غير صالحة/);
   await assert.rejects(api.waiveFee("assignment", "reason"), /استجابة العملية غير صالحة/);
 });
+
+test("finance directories use scoped RPCs and propagate failures", async () => {
+  const calls = [];
+  const api = await load({ rpc: (name) => {
+    calls.push(name);
+    return { range: async () => ({ data: [{ id: "1", name: "allowed" }], count: 1, error: null }) };
+  } });
+  assert.equal((await api.loadFinanceStudents()).length, 1);
+  assert.equal((await api.loadFinanceGroupLabels()).length, 1);
+  assert.equal((await api.loadFinanceSessions()).length, 1);
+  assert.deepEqual(calls, ["sai_finance_students", "sai_finance_group_labels", "sai_finance_sessions"]);
+});

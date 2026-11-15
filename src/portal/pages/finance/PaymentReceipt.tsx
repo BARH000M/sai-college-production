@@ -18,6 +18,7 @@ export function PaymentReceipt({
   studentName,
   admissionNo,
   group,
+  groupName,
   branchName,
   onClose,
 }: {
@@ -26,6 +27,7 @@ export function PaymentReceipt({
   studentName: string;
   admissionNo: string;
   group: FeeGroup | null;
+  groupName: string | null;
   branchName: string;
   onClose: () => void;
 }) {
@@ -52,7 +54,7 @@ export function PaymentReceipt({
           </thead>
           <tbody>
             <tr>
-              <td>{group?.name ?? "رسوم دراسية"}
+              <td>{group?.name ?? groupName ?? "رسوم دراسية"}
                 <span className="learn-meta">تاريخ الاستحقاق: {formatDate(assignment.due_date)}</span>
               </td>
               <td>{methodLabels[payment.method] ?? payment.method}</td>
@@ -63,7 +65,7 @@ export function PaymentReceipt({
         </table>
         <p className="sheet-note">
           حالة الدفعة: {payment.voided_at ? `ملغاة — ${payment.void_reason ?? "بدون سبب مسجل"}` : "مرحّلة"}.
-          الرصيد المتبقي على هذا الإسناد بعد العملية: {formatYER(String(Math.max(assignment.balance, 0)))}.
+          الرصيد الحالي على هذا الإسناد: {formatYER(String(Math.max(assignment.balance, 0)))}.
         </p>
       </div>
 

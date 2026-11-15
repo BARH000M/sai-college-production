@@ -4,13 +4,13 @@ import {
   type FinancePaymentMethod, type PendingFinancePayment, type PendingFinanceRefund,
 } from "../lib/finance";
 import {
-  assignFee, cancelFee, loadFeeAssignments, loadFeeGroups, loadFinanceAudit,
+  assignFee, cancelFee, loadFeeAssignments, loadFeeGroups, loadFinanceAudit, loadFinanceStudents,
+  loadFinanceGroupLabels, loadFinanceSessions,
   loadFinancePayments, loadFinanceRefunds, postFinancePayment, refundFinancePayment,
   saveFeeGroup, voidFinancePayment, waiveFee,
-  type FeeAssignment, type FeeGroup, type FinanceAudit, type FinancePayment, type FinanceRefund,
+  type FeeAssignment, type FeeGroup, type FinanceAudit, type FinancePayment, type FinanceRefund, type FinanceStudent, type FinanceOption,
 } from "../lib/financeApi";
-import { loadReportBranches, loadReportSessions, type ReportOption } from "../lib/reports";
-import { supabase } from "../lib/supabase";
+import { loadReportBranches, type ReportOption } from "../lib/reports";
 import { PaymentReceipt } from "./finance/PaymentReceipt";
 
 const methods: { value: FinancePaymentMethod; label: string }[] = [
@@ -21,9 +21,6 @@ const statuses: Record<string, string> = {
   unpaid: "غير مدفوع", partial: "مدفوع جزئياً", paid: "مدفوع", waived: "معفى", cancelled: "ملغى",
 };
 const emptyGroup = { id: "", branch: "", session: "", name: "", description: "", amount: "", due: "", active: true };
-type FinanceStudent = {
-  id: string; full_name: string; admission_no: string; branch_id: string; class_id: string | null;
-};
 function message(error: unknown) { return error instanceof Error ? error.message : String(error); }
 function amount(value: number) { return formatYER(String(value)); }
 
@@ -31,8 +28,11 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   const permissions = financePermissions(roles);
   const staff = permissions.postPayment;
   const [groups, setGroups] = useState<FeeGroup[]>([]);
+  const [groupLabels, setGroupLabels] = useState<FinanceOption[]>([]);
   const [assignments, setAssignments] = useState<FeeAssignment[]>([]);
   const [payments, setPayments] = useState<FinancePayment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const [refunds, setRefunds] = useState<FinanceRefund[]>([]);
   const refundRequest = useRef(0);
   const [refundsReady, setRefundsReady] = useState(false);
@@ -71,28 +71,6 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   const refundStorageKey = `sai.finance.refund.pending.${userId ?? ""}`;
 
   useEffect(() => {
-    let active = true;
-    void Promise.all([loadReportBranches(), loadReportSessions()])
-      .then(([branchRows, sessionRows]) => {
-        if (!active) return;
-        setBranches(branchRows);
-        setSessions(sessionRows);
-      })
-      .catch((failure: unknown) => {
-        if (active) setError(`تعذر تحميل الفروع والجلسات: ${message(failure)}`);
-      });
-    void supabase.from("students")
-      .select("id,full_name,admission_no,branch_id,class_id")
-      .order("full_name")
-      .then((result) => {
-        if (!active) return;
-        if (result.error) { setError(`تعذر تحميل الطلاب: ${result.error.message}`); return; }
-        setStudents((result.data ?? []) as FinanceStudent[]);
-      });
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
     setRecoveryReady(false); setPendingPayment(null); setPendingRefund(null); setRecoveryError(null);
     if (!staff) { setRecoveryReady(true); return; }
     if (!userId) { setRecoveryError("تعذر التحقق من الحساب؛ تسجيل الدفعات متوقف."); return; }
@@ -124,10 +102,18 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   useEffect(() => {
     let active = true;
     setLoading(true); setError(null);
-    void Promise.all([loadFeeAssignments(), staff ? loadFeeGroups() : Promise.resolve([])])
-      .then(([nextAssignments, nextGroups]) => {
-        if (active) { setAssignments(nextAssignments); setGroups(nextGroups); }
-      }).catch((failure: unknown) => { if (active) { setAssignments([]); setGroups([]); setError(message(failure)); } })
+    void Promise.all([
+      loadFeeAssignments(), staff ? loadFeeGroups() : Promise.resolve([]),
+      loadFinanceStudents(), loadFinanceGroupLabels(), loadReportBranches(),
+      staff ? loadFinanceSessions() : Promise.resolve([]),
+    ]).then(([nextAssignments, nextGroups, nextStudents, nextLabels, nextBranches, nextSessions]) => {
+      if (active) {
+        setAssignments(nextAssignments); setGroups(nextGroups); setStudents(nextStudents);
+        setGroupLabels(nextLabels); setBranches(nextBranches); setSessions(nextSessions);
+      }
+    }).catch((failure: unknown) => {
+      if (active) { setAssignments([]); setGroups([]); setStudents([]); setGroupLabels([]); setError(message(failure)); }
+    })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [staff, version]);
@@ -136,10 +122,12 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     let active = true;
     refundRequest.current += 1;
     setRefundsReady(false);
-    setPayments([]); setSelectedPayment(""); setRefunds([]);
+    setPayments([]); setSelectedPayment(""); setRefunds([]); setPaymentsError(null);
+    setPaymentsLoading(!!selected);
     if (selected) void loadFinancePayments(selected)
       .then((rows) => { if (active) setPayments(rows); })
-      .catch((failure: unknown) => { if (active) setError(message(failure)); });
+      .catch((failure: unknown) => { if (active) setPaymentsError(message(failure)); })
+      .finally(() => { if (active) setPaymentsLoading(false); });
     return () => { active = false; refundRequest.current += 1; };
   }, [selected, version]);
 
@@ -246,7 +234,8 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   }
   const selectedGroup = groups.find((row) => row.id === assignmentGroup) ?? null;
   const eligibleStudents = selectedGroup
-    ? students.filter((row) => row.branch_id === selectedGroup.branch_id)
+    ? students.filter((row) => row.branch_id === selectedGroup.branch_id && row.status === "active"
+      && (!row.class_id || row.session_id === selectedGroup.academic_session_id))
     : [];
   const studentById = (id: string) => students.find((row) => row.id === id) ?? null;
   const methodSelect = (value: FinancePaymentMethod, change: (value: FinancePaymentMethod) => void, disabled = false) =>
@@ -287,7 +276,7 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     </section>}
     {permissions.assignFees && <section className="panel management-detail"><h2>إسناد رسوم لطالب</h2>
       <form className="management-form" onSubmit={submitAssignment}>
-        <label>مجموعة الرسوم<select required value={assignmentGroup} onChange={(e) => setAssignmentGroup(e.target.value)}>
+        <label>مجموعة الرسوم<select required value={assignmentGroup} onChange={(e) => { setAssignmentGroup(e.target.value); setStudent(""); }}>
           <option value="">اختر المجموعة</option>{groups.filter((row) => row.is_active).map((row) => <option key={row.id} value={row.id}>{row.name} — {branches.find((branch) => branch.id === row.branch_id)?.name ?? "فرع"}</option>)}
         </select></label>
         <label>الطالب<span className="vocab-required"> *</span><select required value={student} onChange={(e) => setStudent(e.target.value)}>
@@ -302,11 +291,14 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     <section className="panel management-detail"><h2>الأرصدة والرسوم المسندة</h2>
       {!loading && !error && assignments.length === 0 && <p>لا توجد رسوم متاحة.</p>}
       <div className="table-scroll"><table className="management-table"><thead><tr><th>الطالب</th><th>المجموعة</th><th>الاستحقاق</th><th>الحالة</th><th>الرصيد</th><th>التفاصيل</th></tr></thead>
-        <tbody>{assignments.map((row) => <tr key={row.id}><td>{studentById(row.student_id)?.full_name ?? "طالب"}<span className="learn-meta">{studentById(row.student_id)?.admission_no ?? ""}</span></td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? row.fee_group_id}</td>
+        <tbody>{assignments.map((row) => <tr key={row.id}><td>{studentById(row.student_id)?.full_name ?? "طالب"}<span className="learn-meta">{studentById(row.student_id)?.admission_no ?? ""}</span></td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? groupLabels.find((entry) => entry.id === row.fee_group_id)?.name ?? "رسوم دراسية"}</td>
           <td>{row.due_date}</td><td>{statuses[row.status] ?? row.status}</td><td>{amount(row.balance)}</td>
           <td><button className="text-button" type="button" disabled={(!!pendingPayment && pendingPayment.assignment !== row.id) || (!!pendingRefund && pendingRefund.assignment !== row.id)} onClick={() => setSelected(row.id)}>عرض الدفعات</button></td></tr>)}</tbody></table></div>
     </section>
     {selected && <section className="panel management-detail"><h2>الدفعات والإيصالات</h2>
+      {paymentsLoading && <p role="status">جارٍ تحميل الدفعات...</p>}
+      {paymentsError && <p className="error-box" role="alert">تعذر تحميل الدفعات: {paymentsError} <button type="button" className="text-button" onClick={() => setVersion((value) => value + 1)}>إعادة المحاولة</button></p>}
+      {!paymentsLoading && !paymentsError && !payments.length && <p className="muted">لا توجد دفعات لهذا الاستحقاق.</p>}
       {permissions.postPayment && <form className="management-form" onSubmit={submitPayment}>
         <label>المبلغ<input required disabled={!!pendingPayment} inputMode="decimal" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} /></label>
         <label>طريقة الدفع{methodSelect(paymentMethod, setPaymentMethod, !!pendingPayment)}</label>
@@ -366,6 +358,7 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
       studentName={studentById(receipt.assignment.student_id)?.full_name ?? "—"}
       admissionNo={studentById(receipt.assignment.student_id)?.admission_no ?? "—"}
       group={groups.find((row) => row.id === receipt.assignment.fee_group_id) ?? null}
+      groupName={groupLabels.find((row) => row.id === receipt.assignment.fee_group_id)?.name ?? null}
       branchName={branches.find((row) => row.id === receipt.assignment.branch_id)?.name ?? ""}
       onClose={() => setReceipt(null)}
     />}
