@@ -78,7 +78,15 @@ export type LessonProgress = {
   student_id: string;
   status: LessonStatus;
   updated_at: string;
+  completion_basis: string | null;
 };
+
+/** Exercise-flow completions are self-reported by the student's account; older rows stay unverified. */
+export function lessonProgressLabel(row: LessonProgress | null | undefined): string {
+  if (!row) return lessonStatusLabels.not_started;
+  if (row.status === "completed" && row.completion_basis === "self_reported") return "أكمل التمارين ذاتياً (غير معتمد)";
+  return lessonStatusLabels[row.status];
+}
 
 export type LearningHomework = {
   id: string;
@@ -136,7 +144,7 @@ const workspaceColumns = {
   courses: "id,class_id,branch_id,session_id,title,description,level,is_active,teacher_id",
   lessons: "id,course_id,title,summary,kind,position,duration_minutes,is_published,content_kind,content_url,content_body,content_path,content_file_name,content_updated_at",
   homework: "id,course_id,title,instructions,due_at,max_score,position,is_published,published_at,created_at,updated_at",
-  progress: "lesson_id,student_id,status,updated_at",
+  progress: "lesson_id,student_id,status,updated_at,completion_basis",
   submissions: "id,homework_id,student_id,status,content,submitted_at,score,feedback,graded_at",
 } as const;
 
@@ -543,6 +551,165 @@ export async function gradeSubmission(input: GradeInput): Promise<void> {
   if (!result.data?.length) {
     throw new Error("لم يُحفظ التصحيح؛ قد لا تملك صلاحية التصحيح على هذا الواجب.");
   }
+}
+
+export const lessonKinds = ["lesson", "listening", "speaking", "vocabulary", "reading", "review"] as const;
+export type LessonKind = typeof lessonKinds[number];
+
+export type LessonInput = {
+  courseId: string;
+  title: string;
+  summary: string;
+  kind: LessonKind;
+  durationMinutes: number;
+  isPublished: boolean;
+};
+
+function cleanLessonInput(input: LessonInput): Omit<LessonInput, "courseId"> {
+  const title = input.title.trim();
+  const summary = input.summary.trim();
+  if (!input.courseId) throw new Error("لم يُحدَّد المقرر الذي ينتمي إليه الدرس.");
+  if (title.length < 3 || title.length > 80) throw new Error("عنوان الدرس يجب أن يكون بين ٣ و ٨٠ حرفاً.");
+  if (summary.length > 300) throw new Error("ملخص الدرس أطول من الحد المسموح (٣٠٠ حرف).");
+  if (!lessonKinds.includes(input.kind)) throw new Error("نوع الدرس غير صالح.");
+  if (!Number.isInteger(input.durationMinutes) || input.durationMinutes < 1 || input.durationMinutes > 600) {
+    throw new Error("مدة الدرس يجب أن تكون رقماً صحيحاً بين ١ و ٦٠٠ دقيقة.");
+  }
+  return { title, summary, kind: input.kind, durationMinutes: input.durationMinutes, isPublished: input.isPublished };
+}
+
+/** Creates a lesson at the end of the course order. RLS limits this to course managers. */
+export async function createLesson(input: LessonInput): Promise<string> {
+  const clean = cleanLessonInput(input);
+  const last = await supabase
+    .from("learning_lessons")
+    .select("position")
+    .eq("course_id", input.courseId)
+    .order("position", { ascending: false })
+    .limit(1);
+  if (last.error) throw new Error(last.error.message);
+  const position = Number(last.data?.[0]?.position ?? 0) + 1;
+
+  const result = await supabase
+    .from("learning_lessons")
+    .insert({
+      course_id: input.courseId,
+      title: clean.title,
+      summary: clean.summary || null,
+      kind: clean.kind,
+      position,
+      duration_minutes: clean.durationMinutes,
+      is_published: clean.isPublished,
+    })
+    .select("id");
+  if (result.error) throw new Error(result.error.message);
+  const id = result.data?.[0]?.id;
+  if (!id) throw new Error("لم يُحفظ الدرس؛ تحقق من صلاحيتك على هذا المقرر.");
+  return id;
+}
+
+/** Updates lesson basics only; teaching content is managed through saveLessonContent/saveLessonMedia. */
+export async function updateLesson(lessonId: string, input: LessonInput, position: number): Promise<void> {
+  if (!lessonId) throw new Error("لم يُحدَّد الدرس المطلوب تعديله.");
+  const clean = cleanLessonInput(input);
+  if (!Number.isInteger(position) || position < 1 || position > 500) {
+    throw new Error("ترتيب الدرس يجب أن يكون رقماً صحيحاً بين ١ و ٥٠٠.");
+  }
+  const result = await supabase
+    .from("learning_lessons")
+    .update({
+      title: clean.title,
+      summary: clean.summary || null,
+      kind: clean.kind,
+      position,
+      duration_minutes: clean.durationMinutes,
+      is_published: clean.isPublished,
+    })
+    .eq("id", lessonId)
+    .eq("course_id", input.courseId)
+    .select("id");
+  if (result.error) throw new Error(result.error.message);
+  if (!result.data?.length) throw new Error("لم يُحفظ التعديل؛ تحقق من صلاحيتك على هذا المقرر.");
+}
+
+/** Marks a lesson as started without ever downgrading a completed record. */
+export async function recordLessonStart(lessonId: string, studentId: string): Promise<void> {
+  if (!lessonId || !studentId) return;
+  const existing = await supabase
+    .from("learning_lesson_progress")
+    .select("status")
+    .eq("lesson_id", lessonId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (existing.error) throw new Error(existing.error.message);
+  if (existing.data && existing.data.status !== "not_started") return;
+
+  const result = await supabase
+    .from("learning_lesson_progress")
+    .upsert(
+      { lesson_id: lessonId, student_id: studentId, status: "in_progress", updated_at: new Date().toISOString() },
+      { onConflict: "lesson_id,student_id" },
+    )
+    .select("lesson_id");
+  if (result.error) throw new Error(result.error.message);
+  if (!result.data?.length) throw new Error("لم يُسجَّل بدء الدرس؛ تحقق من ربط حسابك بسجل الطالب.");
+}
+
+/** Records self-reported exercise completion. The UI gates this on the lesson plan, but the write comes from the student's own account and is not server-verified. */
+export async function recordLessonCompletion(lessonId: string, studentId: string): Promise<void> {
+  if (!lessonId || !studentId) throw new Error("لا يمكن تسجيل الإكمال دون طالب مرتبط بالحساب.");
+  const result = await supabase
+    .from("learning_lesson_progress")
+    .upsert(
+      {
+        lesson_id: lessonId,
+        student_id: studentId,
+        status: "completed",
+        completion_basis: "self_reported",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "lesson_id,student_id" },
+    )
+    .select("lesson_id");
+  if (result.error) throw new Error(result.error.message);
+  if (!result.data?.length) throw new Error("لم يُسجَّل الإكمال؛ تحقق من صلاحيتك على هذا السجل.");
+}
+
+export type LessonExerciseId = "reading" | "listening" | "vocabulary";
+export type LessonExercise = { id: LessonExerciseId; label: string; total: number };
+
+export const lessonExerciseLabels: Record<LessonExerciseId, string> = {
+  reading: "تمرين القراءة",
+  listening: "تمرين الاستماع",
+  vocabulary: "تمرين المفردات",
+};
+
+/**
+ * Exercises available for a lesson, derived only from recorded content and
+ * linked vocabulary. A lesson with none of these offers no completion.
+ */
+export function lessonExercisePlan(
+  lesson: Pick<LearningLesson, "content_kind" | "content_body" | "content_path" | "content_url">,
+  lessonWordCount: number,
+): LessonExercise[] {
+  const plan: LessonExercise[] = [];
+  if ((lesson.content_body ?? "").trim().length >= 20) {
+    plan.push({ id: "reading", label: lessonExerciseLabels.reading, total: 1 });
+  }
+  if (lesson.content_kind === "audio" && (lesson.content_path || lesson.content_url)) {
+    plan.push({ id: "listening", label: lessonExerciseLabels.listening, total: 1 });
+  }
+  if (lessonWordCount > 0) {
+    plan.push({ id: "vocabulary", label: lessonExerciseLabels.vocabulary, total: lessonWordCount });
+  }
+  return plan;
+}
+
+export function canCompleteLesson(
+  plan: readonly LessonExercise[],
+  done: Readonly<Partial<Record<LessonExerciseId, number>>>,
+): boolean {
+  return plan.length > 0 && plan.every((exercise) => (done[exercise.id] ?? 0) >= exercise.total);
 }
 
 export function formatDate(value: string, withTime = false): string {

@@ -241,10 +241,100 @@ class _LiveCourseLessonsState extends State<LiveCourseLessons> {
   );
 }
 
+/// Data access for the lesson study flow. Injectable so widget tests run
+/// without a Supabase connection; the default implementation enforces RLS.
+class LessonStudyStore {
+  const LessonStudyStore();
+
+  Future<String?> resolveStudentId() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) throw StateError('انتهت الجلسة. يرجى تسجيل الدخول.');
+    final student = await client
+        .from('students')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+    return student?['id'] as String?;
+  }
+
+  Future<Map<String, dynamic>?> readProgress(String lessonId, String studentId) async {
+    final row = await Supabase.instance.client
+        .from('learning_lesson_progress')
+        .select('status,completion_basis')
+        .eq('lesson_id', lessonId)
+        .eq('student_id', studentId)
+        .maybeSingle();
+    return row;
+  }
+
+  Future<void> writeProgress(
+    String lessonId,
+    String studentId,
+    String status, {
+    String? completionBasis,
+  }) async {
+    await Supabase.instance.client.from('learning_lesson_progress').upsert({
+      'lesson_id': lessonId,
+      'student_id': studentId,
+      'status': status,
+      'completion_basis': completionBasis,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'lesson_id,student_id');
+  }
+
+  Future<List<Map<String, dynamic>>> loadWords(String lessonId) async {
+    final rows = await Supabase.instance.client
+        .from('learning_vocabulary')
+        .select('id,hanzi,pinyin,meaning_ar')
+        .eq('lesson_id', lessonId)
+        .eq('is_published', true)
+        .order('position');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<Set<String>> loadStudiedWords(String studentId, List<String> wordIds) async {
+    if (wordIds.isEmpty) return {};
+    final rows = await Supabase.instance.client
+        .from('learning_vocab_progress')
+        .select('vocabulary_id')
+        .eq('student_id', studentId)
+        .gt('review_count', 0)
+        .inFilter('vocabulary_id', wordIds);
+    return {for (final row in rows) row['vocabulary_id'] as String};
+  }
+
+  Future<void> markWordStudied(String wordId, String studentId) async {
+    final client = Supabase.instance.client;
+    final existing = await client
+        .from('learning_vocab_progress')
+        .select('review_count')
+        .eq('vocabulary_id', wordId)
+        .eq('student_id', studentId)
+        .maybeSingle();
+    final count = (existing?['review_count'] as num?)?.toInt() ?? 0;
+    final now = DateTime.now().toIso8601String();
+    await client.from('learning_vocab_progress').upsert({
+      'vocabulary_id': wordId,
+      'student_id': studentId,
+      'status': 'learning',
+      'review_count': count + 1,
+      'last_reviewed_at': now,
+      'updated_at': now,
+    }, onConflict: 'vocabulary_id,student_id');
+  }
+}
+
 class LiveLessonPage extends StatefulWidget {
-  const LiveLessonPage({super.key, required this.lesson, required this.canTrack});
+  const LiveLessonPage({
+    super.key,
+    required this.lesson,
+    required this.canTrack,
+    this.store,
+  });
   final Map<String, dynamic> lesson;
   final bool canTrack;
+  final LessonStudyStore? store;
 
   @override
   State<LiveLessonPage> createState() => _LiveLessonPageState();
@@ -252,14 +342,28 @@ class LiveLessonPage extends StatefulWidget {
 
 class _LiveLessonPageState extends State<LiveLessonPage> {
   late final Future<String?> mediaUrl;
+  late final LessonStudyStore store;
   String? studentId;
   bool progressReady = false;
   String? progressStatus;
+  String? completionBasis;
   String? progressError;
+  List<Map<String, dynamic>>? words;
+  String? wordsError;
+  Set<String> studiedWords = {};
+  final Set<String> sessionReviewed = {};
+  bool readingDone = false;
+  bool listeningStarted = false;
+  bool listeningDone = false;
+  bool saving = false;
+  String? finishError;
+
+  String get lessonId => '${widget.lesson['id']}';
 
   @override
   void initState() {
     super.initState();
+    store = widget.store ?? const LessonStudyStore();
     mediaUrl = _mediaUrl();
     _loadProgress();
   }
@@ -270,27 +374,90 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
       return;
     }
     try {
-      final client = Supabase.instance.client;
-      final user = client.auth.currentUser;
-      if (user == null) throw StateError('انتهت الجلسة. يرجى تسجيل الدخول.');
-      final student = await client
-          .from('students')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-      if (student == null) return;
-      studentId = student['id'] as String;
-      final row = await client
-          .from('learning_lesson_progress')
-          .select('status')
-          .eq('lesson_id', widget.lesson['id'])
-          .eq('student_id', studentId!)
-          .maybeSingle();
-      if (mounted) setState(() => progressStatus = row?['status'] as String?);
+      final resolved = await store.resolveStudentId();
+      if (resolved == null) {
+        if (mounted) setState(() => progressReady = true);
+        return;
+      }
+      studentId = resolved;
+      final row = await store.readProgress(lessonId, resolved);
+      final status = row?['status'] as String?;
+      // Opening a lesson records "in progress" without downgrading completion.
+      if (status == null || status == 'not_started') {
+        await store.writeProgress(lessonId, resolved, 'in_progress');
+      }
+      final loadedWords = await store.loadWords(lessonId);
+      final studied = await store.loadStudiedWords(
+        resolved,
+        loadedWords.map((word) => '${word['id']}').toList(),
+      );
+      if (mounted) {
+        setState(() {
+          progressStatus = status == null || status == 'not_started' ? 'in_progress' : status;
+          completionBasis = row?['completion_basis'] as String?;
+          words = loadedWords;
+          studiedWords = studied;
+        });
+      }
     } catch (error) {
-      if (mounted) setState(() => progressError = 'تعذر تحميل حالة التقدم: $error');
+      if (mounted) setState(() => progressError = 'تعذر تحميل بيانات الدرس: $error');
     } finally {
       if (mounted) setState(() => progressReady = true);
+    }
+  }
+
+  bool get _hasReading =>
+      ((widget.lesson['content_body'] as String?)?.trim().length ?? 0) >= 20;
+  bool get _hasListening =>
+      widget.lesson['content_kind'] == 'audio' &&
+      (((widget.lesson['content_path'] as String?)?.trim().isNotEmpty ?? false) ||
+          ((widget.lesson['content_url'] as String?)?.trim().isNotEmpty ?? false));
+  bool get _hasVocabulary => (words?.isNotEmpty ?? false);
+
+  bool get _vocabularyDone =>
+      (words ?? const []).every((word) =>
+          sessionReviewed.contains('${word['id']}') || studiedWords.contains('${word['id']}'));
+
+  bool get _completable =>
+      progressStatus != 'completed' &&
+      (_hasReading || _hasListening || _hasVocabulary) &&
+      (!_hasReading || readingDone) &&
+      (!_hasListening || listeningDone) &&
+      (!_hasVocabulary || _vocabularyDone);
+
+  Future<void> _markWordStudied(String wordId) async {
+    if (saving || sessionReviewed.contains(wordId)) return;
+    final student = studentId;
+    if (student == null) return;
+    setState(() => saving = true);
+    try {
+      await store.markWordStudied(wordId, student);
+      if (mounted) setState(() => sessionReviewed.add(wordId));
+    } catch (error) {
+      _notice('تعذر حفظ مراجعة المفردة: $error');
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _finishLesson() async {
+    if (saving || !_completable) return;
+    final student = studentId;
+    if (student == null) return;
+    setState(() { saving = true; finishError = null; });
+    try {
+      await store.writeProgress(lessonId, student, 'completed', completionBasis: 'self_reported');
+      if (mounted) {
+        setState(() {
+          progressStatus = 'completed';
+          completionBasis = 'self_reported';
+        });
+        _notice('أُتممت تمارين هذا الدرس وسُجّل إكمالك الذاتي (غير معتمد).');
+      }
+    } catch (error) {
+      if (mounted) setState(() => finishError = 'تعذر تسجيل الإكمال: $error');
+    } finally {
+      if (mounted) setState(() => saving = false);
     }
   }
 
@@ -380,28 +547,143 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
             ),
           if (widget.canTrack && progressReady && progressError != null)
             EmptyPanel(progressError!, retry: () {
-              setState(() { progressReady = false; progressError = null; });
+              setState(() { progressReady = false; progressError = null; words = null; });
               _loadProgress();
             }),
           if (widget.canTrack && progressReady && studentId != null && progressError == null)
-            LessonProgressNotice(status: progressStatus),
+            LessonProgressNotice(status: progressStatus, basis: completionBasis),
+          if (widget.canTrack && progressReady && studentId != null && progressError == null)
+            ..._exerciseWidgets(),
           if (widget.canTrack && progressReady && studentId == null && progressError == null)
             const EmptyPanel('لا يوجد ملف طالب مرتبط بهذا الحساب؛ لم يُسجل تقدم محلي بديل.'),
         ],
       ),
     );
   }
+
+  List<Widget> _exerciseWidgets() {
+    if (words == null) {
+      return [const SaiCard(child: Center(child: CircularProgressIndicator()))];
+    }
+    final widgets = <Widget>[const SectionHeading('تمارين الدرس')];
+    if (!_hasReading && !_hasListening && !_hasVocabulary) {
+      widgets.add(const EmptyPanel(
+        'لا توجد تمارين مرتبطة بهذا الدرس بعد؛ أكمله بعد إضافة مادة قراءة أو تسجيل صوتي أو مفردات.',
+      ));
+      return widgets;
+    }
+    if (_hasReading) {
+      widgets.add(SaiCard(
+        child: ListTile(
+          leading: Icon(
+            readingDone ? Icons.check_circle_rounded : Icons.menu_book_rounded,
+            color: gold,
+          ),
+          title: const Text('تمرين القراءة'),
+          subtitle: const Text('اقرأ مادة الدرس المعروضة أعلاه كاملة.'),
+          trailing: progressStatus == 'completed'
+              ? null
+              : TextButton(
+                  onPressed: saving || readingDone
+                      ? null
+                      : () => setState(() => readingDone = true),
+                  child: Text(readingDone ? 'اكتملت القراءة' : 'أنهيت قراءة المادة'),
+                ),
+        ),
+      ));
+    }
+    if (_hasListening) {
+      widgets.add(SaiCard(
+        child: ListTile(
+          leading: Icon(
+            listeningDone ? Icons.check_circle_rounded : Icons.headphones_rounded,
+            color: gold,
+          ),
+          title: const Text('تمرين الاستماع'),
+          subtitle: const Text('شغّل التسجيل الصوتي كاملاً ثم أكّد إتمام الاستماع.'),
+          trailing: progressStatus == 'completed'
+              ? null
+              : TextButton(
+                  onPressed: saving || listeningDone
+                      ? null
+                      : () async {
+                          final url = await mediaUrl;
+                          if (url != null) {
+                            setState(() => listeningStarted = true);
+                            await _openMedia(url);
+                          }
+                          if (listeningStarted && mounted && !listeningDone) {
+                            setState(() => listeningDone = true);
+                          }
+                        },
+                  child: Text(listeningDone ? 'اكتمل الاستماع' : 'استمعت للتسجيل'),
+                ),
+        ),
+      ));
+    }
+    if (_hasVocabulary) {
+      widgets.add(SaiCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('تمرين المفردات', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            for (final word in words!)
+              Builder(builder: (context) {
+                final id = '${word['id']}';
+                final done = sessionReviewed.contains(id) || studiedWords.contains(id);
+                return ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${word['hanzi']}  •  ${word['pinyin'] ?? ''}'),
+                  subtitle: Text('${word['meaning_ar'] ?? ''}'),
+                  trailing: done
+                      ? const Icon(Icons.check_circle_rounded, color: gold)
+                      : TextButton(
+                          onPressed: saving || progressStatus == 'completed'
+                              ? null
+                              : () => _markWordStudied(id),
+                          child: const Text('راجعتها'),
+                        ),
+                );
+              }),
+          ],
+        ),
+      ));
+    }
+    if (finishError != null) widgets.add(EmptyPanel(finishError!));
+    if (progressStatus != 'completed') {
+      widgets.add(FilledButton.icon(
+        onPressed: saving || !_completable ? null : _finishLesson,
+        icon: const Icon(Icons.task_alt_rounded),
+        label: Text(saving ? 'جارٍ الحفظ...' : 'إنهاء الدرس'),
+      ));
+      if (!_completable) {
+        widgets.add(const Text(
+          'أكمل كل تمارين الدرس لتفعيل تسجيل الإكمال.',
+          textAlign: TextAlign.center,
+        ));
+      }
+    }
+    return widgets;
+  }
 }
 
 class LessonProgressNotice extends StatelessWidget {
-  const LessonProgressNotice({super.key, required this.status});
+  const LessonProgressNotice({super.key, required this.status, this.basis});
   final String? status;
+  final String? basis;
 
   @override
   Widget build(BuildContext context) => SaiCard(
     child: Text(
-      '${status == 'completed' ? 'توجد حالة إكمال سابقة غير متحققة. ' : status == 'in_progress' ? 'الحالة المسجلة: قيد الدراسة. ' : 'لا توجد حالة إكمال مسجلة. '}'
-      'تسجيل الإكمال معطل حتى يتوفر تقييم موثوق.',
+      status == 'completed' && basis == 'self_reported'
+          ? 'أكملت تمارين هذا الدرس وسُجّل إكمالك الذاتي (غير معتمد).'
+          : status == 'completed'
+              ? 'توجد حالة إكمال سابقة غير متحققة؛ أكمل تمارين الدرس لتسجيل مراجعتك الذاتية.'
+              : status == 'in_progress'
+                  ? 'الحالة المسجلة: قيد الدراسة.'
+                  : 'لا توجد حالة إكمال مسجلة.',
     ),
   );
 }

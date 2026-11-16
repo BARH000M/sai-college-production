@@ -252,6 +252,19 @@ function wordPayload(input: VocabularyWordInput): Record<string, unknown> {
   };
 }
 
+/** Loads the published words linked to one lesson, for the learner exercise flow. */
+export async function loadLessonVocabulary(lessonId: string): Promise<VocabularyWord[]> {
+  if (!lessonId) return [];
+  const result = await supabase
+    .from("learning_vocabulary")
+    .select(wordColumns)
+    .eq("lesson_id", lessonId)
+    .eq("is_published", true)
+    .order("position");
+  if (result.error) throw new Error(`تعذر تحميل مفردات الدرس: ${result.error.message}`);
+  return (result.data ?? []) as VocabularyWord[];
+}
+
 /** Loads the full word bank of one course, including unpublished drafts. */
 export async function loadCourseVocabulary(courseId: string): Promise<VocabularyWord[]> {
   if (!courseId) return [];

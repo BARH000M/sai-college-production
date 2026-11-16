@@ -447,6 +447,33 @@
 .portal-root .learn-score strong { font-size: 18px; color: oklch(var(--primary-700)); }
 .portal-root .learn-empty { display: grid; gap: 6px; }
 
+.portal-root .learn-exercises {
+  flex: 1 1 100%; min-width: 0; margin-top: 8px; padding: 12px 14px;
+  background: oklch(var(--background-50)); border: 1px dashed oklch(var(--background-300)); border-radius: 8px;
+  display: grid; gap: 10px;
+}
+.portal-root .learn-exercises h3 { margin: 0; font-size: 13px; }
+.portal-root .learn-exercise {
+  display: grid; gap: 8px; padding: 10px 12px;
+  background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200)); border-radius: 8px;
+}
+.portal-root .learn-exercise h4 { margin: 0; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.portal-root .learn-exercise audio { width: 100%; }
+.portal-root .learn-exercise-words { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.portal-root .learn-exercise-words li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 8px 10px; background: oklch(var(--background-50));
+  border: 1px solid oklch(var(--background-200)); border-radius: 8px; font-size: 12px;
+}
+.portal-root .learn-exercise-words .vocab-hanzi { font-size: 18px; font-weight: 700; }
+.portal-root .learn-exercise-words .button, .portal-root .learn-exercise-words .learn-pill { margin-inline-start: auto; }
+.portal-root .learn-lesson-manage { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.portal-root .learn-lesson-manage li {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px; background: oklch(var(--background-100));
+  border: 1px solid oklch(var(--background-200)); border-radius: 8px; font-size: 12px;
+}
+
 .portal-root .learn-lesson-panel {
   flex: 1 1 100%; min-width: 0; margin-top: 4px;
   background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-200));

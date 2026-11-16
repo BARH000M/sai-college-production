@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  daysUntil, formatDate, loadLearningWorkspace, statusForLesson, submissionStatusLabels, summarizeProgress,
+  daysUntil, formatDate, lessonProgressLabel, loadLearningWorkspace, statusForLesson, submissionStatusLabels, summarizeProgress,
   type LearningWorkspace,
 } from "@/portal/lib/learning";
 import { loadParentChildren, loadStudentRecord } from "../lib/home";
@@ -258,7 +258,7 @@ export function LearnerHome({ roles, userId }: { roles: readonly string[]; userI
               const lesson = workspace?.lessons.find((item) => item.id === row.lesson_id);
               return <li key={`${row.lesson_id}:${row.updated_at}`}>
                 <span>{lesson?.title ?? "درس غير معروف"}</span>
-                <small>{formatDate(row.updated_at)} · {row.status === "in_progress" ? "قيد الدراسة" : row.status === "completed" ? "إكمال سابق غير متحقق" : "لم يبدأ"}</small>
+                <small>{formatDate(row.updated_at)} · {lessonProgressLabel(row)}</small>
               </li>;
             })}</ul>}
         </section>
