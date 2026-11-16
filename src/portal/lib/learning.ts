@@ -85,6 +85,7 @@ export type LessonProgress = {
 export function lessonProgressLabel(row: LessonProgress | null | undefined): string {
   if (!row) return lessonStatusLabels.not_started;
   if (row.status === "completed" && row.completion_basis === "self_reported") return "أكمل التمارين ذاتياً (غير معتمد)";
+  if (row.status === "completed" && row.completion_basis === "assessed") return "مكتمل بتقييم مُصحَّح";
   return lessonStatusLabels[row.status];
 }
 

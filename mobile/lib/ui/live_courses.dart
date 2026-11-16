@@ -323,6 +323,30 @@ class LessonStudyStore {
       'updated_at': now,
     }, onConflict: 'vocabulary_id,student_id');
   }
+
+  /// Student-safe questions: the answer-key column is not granted to clients.
+  Future<List<Map<String, dynamic>>> loadQuestions(String lessonId) async {
+    final rows = await Supabase.instance.client
+        .from('learning_exercise_questions')
+        .select('id,kind,prompt,choices,position')
+        .eq('lesson_id', lessonId)
+        .eq('is_published', true)
+        .order('position');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Server-side grading: returns total/correct/score/passed/results.
+  Future<Map<String, dynamic>> submitExercise(
+    String lessonId,
+    List<Map<String, dynamic>> answers,
+  ) async {
+    final result = await Supabase.instance.client.rpc(
+      'sai_learning_submit_exercise',
+      params: {'p_lesson': lessonId, 'p_answers': answers},
+    );
+    if (result is! Map) throw StateError('استجابة التصحيح غير صالحة.');
+    return Map<String, dynamic>.from(result);
+  }
 }
 
 class LiveLessonPage extends StatefulWidget {
@@ -357,6 +381,11 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
   bool listeningDone = false;
   bool saving = false;
   String? finishError;
+  List<Map<String, dynamic>>? questions;
+  final Map<String, int> quizAnswers = {};
+  bool submittingQuiz = false;
+  String? quizError;
+  Map<String, dynamic>? quizResult;
 
   String get lessonId => '${widget.lesson['id']}';
 
@@ -391,12 +420,14 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
         resolved,
         loadedWords.map((word) => '${word['id']}').toList(),
       );
+      final loadedQuestions = await store.loadQuestions(lessonId);
       if (mounted) {
         setState(() {
           progressStatus = status == null || status == 'not_started' ? 'in_progress' : status;
           completionBasis = row?['completion_basis'] as String?;
           words = loadedWords;
           studiedWords = studied;
+          questions = loadedQuestions;
         });
       }
     } catch (error) {
@@ -437,6 +468,34 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
       _notice('تعذر حفظ مراجعة المفردة: $error');
     } finally {
       if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _submitQuiz() async {
+    final list = questions ?? const [];
+    if (submittingQuiz || list.isEmpty) return;
+    final answers = [
+      for (final question in list)
+        if (quizAnswers['${question['id']}'] != null)
+          {'question': '${question['id']}', 'choice': quizAnswers['${question['id']}']},
+    ];
+    if (answers.isEmpty) return;
+    setState(() { submittingQuiz = true; quizError = null; });
+    try {
+      final result = await store.submitExercise(lessonId, answers);
+      if (mounted) {
+        setState(() {
+          quizResult = result;
+          if (result['passed'] == true) {
+            progressStatus = 'completed';
+            completionBasis = 'assessed';
+          }
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => quizError = 'تعذر تصحيح الإجابات: $error');
+    } finally {
+      if (mounted) setState(() => submittingQuiz = false);
     }
   }
 
@@ -562,10 +621,12 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
   }
 
   List<Widget> _exerciseWidgets() {
-    if (words == null) {
+    if (words == null || questions == null) {
       return [const SaiCard(child: Center(child: CircularProgressIndicator()))];
     }
-    final widgets = <Widget>[const SectionHeading('تمارين الدرس')];
+    final widgets = <Widget>[];
+    if (questions!.isNotEmpty) widgets.add(_quizCard());
+    widgets.add(const SectionHeading('تمارين الدرس'));
     if (!_hasReading && !_hasListening && !_hasVocabulary) {
       widgets.add(const EmptyPanel(
         'لا توجد تمارين مرتبطة بهذا الدرس بعد؛ أكمله بعد إضافة مادة قراءة أو تسجيل صوتي أو مفردات.',
@@ -667,6 +728,85 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
     }
     return widgets;
   }
+
+  Widget _quizCard() {
+    final list = questions!;
+    final result = quizResult;
+    final results = <String, bool>{
+      if (result != null)
+        for (final row in (result['results'] as List? ?? const []))
+          '${(row as Map)['question']}': row['correct'] == true,
+    };
+    final answered = list.where((q) => quizAnswers['${q['id']}'] != null).length;
+    return SaiCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('التقييم المُصحَّح', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('يُصحَّح على الخادم · النجاح من ٧٠٪', style: TextStyle(fontSize: 11)),
+          const SizedBox(height: 8),
+          for (final entry in list.asMap().entries) ...[
+            Text('${entry.key + 1}. ${entry.value['prompt']}'),
+            RadioGroup<int>(
+              groupValue: quizAnswers['${entry.value['id']}'],
+              onChanged: result != null || submittingQuiz
+                  ? (_) {}
+                  : (value) => setState(() {
+                      if (value != null) quizAnswers['${entry.value['id']}'] = value;
+                    }),
+              child: Column(
+                children: [
+                  for (final choice in (entry.value['choices'] as List).asMap().entries)
+                    RadioListTile<int>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      enabled: result == null && !submittingQuiz,
+                      title: Text('${choice.value}'),
+                      subtitle: result != null &&
+                              quizAnswers['${entry.value['id']}'] == choice.key &&
+                              results.containsKey('${entry.value['id']}')
+                          ? Text(
+                              results['${entry.value['id']}']!
+                                  ? 'إجابة صحيحة'
+                                  : 'إجابة غير صحيحة${entry.value['kind'] == 'vocabulary' ? ' — أُعيدت المفردة إلى المراجعة' : ''}',
+                            )
+                          : null,
+                      value: choice.key,
+                    ),
+                ],
+              ),
+            ),
+          ],
+          if (quizError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('$quizError', style: const TextStyle(color: gold)),
+            ),
+          if (result != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'النتيجة: ${result['correct']} من ${result['total']} (${result['score']}٪).'
+                '${result['passed'] == true ? ' اجتزت التقييم وسُجّل إكمال الدرس كتقييم مُصحَّح.' : ' لم تبلغ درجة النجاح؛ راجع المفردات ثم أعد المحاولة.'}',
+              ),
+            ),
+          const SizedBox(height: 8),
+          if (result == null)
+            FilledButton.icon(
+              onPressed: submittingQuiz || answered == 0 ? null : _submitQuiz,
+              icon: const Icon(Icons.fact_check_outlined),
+              label: Text(submittingQuiz ? 'جارٍ التصحيح...' : 'إرسال الإجابات ($answered / ${list.length})'),
+            )
+          else if (result['passed'] != true)
+            OutlinedButton.icon(
+              onPressed: () => setState(() { quizResult = null; quizAnswers.clear(); }),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class LessonProgressNotice extends StatelessWidget {
@@ -677,13 +817,15 @@ class LessonProgressNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SaiCard(
     child: Text(
-      status == 'completed' && basis == 'self_reported'
-          ? 'أكملت تمارين هذا الدرس وسُجّل إكمالك الذاتي (غير معتمد).'
-          : status == 'completed'
-              ? 'توجد حالة إكمال سابقة غير متحققة؛ أكمل تمارين الدرس لتسجيل مراجعتك الذاتية.'
-              : status == 'in_progress'
-                  ? 'الحالة المسجلة: قيد الدراسة.'
-                  : 'لا توجد حالة إكمال مسجلة.',
+      status == 'completed' && basis == 'assessed'
+          ? 'اجتزت تقييم هذا الدرس؛ صُحِّح على الخادم وسُجّل كإكمال معتمد.'
+          : status == 'completed' && basis == 'self_reported'
+              ? 'أكملت تمارين هذا الدرس وسُجّل إكمالك الذاتي (غير معتمد).'
+              : status == 'completed'
+                  ? 'توجد حالة إكمال سابقة غير متحققة؛ أكمل تمارين الدرس لتسجيل مراجعتك الذاتية.'
+                  : status == 'in_progress'
+                      ? 'الحالة المسجلة: قيد الدراسة.'
+                      : 'لا توجد حالة إكمال مسجلة.',
     ),
   );
 }

@@ -36,6 +36,27 @@ class _FakeStore extends LessonStudyStore {
   Future<void> markWordStudied(String wordId, String studentId) async {
     writes.add('word:$wordId');
   }
+
+  List<Map<String, dynamic>> questions = const [];
+  Map<String, dynamic>? quizOutcome;
+
+  @override
+  Future<List<Map<String, dynamic>>> loadQuestions(String lessonId) async => questions;
+
+  @override
+  Future<Map<String, dynamic>> submitExercise(
+    String lessonId,
+    List<Map<String, dynamic>> answers,
+  ) async {
+    writes.add('quiz:${answers.length}');
+    return quizOutcome ?? {
+      'total': answers.length,
+      'correct': answers.length,
+      'score': 100,
+      'passed': true,
+      'results': [for (final a in answers) {'question': a['question'], 'correct': true}],
+    };
+  }
 }
 
 Map<String, dynamic> _lesson({String? body}) => {
@@ -131,6 +152,80 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('تعذر تحميل بيانات الدرس'), findsOneWidget);
     expect(find.text('إعادة المحاولة'), findsOneWidget);
+  });
+
+  testWidgets('server-graded quiz records assessed completion on pass', (
+    tester,
+  ) async {
+    final store = _FakeStore(progress: {'status': 'in_progress', 'completion_basis': null})
+      ..questions = const [
+        {
+          'id': 'q1',
+          'kind': 'vocabulary',
+          'prompt': 'ما معنى 你好؟',
+          'choices': ['مرحباً', 'وداعاً'],
+          'position': 1,
+        },
+      ];
+    await tester.pumpWidget(MaterialApp(
+      home: LiveLessonPage(lesson: _lesson(), canTrack: true, store: store),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('التقييم المُصحَّح'), findsOneWidget);
+    // Submit stays disabled until at least one answer is chosen.
+    final disabled = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'إرسال الإجابات (0 / 1)'),
+    );
+    expect(disabled.onPressed, isNull);
+
+    await tester.tap(find.text('مرحباً'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'إرسال الإجابات (1 / 1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'إرسال الإجابات (1 / 1)'));
+    await tester.pumpAndSettle();
+
+    expect(store.writes, contains('quiz:1'));
+    expect(find.textContaining('النتيجة: 1 من 1'), findsOneWidget);
+    expect(find.textContaining('اجتزت تقييم هذا الدرس'), findsOneWidget);
+  });
+
+  testWidgets('a failed quiz offers retry and no completion claim', (tester) async {
+    final store = _FakeStore(progress: {'status': 'in_progress', 'completion_basis': null})
+      ..questions = const [
+        {
+          'id': 'q1',
+          'kind': 'listening',
+          'prompt': 'استمع واختر',
+          'choices': ['أ', 'ب'],
+          'position': 1,
+        },
+      ]
+      ..quizOutcome = {
+        'total': 1,
+        'correct': 0,
+        'score': 0,
+        'passed': false,
+        'results': [
+          {'question': 'q1', 'correct': false},
+        ],
+      };
+    await tester.pumpWidget(MaterialApp(
+      home: LiveLessonPage(lesson: _lesson(), canTrack: true, store: store),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('أ'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'إرسال الإجابات (1 / 1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'إرسال الإجابات (1 / 1)'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('النتيجة: 0 من 1'), findsOneWidget);
+    expect(find.text('إعادة المحاولة'), findsWidgets);
+    expect(find.textContaining('اجتزت تقييم'), findsNothing);
   });
 }
 

@@ -8,6 +8,9 @@ import { LessonContent } from "@/portal/pages/learning/LessonContent";
 import { CourseVocabularyPanel } from "@/portal/pages/learning/CourseVocabularyPanel";
 import { LessonComposer } from "@/portal/pages/learning/LessonComposer";
 import { LessonExercises } from "@/portal/pages/learning/LessonExercises";
+import { LessonQuestionsPanel } from "@/portal/pages/learning/LessonQuestionsPanel";
+import { LessonQuiz } from "@/portal/pages/learning/LessonQuiz";
+import { LessonResultsPanel } from "@/portal/pages/learning/LessonResultsPanel";
 
 export function CoursesView({ scope }: { scope: LearningScope }) {
   const { workspace, mode, learnerId, canTrack, canManageContent } = scope;
@@ -127,12 +130,31 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
                 canManage={canManageContent}
                 onSaved={scope.reload}
               />
-              {mode === "learner" && canTrack && learnerId && <LessonExercises
-                key={`exercises-${lesson.id}`}
-                lesson={lesson}
-                studentId={learnerId}
-                progressRow={progressRow}
+              {mode === "learner" && canTrack && learnerId && <>
+                <LessonQuiz
+                  key={`quiz-${lesson.id}`}
+                  lessonId={lesson.id}
+                  onPassed={scope.reload}
+                />
+                <LessonExercises
+                  key={`exercises-${lesson.id}`}
+                  lesson={lesson}
+                  studentId={learnerId}
+                  progressRow={progressRow}
+                  onChanged={scope.reload}
+                />
+              </>}
+              {canManageContent && <LessonQuestionsPanel
+                key={`questions-${lesson.id}`}
+                lessonId={lesson.id}
+                course={active}
                 onChanged={scope.reload}
+              />}
+              {mode === "staff" && <LessonResultsPanel
+                key={`results-${lesson.id}`}
+                scope={scope}
+                lessonId={lesson.id}
+                classId={active.class_id}
               />}
             </>}
           </li>;

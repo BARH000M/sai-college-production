@@ -473,6 +473,16 @@
   padding: 8px 10px; background: oklch(var(--background-100));
   border: 1px solid oklch(var(--background-200)); border-radius: 8px; font-size: 12px;
 }
+.portal-root .learn-quiz-choices { display: grid; gap: 6px; }
+.portal-root .learn-quiz-choice {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer;
+  background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-200));
+  border-radius: 8px; font-size: 12.5px;
+}
+.portal-root .learn-quiz-choice:has(input:disabled) { cursor: default; }
+.portal-root .learn-quiz-choice.learn-quiz-picked { border-color: oklch(var(--primary-500)); background: oklch(var(--primary-50)); }
+.portal-root .learn-quiz-choice.learn-quiz-right { border-color: oklch(var(--secondary-500)); background: oklch(var(--secondary-100)); }
+.portal-root .learn-quiz-choice.learn-quiz-wrong { border-color: oklch(var(--primary-500)); background: oklch(var(--primary-100)); }
 
 .portal-root .learn-lesson-panel {
   flex: 1 1 100%; min-width: 0; margin-top: 4px;

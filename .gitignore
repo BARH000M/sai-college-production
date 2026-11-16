@@ -36,3 +36,6 @@ supabase/.temp/
 # Generated build files
 .gradle/
 /out/
+
+# Generated Android APK files
+mobile/APK-OUTPUT/
