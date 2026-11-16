@@ -17,7 +17,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   String? startupError;
   DemoWorkspace? demo;
-  if (previewMode) {
+  if (saiTarget != 'production' && saiTarget != 'preview') {
+    startupError = 'بيئة التشغيل غير مدعومة.';
+  } else if (previewMode) {
     try {
       demo = DemoWorkspace(await SharedPreferences.getInstance());
     } catch (_) {
@@ -29,15 +31,23 @@ Future<void> main() async {
       startupError = keyError;
     } else {
       try {
-        // initialize restores the SDK's saved session before we choose a screen.
-        // ignore: deprecated_member_use
-        await Supabase.initialize(url: backendUrl, anonKey: publicKey);
+        // Environment-scoped persistence prevents reusing a Production
+        // session in a Preview build (and vice versa) on the same device.
+        await Supabase.initialize(
+          url: backendUrl,
+          publishableKey: publicKey,
+          authOptions: FlutterAuthClientOptions(
+            localStorage: SharedPreferencesLocalStorage(
+              persistSessionKey: 'sai-$saiTarget-auth',
+            ),
+          ),
+        );
       } catch (_) {
         startupError = 'تعذر تهيئة الاتصال. تحقق من الإعدادات وحاول مجدداً.';
       }
     }
   }
-  runApp(SaiApp(startupError: startupError, demo: demo));
+  runApp(SaiApp(startupError: startupError, demo: demo, previewTarget: isPreviewTarget));
 }
 
 String? _publicKeyError(String key) {
@@ -59,7 +69,7 @@ String? _publicKeyError(String key) {
     if (payload['role'] == 'service_role') {
       return 'مفتاح service_role سري ولا يوضع داخل تطبيق الهاتف.';
     }
-    if (payload['ref'] != 'aeryusbrulqdxjdynwfh') {
+    if (payload['ref'] != backendRef) {
       return 'المفتاح لا يخص مشروع Supabase المعتمد لهذا التطبيق.';
     }
     if (payload['role'] != 'anon') {
@@ -72,9 +82,10 @@ String? _publicKeyError(String key) {
 }
 
 class SaiApp extends StatelessWidget {
-  const SaiApp({super.key, this.startupError, this.demo});
+  const SaiApp({super.key, this.startupError, this.demo, this.previewTarget = false});
   final String? startupError;
   final DemoWorkspace? demo;
+  final bool previewTarget;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -97,8 +108,38 @@ class SaiApp extends StatelessWidget {
           )
         : demo != null
         ? PreviewGate(demo: demo!)
-        : const AuthGate(),
+        : PreviewBanner(visible: previewTarget, child: const AuthGate()),
   );
+}
+
+/// Clearly marks Preview-targeted builds so testers never confuse environments.
+class PreviewBanner extends StatelessWidget {
+  const PreviewBanner({super.key, required this.visible, required this.child});
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!visible) return child;
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          color: red,
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: const SafeArea(
+            bottom: false,
+            child: Text(
+              'بيئة المعاينة (Preview) — بيانات اختبار فقط',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ink),
+            ),
+          ),
+        ),
+        Expanded(child: child),
+      ],
+    );
+  }
 }
 
 class PreviewGate extends StatelessWidget {

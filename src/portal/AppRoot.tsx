@@ -10,6 +10,7 @@ import { Profile } from "./pages/Profile";
 import { ModuleEntry } from "./pages/ModuleEntry";
 import { isAppRole } from "./lib/navigation";
 import { canAccessOperations } from "./lib/studentLearning";
+import { supabaseTarget } from "./lib/supabase";
 import {
   getInitialAuthState, restoreAuthState, signIn, signOut,
   subscribeToAuthChanges, type AuthState,
@@ -110,6 +111,9 @@ export default function PortalApp() {
   return (
     <ErrorBoundary>
       <div className="portal-root">
+        {supabaseTarget === "preview" && (
+          <div className="preview-banner" role="status">بيئة المعاينة (Preview) — بيانات اختبار فقط</div>
+        )}
         <Routes>
           {/* The old portal login keeps working, but the real screen lives at /auth. */}
           <Route path="login" element={<Navigate to={HOME} replace />} />
