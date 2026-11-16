@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import type { OnboardingChecks } from "./onboarding";
 
 export type AuthStatus = "loading" | "signed-out" | "signed-in";
 
@@ -7,12 +8,15 @@ export type AuthState = {
   status: AuthStatus;
   userId: string | null;
   email: string | null;
+  emailConfirmed: boolean;
   profile: { fullName: string } | null;
   profileLoaded: boolean;
   profileError: string | null;
   roles: string[];
   rolesLoaded: boolean;
   rolesError: string | null;
+  onboardingChecks: OnboardingChecks;
+  onboardingError: string | null;
   authError: string | null;
 };
 
@@ -37,12 +41,20 @@ export function getInitialAuthState(
     status,
     userId: null,
     email: null,
+    emailConfirmed: false,
     profile: null,
     profileLoaded: false,
     profileError: null,
     roles: [],
     rolesLoaded: false,
     rolesError: null,
+    onboardingChecks: {
+      activeBranchMembership: null,
+      studentRecordVisible: null,
+      verifiedParentLinkVisible: null,
+      assignedClassVisible: null,
+    },
+    onboardingError: null,
     authError: null,
   };
 }
@@ -103,7 +115,7 @@ function appBasePath(): string {
  * profile can be materialised on the first signed-in session even when the
  * visitor had to confirm their email before signing in.
  */
-async function ensureProfileRow(user: Session["user"]): Promise<void> {
+async function ensureProfileRow(user: Session["user"]): Promise<string | null> {
   try {
     const existing = await supabase
       .schema("public")
@@ -111,40 +123,96 @@ async function ensureProfileRow(user: Session["user"]): Promise<void> {
       .select("id")
       .eq("id", user.id)
       .maybeSingle();
-    if (existing.data) return;
+    if (existing.error) return existing.error.message;
+    if (existing.data) return null;
 
     const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
     const metaName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
     const locale = metadata.preferred_locale === "en" ? "en" : "ar";
-    await supabase.schema("public").from("profiles").insert({
+    const inserted = await supabase.schema("public").from("profiles").insert({
       id: user.id,
       full_name: metaName || user.email?.split("@")[0] || "مستخدم جديد",
-      email: user.email ?? null,
       preferred_locale: locale,
     });
-  } catch {
-    // A profile that cannot be created here is reported by the normal loader.
+    return inserted.error?.message ?? null;
+  } catch (error) {
+    return errorMessage(error);
   }
+}
+
+type VisibleRecordResult = { visible: boolean | null; error: string | null };
+
+async function visibleRecord(
+  query: PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<VisibleRecordResult> {
+  try {
+    const result = await query;
+    return { visible: result.error ? null : result.data !== null, error: result.error?.message ?? null };
+  } catch (error) {
+    return { visible: null, error: errorMessage(error) };
+  }
+}
+
+async function loadOnboardingChecks(userId: string, roles: readonly string[]): Promise<{
+  checks: OnboardingChecks;
+  error: string | null;
+}> {
+  const branchScoped = roles.some((role) => [
+    "admin", "teacher", "accountant", "receptionist", "librarian", "content_editor",
+  ].includes(role));
+  const [branch, student, parent, teacher] = await Promise.all([
+    branchScoped
+      ? visibleRecord(supabase.schema("public").from("branch_memberships").select("branch_id")
+        .eq("user_id", userId).eq("is_active", true).limit(1).maybeSingle())
+      : Promise.resolve({ visible: null, error: null }),
+    roles.includes("student")
+      ? visibleRecord(supabase.schema("public").from("students").select("id")
+        .eq("user_id", userId).limit(1).maybeSingle())
+      : Promise.resolve({ visible: null, error: null }),
+    roles.includes("parent")
+      ? visibleRecord(supabase.schema("public").from("parent_student_links").select("student_id")
+        .eq("parent_user_id", userId).not("verified_at", "is", null).limit(1).maybeSingle())
+      : Promise.resolve({ visible: null, error: null }),
+    roles.includes("teacher")
+      ? visibleRecord(supabase.schema("public").from("classes").select("id")
+        .eq("teacher_id", userId).eq("is_active", true).limit(1).maybeSingle())
+      : Promise.resolve({ visible: null, error: null }),
+  ]);
+  return {
+    checks: {
+      activeBranchMembership: branch.visible,
+      studentRecordVisible: student.visible,
+      verifiedParentLinkVisible: parent.visible,
+      assignedClassVisible: teacher.visible,
+    },
+    error: [branch, student, parent, teacher].map((result) => result.error).filter(Boolean).join(" — ") || null,
+  };
 }
 
 async function loadSignedInState(session: Session): Promise<AuthState> {
   const { user } = session;
-  await ensureProfileRow(user);
+  const profileCreationError = await ensureProfileRow(user);
   const [profileResult, rolesResult] = await Promise.all([
     loadProfile(user.id),
     loadRoles(user.id),
   ]);
+  const onboardingResult = rolesResult.error
+    ? { checks: getInitialAuthState().onboardingChecks, error: null }
+    : await loadOnboardingChecks(user.id, rolesResult.roles);
 
   return {
     status: "signed-in",
     userId: user.id,
     email: user.email ?? null,
+    emailConfirmed: !!user.email_confirmed_at,
     profile: profileResult.profile,
     profileLoaded: profileResult.error === null,
-    profileError: profileResult.error,
+    profileError: profileResult.error ?? (!profileResult.profile ? profileCreationError : null),
     roles: rolesResult.roles,
     rolesLoaded: rolesResult.error === null,
     rolesError: rolesResult.error,
+    onboardingChecks: onboardingResult.checks,
+    onboardingError: onboardingResult.error,
     authError: null,
   };
 }

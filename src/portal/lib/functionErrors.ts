@@ -4,11 +4,17 @@ export async function functionFailure(error: unknown, endpoint: string): Promise
   const response = context instanceof Response ? context : null;
   const status = response?.status;
   let permissionDenied = false;
+  let safeCode: string | null = null;
   if (response) {
     try {
       const body: unknown = await response.clone().json();
-      if (body && typeof body === "object" && "message" in body) {
-        permissionDenied = typeof body.message === "string" && /^permission denied for (table|schema) [a-z_]+$/.test(body.message);
+      if (body && typeof body === "object") {
+        if ("message" in body) {
+          permissionDenied = typeof body.message === "string" && /^permission denied for (table|schema) [a-z_]+$/.test(body.message);
+        }
+        if ("code" in body && typeof body.code === "string" && /^[a-z0-9_]{1,48}$/i.test(body.code)) {
+          safeCode = body.code;
+        }
       }
     } catch { /* Gateways can return HTML or an empty body. */ }
   }
@@ -20,5 +26,6 @@ export async function functionFailure(error: unknown, endpoint: string): Promise
     : status && status >= 500 ? "تعذر تنفيذ العملية على الخادم؛ راجع مسؤول النظام."
     : status ? "رفض الخادم الطلب؛ تحقق من البيانات والصلاحيات."
     : "تعذر الاتصال بالخدمة؛ تحقق من الشبكة ثم أعد المحاولة.";
-  return new Error(`${endpoint}${status ? ` (HTTP ${status})` : ""}: ${reason}${permissionDenied ? " [database_permission_denied]" : ""}`);
+  const classification = permissionDenied ? "database_permission_denied" : safeCode;
+  return new Error(`${endpoint}${status ? ` (HTTP ${status})` : ""}: ${reason}${classification ? ` [${classification}]` : ""}`);
 }

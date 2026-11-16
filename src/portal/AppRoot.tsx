@@ -9,6 +9,7 @@ import { PortalHome } from "./pages/PortalHome";
 import { Profile } from "./pages/Profile";
 import { ModuleEntry } from "./pages/ModuleEntry";
 import { isAppRole } from "./lib/navigation";
+import { onboardingNotices } from "./lib/onboarding";
 import { canAccessOperations } from "./lib/studentLearning";
 import { supabaseTarget } from "./lib/supabase";
 import {
@@ -71,6 +72,12 @@ export default function PortalApp() {
   }
 
   const signInPath = `/auth?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
+  const accountNotices = onboardingNotices(
+    auth.roles,
+    auth.emailConfirmed,
+    auth.onboardingChecks,
+    auth.onboardingError,
+  );
 
   const signOutButton = (
     <>
@@ -93,6 +100,7 @@ export default function PortalApp() {
     ) : !auth.roles.some(isAppRole) ? (
       <WaitingForRole
         email={auth.email}
+        emailConfirmed={auth.emailConfirmed}
         busy={busy}
         onRefresh={() => void refresh()}
         onSignOut={handleSignOut}
@@ -102,7 +110,7 @@ export default function PortalApp() {
         {signOutButton}
       </StatusCard>
     ) : (
-      <AppShell profileName={auth.profile.fullName} email={auth.email} roles={auth.roles} onSignOut={handleSignOut} busy={busy} signOutError={signOutError}>
+      <AppShell profileName={auth.profile.fullName} email={auth.email} roles={auth.roles} onSignOut={handleSignOut} busy={busy} signOutError={signOutError} onboardingNotices={accountNotices}>
         {content}
       </AppShell>
     );

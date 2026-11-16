@@ -90,10 +90,13 @@ test('settings save requires exact server acknowledgement, and missing-contract 
 test('privileged service clients do not forward caller JWTs and authorization remains database assigned', () => {
   for (const name of ['manage-roles','provision-learning-account','link-student-account']) {
     const source = read(`supabase/functions/${name}/index.ts`);
-    assert.match(source, /const admin = createClient\(url, serviceKey, \{ auth: \{ persistSession: false \} \}\)/);
+    assert.match(source, /const admin = createClient\(url, serviceKey,\s*\{\s*auth:\s*\{\s*persistSession: false(?:,\s*[a-zA-Z:, ]+)?\s*\},?\s*\}\)/);
     assert.match(source, /authClient.auth.getUser\(token\)/);
     assert.match(source, /\.from\("user_roles"\)/);
     assert.doesNotMatch(source, /createClient\(url, serviceKey,[^;]*Authorization/);
+    if (name === 'manage-roles') {
+      assert.match(source, /auth: \{ persistSession: false, autoRefreshToken: false, detectSessionInUrl: false \}/g);
+    }
     if (name !== 'link-student-account') assert.match(source, /if \(!superRole\) return json\([^\n]+403\)/);
   }
   for (const directory of ['src','mobile/lib']) {

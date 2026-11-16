@@ -21,6 +21,11 @@ test('function diagnostics preserve status and classify permission failure witho
   assert.match(error.message, /database_permission_denied/);
   assert.doesNotMatch(error.message, /DO_NOT_PRINT|user_roles/);
   assert.equal(response.bodyUsed, false);
+  const classified = await functionFailure({
+    context: new Response(JSON.stringify({ code: "last_super_admin_protected", secret: "DO_NOT_PRINT" }), { status: 409 }),
+  }, "manage-roles");
+  assert.match(classified.message, /\[last_super_admin_protected\]/);
+  assert.doesNotMatch(classified.message, /DO_NOT_PRINT/);
   for (const status of [400, 401, 403, 404, 409, 422, 500, 502]) {
     const result = await functionFailure({ context: new Response('SECRET_HTML_OR_JWT', { status }) }, 'test');
     assert.match(result.message, new RegExp(`HTTP ${status}`));

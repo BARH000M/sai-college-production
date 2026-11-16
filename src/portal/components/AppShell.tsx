@@ -8,9 +8,9 @@ import { mobileTabs } from "../lib/sidebarSections";
 import "./role-sidebar.css";
 import { useNotificationFeed } from "../hooks/useNotificationFeed";
 
-export function AppShell({ profileName, email, roles, onSignOut, busy, signOutError, children }: {
+export function AppShell({ profileName, email, roles, onSignOut, busy, signOutError, onboardingNotices = [], children }: {
   profileName: string; email: string | null; roles: readonly string[]; onSignOut: () => void; busy: boolean;
-  signOutError: string | null; children: ReactNode;
+  signOutError: string | null; onboardingNotices?: readonly string[]; children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -53,6 +53,10 @@ export function AppShell({ profileName, email, roles, onSignOut, busy, signOutEr
         <details className="profile-menu"><summary>{profileName}</summary><div><span dir="ltr">{email ?? "البريد غير متاح"}</span><button onClick={onSignOut} disabled={busy}>{busy ? "جارٍ تسجيل الخروج..." : "تسجيل الخروج"}</button></div></details>
       </header>
       {signOutError && <p className="error-box global-error" role="alert">تعذر تسجيل الخروج: {signOutError}</p>}
+      {!!onboardingNotices.length && <section className="data-note" role="status" aria-label="حالة اكتمال إعداد الحساب">
+        <strong>حالة إعداد الحساب</strong>
+        <ul>{onboardingNotices.map((notice) => <li key={notice}>{notice}</li>)}</ul>
+      </section>}
       {children}
     </div>
     <nav className="bottom-nav" aria-label="التنقل على الهاتف">

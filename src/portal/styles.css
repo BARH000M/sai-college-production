@@ -228,6 +228,9 @@
 .portal-root .role-chip-remove:disabled { opacity: .5; cursor: not-allowed; }
 .portal-root .role-grant-action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .portal-root .role-grant-action select { min-height: 38px; }
+.portal-root .role-branch-picker { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: oklch(var(--foreground-600)); }
+.portal-root .role-branch-picker select { min-width: 180px; }
+.portal-root .role-branch-warning { flex-basis: 100%; color: oklch(var(--accent-900)); }
 .portal-root .attendance-shortcut { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
 
 .portal-root .receipt-actions { margin-top: 12px; }

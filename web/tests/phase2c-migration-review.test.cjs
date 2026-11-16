@@ -5,14 +5,20 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
 const read = file => fs.readFileSync(path.join(root,file),'utf8');
 const names = fs.readdirSync(path.join(root,'supabase/migrations')).filter(n => n.endsWith('.sql')).sort();
+const phase3bProposals = [
+  '20261116142308_atomic_role_management.sql',
+  '20261116151509_branch_membership_write_lockdown.sql',
+];
+const baselineNames = names.filter(name => !phase3bProposals.includes(name));
 const service = read('supabase/migrations/20261116013951_phase2b_service_permissions.sql');
 const settings = read('supabase/migrations/20261116013952_phase2b_system_settings.sql');
 
-test('proposal versions follow the 36 baseline migrations uniquely, with no destructive data SQL', () => {
-  assert.equal(names.length, 38);
-  assert.equal(new Set(names.map(n => n.split('_')[0])).size, 38);
-  assert.deepEqual(names.slice(-3), ['20261116013950_learning_scored_exercises.sql',
+test('Phase 2C migration baseline remains intact beside the local Phase 3B proposal', () => {
+  assert.equal(baselineNames.length, 38);
+  assert.equal(new Set(baselineNames.map(n => n.split('_')[0])).size, 38);
+  assert.deepEqual(baselineNames.slice(-3), ['20261116013950_learning_scored_exercises.sql',
     '20261116013951_phase2b_service_permissions.sql','20261116013952_phase2b_system_settings.sql']);
+  assert.deepEqual(names.slice(-2), phase3bProposals);
   for (const sql of [service,settings]) {
     assert.match(sql, /\bbegin;/); assert.match(sql, /commit;\s*$/);
     assert.doesNotMatch(sql.replace(/--[^\n]*/g,''), /\b(?:drop|truncate)\b|disable row level|grant all|to\s+public\b/i);
