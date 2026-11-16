@@ -12,6 +12,7 @@ import { isAppRole } from "./lib/navigation";
 import { onboardingNotices } from "./lib/onboarding";
 import { canAccessOperations } from "./lib/studentLearning";
 import { supabaseTarget } from "./lib/supabase";
+import { accountErrorMessage } from "./lib/accountError";
 import {
   getInitialAuthState, restoreAuthState, signIn, signOut,
   subscribeToAuthChanges, type AuthState,
@@ -94,7 +95,7 @@ export default function PortalApp() {
     ) : auth.status === "signed-out" ? (
       <Navigate to={signInPath} replace />
     ) : auth.profileError || auth.rolesError ? (
-      <StatusCard title="تعذر تحميل بيانات الحساب" message={[auth.profileError, auth.rolesError].filter(Boolean).join(" — ")} onRetry={refresh}>
+      <StatusCard title="تعذر تحميل بيانات الحساب" message={accountErrorMessage([auth.profileError, auth.rolesError])} onRetry={refresh}>
         {signOutButton}
       </StatusCard>
     ) : !auth.roles.some(isAppRole) ? (
