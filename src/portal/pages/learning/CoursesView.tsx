@@ -1,18 +1,23 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  lessonKindLabels, lessonStatusLabels, statusForLesson,
+  lessonKindLabels, lessonProgressLabel, statusForLesson,
   type LearningScope, type LearningCourse,
 } from "@/portal/lib/learning";
 import { LessonContent } from "@/portal/pages/learning/LessonContent";
 import { CourseVocabularyPanel } from "@/portal/pages/learning/CourseVocabularyPanel";
+import { LessonComposer } from "@/portal/pages/learning/LessonComposer";
+import { LessonExercises } from "@/portal/pages/learning/LessonExercises";
+import { LessonQuestionsPanel } from "@/portal/pages/learning/LessonQuestionsPanel";
+import { LessonQuiz } from "@/portal/pages/learning/LessonQuiz";
+import { LessonResultsPanel } from "@/portal/pages/learning/LessonResultsPanel";
 
 export function CoursesView({ scope }: { scope: LearningScope }) {
   const { workspace, mode, learnerId, canTrack, canManageContent } = scope;
   const learner = workspace.students.find((student) => student.id === learnerId) ?? null;
   const [params] = useSearchParams();
   const [selectedId, setSelectedId] = useState("");
-  const [openLessonId, setOpenLessonId] = useState("");
+  const [openLessonId, setOpenLessonId] = useState(params.get("lesson") ?? "");
 
   const courses = useMemo(() => (mode === "staff"
     ? workspace.courses
@@ -61,7 +66,7 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
     <section className="panel">
       <h2>المقررات المتاحة</h2>
       <p className="data-note">اختر مقرراً لعرض دروسه بالترتيب.</p>
-      <p className="data-note">حالات الإكمال المسجلة سابقاً غير متحققة، ولا تمثل إنجازاً معتمداً. تسجيل الإكمال معطل لحين توفر تقييم موثوق.</p>
+      <p className="data-note">تُسجَّل إكمالات التمارين كإكمال ذاتي غير معتمد من حساب الطالب نفسه، وتظهر بعلامة «أكمل التمارين ذاتياً». حالات الإكمال الأقدم تبقى غير متحققة.</p>
       <div className="learn-course-grid">
         {courses.map((course) => {
           const stat = courseStat(course);
@@ -93,6 +98,7 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
       <ol className="learn-lessons">
         {lessons.map((lesson) => {
           const status = statusForLesson(workspace.progress, lesson.id, learnerId);
+          const progressRow = workspace.progress.find((row) => row.lesson_id === lesson.id && row.student_id === learnerId) ?? null;
           const doneCount = workspace.progress.filter((row) => row.lesson_id === lesson.id && row.status === "completed").length;
           return <li className="learn-lesson" key={lesson.id}>
             <span className="learn-lesson-index">{lesson.position}</span>
@@ -107,7 +113,7 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
             <div className="learn-lesson-side">
               {mode === "staff"
                 ? <span className="learn-pill">{doneCount} / {classStudents.length} حالة إكمال سابقة غير متحققة</span>
-                : <span className={`learn-pill learn-status-${status}`}>{lessonStatusLabels[status]}</span>}
+                : <span className={`learn-pill learn-status-${status}`}>{lessonProgressLabel(progressRow)}</span>}
               <div className="actions">
                 <button
                   type="button"
@@ -117,17 +123,46 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
                 >{openLessonId === lesson.id ? "إغلاق الدرس" : "فتح الدرس"}</button>
               </div>
             </div>
-            {openLessonId === lesson.id && <LessonContent
-              key={lesson.id}
-              lesson={lesson}
-              canManage={canManageContent}
-              onSaved={scope.reload}
-            />}
+            {openLessonId === lesson.id && <>
+              <LessonContent
+                key={lesson.id}
+                lesson={lesson}
+                canManage={canManageContent}
+                onSaved={scope.reload}
+              />
+              {mode === "learner" && canTrack && learnerId && <>
+                <LessonQuiz
+                  key={`quiz-${lesson.id}`}
+                  lessonId={lesson.id}
+                  onPassed={scope.reload}
+                />
+                <LessonExercises
+                  key={`exercises-${lesson.id}`}
+                  lesson={lesson}
+                  studentId={learnerId}
+                  progressRow={progressRow}
+                  onChanged={scope.reload}
+                />
+              </>}
+              {canManageContent && <LessonQuestionsPanel
+                key={`questions-${lesson.id}`}
+                lessonId={lesson.id}
+                course={active}
+                onChanged={scope.reload}
+              />}
+              {mode === "staff" && <LessonResultsPanel
+                key={`results-${lesson.id}`}
+                scope={scope}
+                lessonId={lesson.id}
+                classId={active.class_id}
+              />}
+            </>}
           </li>;
         })}
       </ol>
       {!lessons.length && <p className="muted">لم تُضف دروس لهذا المقرر بعد.</p>}
 
+      {canManageContent && <LessonComposer key={`composer-${active.id}`} course={active} lessons={lessons} onSaved={scope.reload} />}
       {canManageContent && <CourseVocabularyPanel key={active.id} course={active} lessons={lessons} />}
       {canTrack && <Link className="button secondary" to={`/portal/modules/vocabulary?course=${encodeURIComponent(active.id)}`}>
         مفردات هذا المقرر

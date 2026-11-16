@@ -24,24 +24,39 @@ export const settingsSections: readonly SettingSection[] = [
 ];
 export type SettingRow = { category:string; setting_key:string; value_text:string; updated_at:string; updated_by:string|null };
 
+function settingsFailure(error: { code?: string; message: string }): Error {
+  if (error.code === "PGRST205" || error.code === "42P01") {
+    return new Error("إعدادات النظام غير متاحة: عقد التخزين غير مثبت في هذه البيئة. الحفظ معطل حتى تجهيز الخادم. [settings_backend_unavailable]");
+  }
+  return new Error(error.code === "42501" ? "لا تملك صلاحية الوصول إلى هذه الإعدادات. [settings_access_denied]" : "تعذر تنفيذ عملية الإعدادات؛ تحقق من الاتصال أو راجع مسؤول النظام.");
+}
+
 export async function loadSettings(category: string): Promise<SettingRow[]> {
   if (!settingsSections.some(section=>section.category===category)) throw new Error("تصنيف إعدادات غير معروف.");
   const { data, error } = await supabase.from("sai_system_settings").select("category,setting_key,value_text,updated_at,updated_by")
     .eq("category",category).order("setting_key");
-  if (error) throw new Error(error.message);
-  return (data ?? []) as SettingRow[];
+  if (error) throw settingsFailure(error);
+  if (!Array.isArray(data)) throw new Error("لم يؤكد الخادم تحميل الإعدادات.");
+  return data as SettingRow[];
 }
-export async function saveSetting(section: SettingSection, field: SettingField, value: string): Promise<void> {
+export function validateSettingValue(section: SettingSection, field: SettingField, value: string): string {
   if (!settingsSections.includes(section) || !section.fields.includes(field)) throw new Error("هذا الإعداد غير مسموح.");
   const next = value.trim();
   if (next.length > 2000) throw new Error("القيمة طويلة جداً.");
   if (field.type==="boolean" && !["true","false"].includes(next)) throw new Error("قيمة غير صحيحة.");
   if (field.type==="select" && field.options && !field.options.includes(next)) throw new Error("خيار غير مدعوم.");
-  if (field.type==="number" && next && (!/^\d+$/.test(next) || Number(next)>3650)) throw new Error("رقم غير صالح.");
+  if (field.type==="number" && (!/^\d{1,4}$/.test(next) || Number(next)>3650)) throw new Error("رقم غير صالح.");
   if (field.type==="email" && next && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) throw new Error("البريد غير صحيح.");
+  if (/Bearer\s|sb_secret_|sbp_|-----BEGIN|eyJ[A-Za-z0-9_-]+\./i.test(next)) throw new Error("لا يسمح بحفظ بيانات اعتماد سرية في الإعدادات.");
+  if (field.key === "website_url" && next && !/^https:\/\/[^\s@/?#]+([/?#][^\s]*)?$/.test(next)) throw new Error("يجب استخدام عنوان موقع HTTPS دون بيانات دخول.");
+  return next;
+}
+
+export async function saveSetting(section: SettingSection, field: SettingField, value: string): Promise<void> {
+  const next = validateSettingValue(section, field, value);
   const { data, error } = await supabase.from("sai_system_settings")
     .upsert({category:section.category, setting_key:field.key, value_text:next},{onConflict:"category,setting_key"})
     .select("setting_key");
-  if (error) throw new Error(error.message);
-  if (!data?.length) throw new Error("لم يسمح الخادم بحفظ الإعداد.");
+  if (error) throw settingsFailure(error);
+  if (data?.length !== 1 || data[0].setting_key !== field.key) throw new Error("لم يؤكد الخادم حفظ الإعداد المطلوب.");
 }

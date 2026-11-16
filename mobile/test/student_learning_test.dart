@@ -16,20 +16,38 @@ void main() {
     }
   });
 
-  for (final status in [null, 'in_progress', 'completed']) {
-    testWidgets('lesson progress $status cannot be marked complete', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(body: LessonProgressNotice(status: status)),
+  testWidgets('lesson progress notice distinguishes exercise completion from legacy rows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: LessonProgressNotice(status: null)),
+      ),
+    );
+    expect(find.textContaining('لا توجد حالة إكمال مسجلة'), findsOneWidget);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: LessonProgressNotice(status: 'in_progress')),
+      ),
+    );
+    expect(find.textContaining('قيد الدراسة'), findsOneWidget);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: LessonProgressNotice(status: 'completed')),
+      ),
+    );
+    expect(find.textContaining('غير متحققة'), findsOneWidget);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: LessonProgressNotice(status: 'completed', basis: 'self_reported'),
         ),
-      );
-      expect(find.textContaining('تسجيل الإكمال معطل'), findsOneWidget);
-      expect(find.byType(FilledButton), findsNothing);
-      if (status == 'completed') {
-        expect(find.textContaining('غير متحققة'), findsOneWidget);
-      }
-    });
-  }
+      ),
+    );
+    expect(find.textContaining('أكملت تمارين هذا الدرس'), findsOneWidget);
+    expect(find.textContaining('غير معتمد'), findsOneWidget);
+  });
 }

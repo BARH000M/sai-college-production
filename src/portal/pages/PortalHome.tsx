@@ -12,6 +12,7 @@ export function PortalHome({ roles, userId }: { roles: readonly string[]; userId
   if (!userId) {
     return <StatusCard title="تعذر تحديد الحساب" message="أعد تسجيل الدخول للوصول إلى لوحتك." />;
   }
+  if (roles.includes("super_admin")) return <StaffHome superAdmin />;
   if (roles.some((role) => adminRoles.includes(role))) return <StaffHome />;
   if (roles.includes("teacher")) return <TeacherHome userId={userId} />;
   if (roles.some((role) => specialistRoles.includes(role))) return <SpecialistHome roles={roles} />;

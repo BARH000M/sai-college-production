@@ -12,7 +12,7 @@ const actionLabels: Record<string, string> = {
 
 const headers = [
   "رقم الطلب", "اسم المتقدم", "الفرع", "نوع الحركة",
-  "الحالة السابقة", "الحالة الجديدة", "الحقول المعدّلة", "الموظف", "التاريخ والوقت",
+  "الحالة السابقة", "الحالة الجديدة", "الحقول المعدّلة", "الموظف", "التاريخ والوقت", "موثوقية السجل",
 ] as const;
 
 function statusLabel(value: string | null): string {
@@ -41,6 +41,7 @@ function toRow(row: AdmissionHistoryExportRow): (string | null)[] {
     row.changed_columns,
     row.actor_name,
     formatWhen(row.occurred_at),
+    "غير متحقق منه؛ قد يكون مزوراً",
   ];
 }
 

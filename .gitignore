@@ -6,6 +6,7 @@ build/
 coverage/
 
 # Secrets and environment files
+.codex/config-backups/
 .env
 .env.*
 !.env.example
@@ -36,3 +37,6 @@ supabase/.temp/
 # Generated build files
 .gradle/
 /out/
+
+# Generated Android APK files
+mobile/APK-OUTPUT/

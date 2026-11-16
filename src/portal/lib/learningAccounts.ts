@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { functionFailure } from "./functionErrors";
 
 export type ProvisionAccount = { userId: string; email: string; fullName: string };
 
@@ -16,10 +17,10 @@ export type ProvisionKind = "student" | "parent";
 
 export type CreatedAccount = {
   email: string;
-  password: string;
   role: ProvisionKind;
   fullName: string;
   studentName: string;
+  inviteSent: boolean;
 };
 
 type OverviewResponse = { ok?: boolean; students?: ProvisionStudent[]; message?: string };
@@ -31,7 +32,7 @@ async function invoke<T extends { ok?: boolean; message?: string }>(
   body: Record<string, unknown>,
 ): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>("provision-learning-account", { body });
-  if (error) throw new Error(error.message || NOT_CONFIGURED);
+  if (error) throw await functionFailure(error, "provision-learning-account");
   if (!data) throw new Error(NOT_CONFIGURED);
   if (data.ok !== true) throw new Error(data.message ?? "تعذر تنفيذ الطلب.");
   return data;
@@ -46,11 +47,12 @@ export async function provisionLearningAccount(input: {
   studentId: string;
   kind: ProvisionKind;
   email: string;
-  password: string;
   parentName?: string;
 }): Promise<CreatedAccount> {
   const data = await invoke<CreateResponse>({ action: "create", ...input });
-  if (!data.account) throw new Error("لم تُرجع الخدمة بيانات الحساب المنشأ.");
+  if (!data.account || data.account.inviteSent !== true) {
+    throw new Error("لم تؤكد الخدمة إرسال دعوة الحساب.");
+  }
   return data.account;
 }
 

@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -107,13 +107,18 @@ Deno.serve(async (req) => {
   if (superError) return json({ ok: false, message: superError.message }, 500);
   if (!superRole) return json({ ok: false, message: "هذه العملية متاحة للمسؤول العام فقط." }, 403);
 
-  let body: Record<string, unknown> = {};
+  let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    const parsed: unknown = await req.json();
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return json({ ok: false, message: "Invalid request body" }, 400);
+    }
+    body = parsed as Record<string, unknown>;
   } catch {
-    body = {};
+    return json({ ok: false, message: "Invalid JSON request body" }, 400);
   }
-  const action = text(body.action) || "overview";
+  const action = text(body.action);
+  if (!action) return json({ ok: false, message: "An action is required" }, 400);
 
   if (action === "overview") {
     const students = await admin
@@ -179,17 +184,16 @@ Deno.serve(async (req) => {
 
   if (action === "create") {
     const studentId = text(body.studentId);
-    const kind = text(body.kind) === "parent" ? "parent" : "student";
+    const kind = text(body.kind);
     const email = text(body.email).toLowerCase();
-    const password = text(body.password);
     const parentName = text(body.parentName);
 
     if (!studentId) return json({ ok: false, message: "اختر الطالب أولاً." }, 400);
+    if (kind !== "student" && kind !== "parent") {
+      return json({ ok: false, message: "نوع الحساب غير صالح." }, 400);
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json({ ok: false, message: "صيغة البريد الإلكتروني غير صحيحة." }, 400);
-    }
-    if (password.length < 8) {
-      return json({ ok: false, message: "كلمة المرور يجب ألا تقل عن ٨ أحرف." }, 400);
     }
 
     const { data: student, error: studentError } = await admin
@@ -219,21 +223,18 @@ Deno.serve(async (req) => {
       ? (parentName || `ولي أمر ${student.full_name}`)
       : student.full_name;
 
-    const created = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName },
+    const invited = await admin.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName },
     });
-    if (created.error || !created.data.user) {
-      const reason = created.error?.message ?? "تعذر إنشاء الحساب.";
+    if (invited.error || !invited.data.user) {
+      const reason = invited.error?.message ?? "تعذر إرسال دعوة الحساب.";
       const friendly = /already|registered|exists/i.test(reason)
         ? "هذا البريد مستخدم في حساب آخر؛ اختر بريداً مختلفاً."
         : reason;
       return json({ ok: false, message: friendly }, 400);
     }
 
-    const userId = created.data.user.id;
+    const userId = invited.data.user.id;
     const rollback = async (reason: string) => {
       await admin.auth.admin.deleteUser(userId);
       return json({ ok: false, message: reason }, 500);
@@ -249,33 +250,25 @@ Deno.serve(async (req) => {
       .upsert({ user_id: userId, role: kind, assigned_by: caller.id }, { onConflict: "user_id,role", ignoreDuplicates: true });
     if (roleResult.error) return rollback(roleResult.error.message);
 
-    if (kind === "student") {
-      const updateResult = await admin
-        .from("students")
-        .update({ user_id: userId })
-        .eq("id", studentId);
-      if (updateResult.error) return rollback(updateResult.error.message);
-    } else {
-      const linkResult = await admin.from("parent_student_links").insert({
-        parent_user_id: userId,
-        student_id: studentId,
-        verified_at: new Date().toISOString(),
-        verified_by: caller.id,
-      });
-      if (linkResult.error) return rollback(linkResult.error.message);
-    }
-
-    await admin.from("audit_logs").insert({
+    const auditResult = await admin.from("audit_logs").insert({
       actor_user_id: caller.id,
-      action: kind === "student" ? "student_account_provision" : "parent_account_provision",
-      entity_type: kind === "student" ? "students" : "parent_student_links",
+      action: kind === "student" ? "student_account_invite" : "parent_account_invite",
+      entity_type: "students",
       entity_id: studentId,
-      metadata: { account_user_id: userId, email, source: "learning_accounts" },
+      metadata: { account_user_id: userId, email, role: kind, source: "learning_accounts" },
     });
+    if (auditResult.error) return rollback(auditResult.error.message);
 
     return json({
       ok: true,
-      account: { userId, email, password, role: kind, fullName, studentName: student.full_name },
+      account: {
+        userId,
+        email,
+        role: kind,
+        fullName,
+        studentName: student.full_name,
+        inviteSent: true,
+      },
     });
   }
 

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  formatDate, lessonStatusLabels, submissionStatusLabels, summarizeProgress,
+  formatDate, lessonProgressLabel, submissionStatusLabels, summarizeProgress,
   type LearningScope,
 } from "@/portal/lib/learning";
 
@@ -137,7 +137,7 @@ export function ProgressView({ scope }: { scope: LearningScope }) {
 
     {mode === "learner" && learner && <section className="panel">
       <h2>ملخص الدروس</h2>
-      <p className="data-note">الإكمال معطل حتى يتوفر تقييم موثوق على الخادم.</p>
+      <p className="data-note">تُوثَّق الإكمالات الجديدة بتمارين الدرس؛ حالات الإكمال الأقدم تبقى غير متحققة.</p>
       <div className="table-scroll">
         <table className="management-table">
           <thead><tr><th>الدرس</th><th>المقرر</th><th>الحالة</th></tr></thead>
@@ -150,7 +150,7 @@ export function ProgressView({ scope }: { scope: LearningScope }) {
                 return <tr key={lesson.id}>
                   <td>{lesson.position}. {lesson.title}</td>
                   <td>{workspace.courses.find((course) => course.id === lesson.course_id)?.title ?? "—"}</td>
-                  <td>{lessonStatusLabels[row?.status ?? "not_started"]}</td>
+                  <td>{lessonProgressLabel(row)}</td>
                 </tr>;
               })}
           </tbody>

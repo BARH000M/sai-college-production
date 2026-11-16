@@ -40,7 +40,7 @@ export function admissionDraft(row: Admission | null, branch: string, session: s
 export function admissionPayload(draft: AdmissionDraft, editing: boolean) {
   const optional = (value: string) => value.trim() || null;
   return {
-    ...(editing ? { status: draft.status } : { branch_id: draft.branch_id }),
+    ...(editing ? {} : { branch_id: draft.branch_id }),
     academic_session_id: draft.academic_session_id,
     applicant_full_name: draft.applicant_full_name.trim(),
     guardian_name: optional(draft.guardian_name), phone: optional(draft.phone), email: optional(draft.email),
@@ -300,10 +300,57 @@ export async function loadAdmissionStatusCounts(branch: string, session: string)
 }
 
 export async function setAdmissionStatus(enquiryId: string, status: AdmissionStatus): Promise<void> {
-  const result = await supabase.from("admissions_enquiries")
-    .update({ status }).eq("id", enquiryId).select("id");
+  if (status === "enrolled") {
+    throw new Error("يجب إنشاء سجل الطالب عبر إجراء التسجيل الآمن.");
+  }
+  const result = await supabase.rpc("sai_admissions_set_status", {
+    p_enquiry_id: enquiryId,
+    p_status: status,
+  });
   if (result.error) throw new Error(result.error.message);
-  if (!result.data?.length) throw new Error("لم تُحدّث الحالة؛ قد لا تملك الصلاحية أو لم يعد الطلب متاحاً.");
+}
+
+export type AdmissionEnrollment = { student_id: string; admission_no: string };
+
+function isAdmissionEnrollment(value: unknown): value is AdmissionEnrollment {
+  return typeof value === "object" && value !== null
+    && "student_id" in value && typeof value.student_id === "string"
+    && "admission_no" in value && typeof value.admission_no === "string";
+}
+
+export async function enrollAdmission(enquiryId: string): Promise<AdmissionEnrollment> {
+  const result = await supabase.rpc("sai_admissions_enroll", {
+    p_enquiry_id: enquiryId,
+  });
+  if (result.error) throw new Error(result.error.message);
+  if (!isAdmissionEnrollment(result.data)) {
+    throw new Error("لم تُنشئ قاعدة البيانات سجل الطالب المتوقع.");
+  }
+  return result.data;
+}
+
+export type TrackingTokenDelivery = { sent: boolean; trackingToken: string; reason: string | null };
+
+export async function issueAndEmailAdmissionTrackingToken(enquiryId: string): Promise<TrackingTokenDelivery> {
+  const issued = await supabase.rpc("admissions_issue_tracking_token", {
+    p_enquiry_id: enquiryId,
+  });
+  if (issued.error) throw new Error(issued.error.message);
+  if (typeof issued.data !== "string" || !/^[0-9a-f]{64}$/.test(issued.data)) {
+    throw new Error("لم تُصدر قاعدة البيانات رمز متابعة صالحًا.");
+  }
+
+  const { data, error } = await supabase.functions.invoke("admission-notify", {
+    body: { mode: "tracking_token", enquiryId, trackingToken: issued.data },
+  });
+  if (error) {
+    return { sent: false, trackingToken: issued.data, reason: error.message };
+  }
+  return {
+    sent: data?.sent === true,
+    trackingToken: issued.data,
+    reason: typeof data?.reason === "string" ? data.reason : null,
+  };
 }
 
 export async function assignAdmission(enquiryId: string, userId: string | null): Promise<void> {

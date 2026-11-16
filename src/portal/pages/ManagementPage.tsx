@@ -6,6 +6,7 @@ import {
 import { exportStudentRecordsCsv } from "../lib/reportExport";
 import { isAvailableStudentClass, makeDraft, managementPayload, validateManagementDraft, type Draft } from "../lib/managementForms";
 import { StudentAccountLink } from "./students/StudentAccountLink";
+import { StudentParentLink } from "./students/StudentParentLink";
 import { StudentProgressReport } from "./students/StudentProgressReport";
 import { StudentRecordsPrintSheet, type RecordsPrintScope } from "./students/StudentRecordsPrintSheet";
 
@@ -267,7 +268,10 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
       {canEditRow(selected) && <div className="actions"><button className="button primary" disabled={saving} onClick={() => openForm(selected)}>تعديل</button>{(kind === "students" ? selected.status === "active" : selected.is_active) && <button className="button secondary" disabled={saving} onClick={() => void deactivate(selected)}>إيقاف</button>}</div>}
       {kind === "students" && <>
         <div className="actions"><button className="button secondary" type="button" disabled={saving} onClick={() => setReportStudent(selected.id)}>طباعة تقرير الفصل لولي الأمر</button></div>
-        {canEditRow(selected) && <StudentAccountLink studentId={selected.id} currentUserId={selected.user_id ?? null} onChanged={() => setRetry((value) => value + 1)} />}
+        {canEditRow(selected) && <>
+          <StudentAccountLink studentId={selected.id} currentUserId={selected.user_id ?? null} onChanged={() => setRetry((value) => value + 1)} />
+          <StudentParentLink studentId={selected.id} canVerify={isSuperAdmin || roles.includes("admin")} />
+        </>}
       </>}
     </section>}
     {reportStudent && <StudentProgressReport studentId={reportStudent} onClose={() => setReportStudent(null)} />}
@@ -284,7 +288,7 @@ export function ManagementPage({ kind, roles, userId }: { kind: ManagementKind; 
         {scoped && <label>الفرع<select required disabled={!!editing} value={draft.branch_id} onChange={(event) => change("branch_id", event.target.value)}><option value="">اختر فرعاً</option>{options.branches.filter((item) => isSuperAdmin || managedBranches.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
         {(kind === "students" || kind === "classes") && <label>الجلسة<select required={kind === "classes"} disabled={kind === "classes" && !!editing} value={draft.session_id} onChange={(event) => change("session_id", event.target.value)}><option value="">اختر جلسة</option>{options.sessions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
         {kind === "classes" && <><label>البرنامج<input required value={draft.program} onChange={(event) => change("program", event.target.value)} /></label><label>السعة<input type="number" min="1" step="1" required value={draft.capacity} onChange={(event) => change("capacity", event.target.value)} /></label>{!editing && <label>معرّف حساب المعلم (اختياري)<input dir="ltr" value={draft.teacher_id} onChange={(event) => change("teacher_id", event.target.value)} /></label>}</>}
-        {kind === "students" && <>{!editing && <label>معرّف حساب الطالب (اختياري)<input dir="ltr" value={draft.user_id} onChange={(event) => change("user_id", event.target.value)} /></label>}<label>الصف<select disabled={!draft.session_id || formLoading} value={draft.class_id} onChange={(event) => change("class_id", event.target.value)}><option value="">بدون صف</option>{formClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>الحالة<select value={draft.status} onChange={(event) => change("status", event.target.value)}>{Object.entries(statuses).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label></>}
+        {kind === "students" && <><label>الصف<select disabled={!draft.session_id || formLoading} value={draft.class_id} onChange={(event) => change("class_id", event.target.value)}><option value="">بدون صف</option>{formClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>الحالة<select value={draft.status} onChange={(event) => change("status", event.target.value)}>{Object.entries(statuses).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label></>}
         {kind !== "students" && <label>الحالة<select value={draft.is_active} onChange={(event) => change("is_active", event.target.value)}><option value="true">نشط</option><option value="false">غير نشط</option></select></label>}
         {formLoading && <p role="status">جارٍ تحميل الصفوف...</p>}
         {formOptionsError && <p className="error-box" role="alert">{formOptionsError} <button type="button" className="text-button" onClick={() => setRetry((value) => value + 1)}>إعادة المحاولة</button></p>}

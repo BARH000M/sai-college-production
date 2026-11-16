@@ -41,9 +41,9 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
   const chosenClass = classes.find((item) => item.id === filters.classId);
   const teacherReadOnly = roles.includes("teacher") && !roles.some((role) => ["super_admin", "admin", "receptionist"].includes(role));
   const rosterReader = !!selectedClass && canManageAttendance(roles, userId, scope, selectedClass);
-  const manager = rosterReader && !teacherReadOnly;
+  const manager = rosterReader;
   const corrector = !!selected && canCorrectAttendance(roles, scope, selected.branch_id);
-  const canCreate = !teacherReadOnly && !!chosenClass && canManageAttendance(roles, userId, scope, chosenClass);
+  const canCreate = !!chosenClass && canManageAttendance(roles, userId, scope, chosenClass);
 
   useEffect(() => {
     if (!allowed) { setLoading(false); return; }
@@ -107,12 +107,11 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
   const editableRows = roster.filter((row) => selected?.status === "open" && (manager || (corrector && !!row.record_id)));
   const pendingDrafts = editableRows.filter((row) => !!drafts[row.student_id]?.status);
   const registerEntries: RegisterEntry[] = roster.map((row) => {
-    const draft = drafts[row.student_id];
     return {
       key: row.student_id,
       name: row.full_name,
-      status: (draft?.status || row.attendance_status || null) as AttendanceStatus | null,
-      note: draft?.note ?? row.note,
+      status: row.attendance_status,
+      note: row.note,
       saved: !!row.record_id,
     };
   });
@@ -146,7 +145,6 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
   return <main className="workspace">
     <div className="page-heading"><div><p className="eyebrow">إدارة الأكاديمية</p><h1>الحضور والغياب</h1></div></div>
     <p className="data-note">تاريخ الحضور حسب توقيت عدن. تظهر البيانات المسموح بها فقط؛ لا يمكن تعديل الجلسات المغلقة أو الملغاة.</p>
-    {teacherReadOnly && <p className="data-note">عرض الحضور للمعلم فقط حتى التحقق من صلاحيات الكتابة في البيئة المعتمدة.</p>}
     <fieldset className="context-card" disabled={saving}>
       <label>الفرع<select value={filters.branch} onChange={(e) => filter("branch", e.target.value)}><option value="">كل الفروع المتاحة</option>{branchIds.map((id) => <option key={id} value={id}>{branchName(id)}</option>)}</select></label>
       <label>الجلسة الأكاديمية<select value={filters.session} onChange={(e) => filter("session", e.target.value)}><option value="">كل الجلسات المتاحة</option>{sessionIds.map((id) => <option key={id} value={id}>{sessionName(id)}</option>)}</select></label>
@@ -164,7 +162,7 @@ export function Attendance({ roles, userId }: { roles: readonly string[]; userId
       </tbody></table></div>}
       <div className="pagination"><button className="button secondary" disabled={filters.page === 0 || saving} onClick={() => setFilters((value) => ({ ...value, page: value.page - 1 }))}>السابق</button><span>صفحة {filters.page + 1} · {count} جلسة</span><button className="button secondary" disabled={(filters.page + 1) * attendancePageSize >= count || saving} onClick={() => setFilters((value) => ({ ...value, page: value.page + 1 }))}>التالي</button></div>
     </section>}
-    {selected && <section className="panel management-detail"><div className="page-heading"><h2>تفاصيل الحضور · {selected.attendance_date}</h2><div className="actions"><button className="button secondary" disabled={saving} onClick={() => setPrinting(true)}><i className="ri-printer-line" aria-hidden="true"></i> طباعة الكشف</button><button className="button secondary" disabled={saving} onClick={() => setSelected(null)}>إغلاق التفاصيل</button></div></div>
+    {selected && <section className="panel management-detail"><div className="page-heading"><h2>تفاصيل الحضور · {selected.attendance_date}</h2><div className="actions">{(rosterReader || corrector) && <button className="button secondary" disabled={saving || detailLoading || !!detailError} onClick={() => setPrinting(true)}><i className="ri-printer-line" aria-hidden="true"></i> طباعة الكشف المحفوظ</button>}<button className="button secondary" disabled={saving} onClick={() => setSelected(null)}>إغلاق التفاصيل</button></div></div>
       {detailLoading ? <p role="status">جارٍ تحميل السجل...</p> : !detailError && <>
         <p>ملخص السجلات المعروضة: {Object.entries(attendanceStatuses).map(([key, label]) => `${label}: ${visibleStatuses.filter((status) => status === key).length}`).join(" · ")}</p>
         {manager && selected.status === "open" && <div className="actions"><button className="button primary" disabled={saving} onClick={() => void mutate(() => setAttendanceSessionStatus(selected.id, "closed"), "تم إغلاق الجلسة.")}>إغلاق الجلسة</button><button className="button secondary" disabled={saving} onClick={() => void mutate(() => setAttendanceSessionStatus(selected.id, "cancelled"), "تم إلغاء الجلسة دون حذفها.")}>إلغاء الجلسة</button></div>}

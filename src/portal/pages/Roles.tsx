@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  assignableRoles, changeUserRole, isAssignableRole, loadDirectoryUsers,
-  type AssignableRole, type DirectoryUser,
+  assignableRoles, changeUserRole, isAssignableRole, isBranchScopedRole, loadDirectoryUsers,
+  type AssignableRole, type BranchOption, type DirectoryUser,
 } from "../lib/roles";
 import { isAppRole, roleLabels } from "../lib/navigation";
 import { LearningAccountPanel } from "./roles/LearningAccountPanel";
@@ -14,15 +14,23 @@ function displayRole(role: string): string {
 }
 
 function GrantRow({
-  user, busyKey, onGrant, onRevoke,
+  user, busyKey, branches, onGrant, onRevoke,
 }: {
   user: DirectoryUser;
   busyKey: string | null;
-  onGrant: (user: DirectoryUser, role: AssignableRole) => void;
-  onRevoke: (user: DirectoryUser, role: AssignableRole) => void;
+  branches: BranchOption[];
+  onGrant: (user: DirectoryUser, role: AssignableRole, branchIds: string[]) => Promise<boolean>;
+  onRevoke: (user: DirectoryUser, role: AssignableRole) => Promise<boolean>;
 }) {
   const [choice, setChoice] = useState<AssignableRole | "">("");
+  const [selectedBranches, setSelectedBranches] = useState<string[]>(user.branchIds);
   const addable = assignableRoles.filter((role) => !user.roles.includes(role.id));
+  const selectedRole = choice ? assignableRoles.find((role) => role.id === choice) : undefined;
+
+  useEffect(() => {
+    setSelectedBranches(user.branchIds);
+  }, [user.id, user.branchIds]);
+
   return (
     <div className="role-grant-row">
       <div className="role-grant-main">
@@ -32,6 +40,9 @@ function GrantRow({
           {!user.emailConfirmed && <span className="role-flag">لم يؤكد بريده بعد</span>}
           {user.profileMissing && <span className="role-flag">لم يكمل الملف الشخصي</span>}
         </div>
+        {!!user.branchIds.length && <small className="muted">
+          نطاق الفروع الحالي: {user.branchIds.map((id) => branches.find((branch) => branch.id === id)?.name ?? "فرع غير نشط").join("، ")}
+        </small>}
         <div className="role-chips">
           {user.roles.length
             ? user.roles.map((role) => (
@@ -61,14 +72,40 @@ function GrantRow({
           <option value="">اختر دوراً...</option>
           {addable.map((role) => <option key={role.id} value={role.id}>{role.label}</option>)}
         </select>
+        {selectedRole && isBranchScopedRole(selectedRole.id) && (
+          <label className="role-branch-picker">نطاق الفروع لهذا الحساب
+            <select
+              aria-label={`اختر نطاق الفروع لحساب ${user.fullName || user.email}`}
+              multiple
+              size={Math.min(Math.max(branches.length, 2), 5)}
+              value={selectedBranches}
+              disabled={!!busyKey || !branches.length}
+              onChange={(event) => setSelectedBranches(
+                Array.from(event.currentTarget.selectedOptions, (option) => option.value),
+              )}
+            >
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </label>
+        )}
         <button
           type="button"
           className="button primary"
-          disabled={!!busyKey || !choice}
-          onClick={() => { if (choice) { onGrant(user, choice); setChoice(""); } }}
+          disabled={
+            !!busyKey || !choice || !user.emailConfirmed
+            || (!!selectedRole && isBranchScopedRole(selectedRole.id) && (!branches.length || !selectedBranches.length))
+          }
+          onClick={() => {
+            if (!choice) return;
+            void onGrant(user, choice, selectedRole && isBranchScopedRole(selectedRole.id) ? selectedBranches : [])
+              .then((succeeded) => { if (succeeded) setChoice(""); });
+          }}
         >
           منح الوصول
         </button>
+        {selectedRole && isBranchScopedRole(selectedRole.id) && !branches.length && (
+          <small className="role-branch-warning">لا يوجد فرع نشط؛ لن يُمنح دور موظف قبل إعداد فرع معتمد.</small>
+        )}
       </div>
     </div>
   );
@@ -76,6 +113,7 @@ function GrantRow({
 
 export function Roles() {
   const [users, setUsers] = useState<DirectoryUser[]>([]);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -88,7 +126,12 @@ export function Roles() {
     setLoading(true);
     setError(null);
     void loadDirectoryUsers()
-      .then((rows) => { if (active) setUsers(rows); })
+      .then((result) => {
+        if (active) {
+          setUsers(result.users);
+          setBranches(result.branches);
+        }
+      })
       .catch((failure: unknown) => {
         if (active) setError(failure instanceof Error ? failure.message : String(failure));
       })
@@ -105,23 +148,47 @@ export function Roles() {
   const waiting = filtered.filter((user) => !user.roles.some((role) => isAppRole(role)));
   const active = filtered.filter((user) => user.roles.some((role) => isAppRole(role)));
 
-  async function apply(user: DirectoryUser, role: AssignableRole, grant: boolean) {
+  async function apply(user: DirectoryUser, role: AssignableRole, grant: boolean, branchIds: string[] = []) {
     const key = `${user.id}:${role}`;
-    if (busyKey) return;
+    if (busyKey) return false;
+    if (grant && !user.emailConfirmed) {
+      setError("يجب تأكيد البريد الإلكتروني قبل منح أي دور.");
+      return false;
+    }
+    if (grant && isBranchScopedRole(role) && !branchIds.length) {
+      setError("اختر فرعاً نشطاً واحداً على الأقل لهذا الحساب.");
+      return false;
+    }
+    const roleLabel = displayRole(role);
+    const branchNames = branchIds.map((id) => branches.find((branch) => branch.id === id)?.name ?? id);
+    const actionText = grant ? `منح دور «${roleLabel}» إلى ${user.fullName || user.email}` : `سحب دور «${roleLabel}» من ${user.fullName || user.email}`;
+    if (!window.confirm(`هل تؤكد ${actionText}${grant && branchNames.length ? ` ضمن الفروع: ${branchNames.join("، ")}` : ""}؟`)) {
+      return false;
+    }
+    if (grant && role === "super_admin" && !window.confirm(
+      `تأكيد إضافي: سيحصل ${user.fullName || user.email} على صلاحيات المسؤول العام على مستوى النظام. هل تريد المتابعة؟`,
+    )) {
+      return false;
+    }
+
     setBusyKey(key);
     setError(null);
     setSuccess(null);
     try {
-      await changeUserRole(user.id, role, grant);
-      setUsers((current) => current.map((row) => row.id === user.id
-        ? {
-            ...row,
-            roles: grant ? [...new Set([...row.roles, role])] : row.roles.filter((item) => item !== role),
-          }
-        : row));
-      setSuccess(`${grant ? "تم منح" : "تم سحب"} دور «${displayRole(role)}» ${grant ? "إلى" : "من"} ${user.fullName || user.email}.`);
+      await changeUserRole(user.id, role, grant, branchIds, grant && role === "super_admin");
+      try {
+        const refreshed = await loadDirectoryUsers();
+        setUsers(refreshed.users);
+        setBranches(refreshed.branches);
+      } catch {
+        setError(`تم تنفيذ العملية، لكن تعذر تحديث القائمة. استخدم «تحديث القائمة» للتحقق من الحالة.`);
+        return true;
+      }
+      setSuccess(`${grant ? "تم منح" : "تم سحب"} دور «${roleLabel}» ${grant ? "إلى" : "من"} ${user.fullName || user.email}.`);
+      return true;
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
+      return false;
     } finally {
       setBusyKey(null);
     }
@@ -132,11 +199,11 @@ export function Roles() {
       <div>
         <p className="eyebrow">الإدارة العامة</p>
         <h1>إدارة الأدوار والصلاحيات</h1>
-        <p className="muted">امنح الحسابات الجديدة الوصول المناسب، واسحب أي دور بالنقر على × في شارته. تُطبَّق الصلاحيات فوراً عند تسجيل الدخول.</p>
+        <p className="muted">راجع حالة تأكيد البريد ونطاق الفروع قبل منح الدور. لا يُمنح الوصول قبل تأكيد العملية.</p>
       </div>
       <button className="button secondary" onClick={() => setRetry((value) => value + 1)} disabled={loading}>تحديث القائمة</button>
     </div>
-    <p className="data-note">هذه الشاشة متاحة للمسؤول العام فقط؛ ومنح أي دور موظف يضع الحساب في فريق الحرم ليصبح قابلاً للإسناد. تُسجَّل كل عملية في سجل التدقيق.</p>
+    <p className="data-note">هذه الشاشة متاحة للمسؤول العام فقط. نطاق الفروع مشترك بين أدوار الموظفين في الحساب ويُحدّث حصراً من الخادم. دور الطالب أو ولي الأمر لا يثبت وحده وجود تسجيل أكاديمي أو علاقة أسرية؛ يجب إكمال الربط المعتمد بشكل منفصل.</p>
     <LearningAccountPanel />
     <TeacherAccountPanel />
 
@@ -156,12 +223,13 @@ export function Roles() {
           <h2>بانتظار الوصول</h2>
           <span className="role-count">{waiting.length}</span>
         </div>
-        <p className="data-note">حسابات سجّلت للتو ولم يُمنح لها أي دور بعد، بما فيها من لم يؤكد بريده الإلكتروني.</p>
+        <p className="data-note">الحسابات بلا دور. لا يمكن منح الدور قبل تأكيد البريد الإلكتروني، ويظل الربط الأكاديمي أو الأسري خطوة منفصلة.</p>
         {!waiting.length
           ? <p className="muted">لا توجد حسابات تنتظر الوصول حالياً.</p>
           : <div className="role-grant-list">
-            {waiting.map((user) => <GrantRow key={user.id} user={user} busyKey={busyKey}
-              onGrant={(u, role) => void apply(u, role, true)} onRevoke={(u, role) => void apply(u, role, false)} />)}
+            {waiting.map((user) => <GrantRow key={user.id} user={user} busyKey={busyKey} branches={branches}
+              onGrant={(u, role, branchIds) => apply(u, role, true, branchIds)}
+              onRevoke={(u, role) => apply(u, role, false)} />)}
           </div>}
       </section>
 
@@ -173,8 +241,9 @@ export function Roles() {
         {!active.length
           ? <p className="muted">لا توجد حسابات ذات وصول مطابقة للبحث.</p>
           : <div className="role-grant-list">
-            {active.map((user) => <GrantRow key={user.id} user={user} busyKey={busyKey}
-              onGrant={(u, role) => void apply(u, role, true)} onRevoke={(u, role) => void apply(u, role, false)} />)}
+            {active.map((user) => <GrantRow key={user.id} user={user} busyKey={busyKey} branches={branches}
+              onGrant={(u, role, branchIds) => apply(u, role, true, branchIds)}
+              onRevoke={(u, role) => apply(u, role, false)} />)}
           </div>}
       </section>
     </>}

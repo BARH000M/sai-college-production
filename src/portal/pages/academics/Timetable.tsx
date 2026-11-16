@@ -3,7 +3,6 @@ import {
   academicBranchOptions, academicClassOptions, calendarEvents, periodSlots, weekDays, weeklyLessons,
 } from "@/mocks/academics";
 import { LabTabs } from "@/portal/pages/labs/LabShell";
-import { PrintDoc } from "@/portal/pages/academics/PrintDoc";
 
 type View = "week" | "month";
 
@@ -68,7 +67,6 @@ export function Timetable() {
   const [classId, setClassId] = useState(academicClassOptions[0].id);
   const [view, setView] = useState<View>("week");
   const [selectedDate, setSelectedDate] = useState("2026-11-11");
-  const [printOpen, setPrintOpen] = useState(false);
 
   const activeClass = academicClassOptions.find((row) => row.id === classId) ?? academicClassOptions[0];
   const branchName = academicBranchOptions.find((row) => row.id === branch)?.name ?? academicBranchOptions[0].name;
@@ -94,13 +92,14 @@ export function Timetable() {
   const weekLessonCount = weeklyLessons.filter((row) => row.classId === classId).length;
 
   return <main className="workspace">
+    <p className="data-note" role="note" data-academic-demo>عرض توضيحي غير مكتمل — جميع السجلات والأسماء والأرقام والمواعيد أمثلة وليست بيانات طلاب أو معلمين حقيقية. الاعتماد والإشعارات والطباعة الرسمية غير متاحة. Demonstration only — sample data; no backend operations.</p>
     <div className="page-heading">
       <div>
         <p className="eyebrow">الشؤون الأكاديمية</p>
         <h1>الجداول والتقويم</h1>
         <p className="muted">جدول الحصص الأسبوعي وتقويم الاختبارات والفعاليات والمواعيد الرسمية للكلية.</p>
       </div>
-      <button className="button secondary" type="button" onClick={() => setPrintOpen(true)}>
+      <button className="button secondary" type="button" disabled title="الطباعة الرسمية غير متاحة للبيانات التوضيحية">
         <i className="ri-printer-line" aria-hidden="true"></i> طباعة الجدول
       </button>
     </div>
@@ -220,18 +219,6 @@ export function Timetable() {
       </ul>
     </section>
 
-    {printOpen && <PrintDoc
-      title="الجدول الأسبوعي للحصص"
-      subtitle={`${activeClass.name} · ${branchName} · ${activeClass.program}`}
-      archive={{ term: "الفصل الأول 2026/2027", preparedBy: activeClass.teacher }}
-      onClose={() => setPrintOpen(false)}
-    >
-      <WeekGrid classId={classId} />
-      <p className="sheet-note">هذا الجدول صادر عن الشؤون الأكاديمية ويعتمد التوزيع المعتمد للفصل الأول. أي تعديل يُنشر إشعاره للطلاب وأولياء الأمور.</p>
-      <div className="receipt-signatures">
-        <div><span>إعداد: {activeClass.teacher}</span></div>
-        <div><span>اعتماد الشؤون الأكاديمية</span></div>
-      </div>
-    </PrintDoc>}
+
   </main>;
 }

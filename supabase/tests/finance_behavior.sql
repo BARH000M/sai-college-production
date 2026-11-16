@@ -50,8 +50,8 @@ begin
     raise exception 'Browser role has direct finance access';
   end if;
 
-  insert into auth.users(id) values (super_id), (admin_id), (accountant_id), (reception_id),
-    (student_user), (parent_id), (teacher_id), (outsider_id);
+  insert into auth.users(id, email_confirmed_at) values (super_id, now()), (admin_id, now()), (accountant_id, now()), (reception_id, now()),
+    (student_user, now()), (parent_id, now()), (teacher_id, now()), (outsider_id, now());
   insert into public.user_roles(user_id, role) values
     (super_id,'super_admin'),(admin_id,'admin'),(accountant_id,'accountant'),
     (reception_id,'receptionist'),(student_user,'student'),(parent_id,'parent'),
@@ -69,11 +69,11 @@ begin
     (class_b,branch_b,session_b,'WAVE1_FINANCE_TEST_class_b','test');
   perform set_config('request.jwt.claim.sub',super_id::text,true);
   insert into public.students(id,user_id,branch_id,admission_no,full_name,class_id) values
-    (student_a,student_user,branch_a,'WAVE1_FINANCE_TEST_' || run_id || '_a','WAVE1_FINANCE_TEST_student_a',class_a),
+    (student_a,null,branch_a,'WAVE1_FINANCE_TEST_' || run_id || '_a','WAVE1_FINANCE_TEST_student_a',class_a),
     (student_b,null,branch_b,'WAVE1_FINANCE_TEST_' || run_id || '_b','WAVE1_FINANCE_TEST_student_b',class_b);
-  insert into public.parent_student_links(parent_user_id,student_id,verified_at)
-    values (parent_id,student_a,now());
   execute 'set local role authenticated';
+  perform public.admissions_link_student_account(student_a,student_user);
+  perform public.admissions_verify_parent_student(student_a,parent_id);
 
   group_a := public.sai_finance_save_group(null,branch_a,session_a,'WAVE1_FINANCE_TEST_group',null,100.005,'2031-03-01',true);
   rejected := false;
@@ -109,6 +109,11 @@ begin
   if balance <> 60.01 or status_value <> 'partial' then raise exception 'Partial balance incorrect'; end if;
 
   perform set_config('request.jwt.claim.sub',reception_id::text,true);
+  rejected := false;
+  begin perform public.sai_finance_pay(assignment_a,5,'bank_transfer','WAVE1_FINANCE_TEST_ref',gen_random_uuid());
+  exception when insufficient_privilege then rejected := true; end;
+  if not rejected then raise exception 'Receptionist payment allowed'; end if;
+  perform set_config('request.jwt.claim.sub',admin_id::text,true);
   payment_b := public.sai_finance_pay(assignment_a,5,'bank_transfer','WAVE1_FINANCE_TEST_ref',gen_random_uuid());
   if (select count(distinct p.receipt_number) from public.sai_finance_payments(assignment_a) p) <> 2 then
     raise exception 'Receipts not unique';
@@ -117,6 +122,7 @@ begin
   begin perform public.sai_finance_pay(assignment_a,5,'bank_transfer','WAVE1_FINANCE_TEST_ref',gen_random_uuid());
   exception when unique_violation then rejected := true; end;
   if not rejected then raise exception 'Duplicate transaction reference accepted'; end if;
+  perform set_config('request.jwt.claim.sub',reception_id::text,true);
   rejected := false;
   begin perform public.sai_finance_void(payment_b,'WAVE1_FINANCE_TEST_reason');
   exception when insufficient_privilege then rejected := true; end;

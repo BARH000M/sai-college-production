@@ -4,8 +4,11 @@ import 'package:sai_approved_mobile/data/repository.dart';
 
 void main() {
   test('Android/iOS client targets the one approved Supabase project', () {
+    // Tests run without SAI_TARGET, so the default stays Production-locked.
     expect(backendUrl, 'https://aeryusbrulqdxjdynwfh.supabase.co');
     expect(backendUrl.startsWith('https://'), isTrue);
+    expect(isPreviewTarget, isFalse);
+    expect(backendRef, 'aeryusbrulqdxjdynwfh');
   });
 
   test('Yemen SAI official identity is retained', () {

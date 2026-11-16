@@ -3,13 +3,14 @@ import { Link } from "react-router-dom";
 import { loadStaffHome, type StaffHome as StaffHomeData } from "../../lib/home";
 import { formatDateTime } from "./dateFormat";
 import { AdmissionChip, OccupancyBar } from "./SectionBits";
+import { SuperAdminOverview } from "./SuperAdminOverview";
 
 type State =
   | { status: "loading"; data: null; error: null }
   | { status: "ready"; data: StaffHomeData; error: null }
   | { status: "error"; data: null; error: string };
 
-export function StaffHome() {
+export function StaffHome({ superAdmin = false }: { superAdmin?: boolean }) {
   const [state, setState] = useState<State>({ status: "loading", data: null, error: null });
   const [retry, setRetry] = useState(0);
 
@@ -28,6 +29,7 @@ export function StaffHome() {
   const refresh = () => setRetry((value) => value + 1);
 
   return <main className="workspace">
+    {superAdmin && <SuperAdminOverview />}
     <div className="page-heading">
       <div>
         <p className="eyebrow">الإدارة والأكاديمية</p>

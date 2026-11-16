@@ -25,7 +25,14 @@ function client(response) {
     insert(...args) { calls.push(["insert", ...args]); return Promise.resolve(response); },
     then(resolve, reject) { return Promise.resolve(response).then(resolve, reject); },
   };
-  return { calls, from(table) { calls.push(["from", table]); return builder; } };
+  return {
+    calls,
+    from(table) { calls.push(["from", table]); return builder; },
+    rpc(name, args) {
+      calls.push(["rpc", name, args]);
+      return Promise.resolve(response);
+    },
+  };
 }
 const filters = { branch: "", session: "", status: "", assignee: "", search: "", page: 0 };
 
@@ -51,7 +58,58 @@ test("status validation and immutable edit fields", async () => {
   for (const field of ["id", "branch_id", "application_no", "created_by", "created_at", "updated_at", "closed_at"]) {
     assert.equal(field in edit, false);
   }
+  assert.equal("status" in edit, false);
   assert.equal("status" in api.admissionPayload(draft, false), false);
+});
+
+test("status changes and enrollment use their guarded RPCs", async () => {
+  const db = client({ data: null, error: null });
+  const api = await load("status-rpcs", db);
+  await api.setAdmissionStatus("enquiry", "accepted");
+  assert.deepEqual(db.calls.at(-1), ["rpc", "sai_admissions_set_status", {
+    p_enquiry_id: "enquiry",
+    p_status: "accepted",
+  }]);
+  await assert.rejects(api.setAdmissionStatus("enquiry", "enrolled"), /التسجيل الآمن/);
+
+  db.rpc = (name, args) => {
+    db.calls.push(["rpc", name, args]);
+    return Promise.resolve({
+      data: { student_id: "student", admission_no: "SAI-APP-1042" },
+      error: null,
+    });
+  };
+  assert.deepEqual(await api.enrollAdmission("enquiry"), {
+    student_id: "student",
+    admission_no: "SAI-APP-1042",
+  });
+  assert.equal(db.calls.at(-1)[1], "sai_admissions_enroll");
+});
+
+test("tracking-token reissue uses the staff RPC and validates delivery input", async () => {
+  const db = client({ data: "a".repeat(64), error: null });
+  const invokeCalls = [];
+  db.functions = {
+    invoke: async (...args) => {
+      invokeCalls.push(args);
+      return { data: { sent: true }, error: null };
+    },
+  };
+  const api = await load("tracking-token", db);
+  assert.deepEqual(await api.issueAndEmailAdmissionTrackingToken("enquiry-id"), {
+    sent: true,
+    trackingToken: "a".repeat(64),
+    reason: null,
+  });
+  assert.deepEqual(db.calls.at(-1), ["rpc", "admissions_issue_tracking_token", {
+    p_enquiry_id: "enquiry-id",
+  }]);
+  assert.deepEqual(invokeCalls[0], ["admission-notify", {
+    body: { mode: "tracking_token", enquiryId: "enquiry-id", trackingToken: "a".repeat(64) },
+  }]);
+
+  db.rpc = () => Promise.resolve({ data: "not-a-token", error: null });
+  await assert.rejects(api.issueAndEmailAdmissionTrackingToken("enquiry-id"), /رمز متابعة صالح/);
 });
 
 test("enquiries require both branch and session", async () => {
@@ -111,5 +169,30 @@ test("admissions implementation has no deletion operation", () => {
   for (const file of ["../../src/portal/lib/admissions.ts", "../../src/portal/pages/Admissions.tsx", "../../supabase/migrations/004_admissions.sql"]) {
     const text = fs.readFileSync(path.join(__dirname, file), "utf8");
     assert.doesNotMatch(text, /\.delete\s*\(|\btruncate\b|\bdelete\s+from\b|\bdrop\b/i);
+  }
+});
+
+test("each exported audit history row is marked unverified", async () => {
+  const exportSource = fs.readFileSync(path.join(__dirname, "../../src/portal/lib/admissionExport.ts"), "utf8")
+    .replace(/import\s*\{[\s\S]*?\}\s*from\s*"\.\/admissions";/, "const { admissionStatuses, loadAdmissionHistoryExport } = globalThis.__admissionExportTest;")
+    .replace('import { buildCsv, downloadCsv } from "./csv";', "const { buildCsv, downloadCsv } = globalThis.__admissionExportTest;");
+  let captured;
+  globalThis.__admissionExportTest = {
+    admissionStatuses: { accepted: "مقبول", new: "جديد" },
+    loadAdmissionHistoryExport: async () => [{
+      application_no: "ADM-1", applicant_full_name: "Applicant", branch_name: null, action: "status_change",
+      old_status: "new", new_status: "accepted", changed_columns: null, actor_name: "Actor", occurred_at: "2026-01-01",
+    }],
+    buildCsv: (headers, rows) => { captured = { headers, rows }; return "csv"; },
+    downloadCsv: () => {},
+  };
+  try {
+    const code = stripTypeScriptTypes(exportSource, { mode: "strip" });
+    const api = await import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}#unverified-export`);
+    assert.equal(await api.exportAdmissionHistoryCsv({ branch: null, from: null, to: null, enquiryId: "id" }), 1);
+    assert.equal(captured.headers.at(-1), "موثوقية السجل");
+    assert.match(captured.rows[0].at(-1), /غير متحقق منه/);
+  } finally {
+    delete globalThis.__admissionExportTest;
   }
 });

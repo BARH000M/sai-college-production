@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  financePermissions, formatYER, normalizeYER, parsePendingFinancePayment, parsePendingFinanceRefund, validateFinancePayment,
+  canPayFinanceInvoice, financePermissions, financeSummary, filterFinanceInvoices, formatYER, normalizeYER, parsePendingFinancePayment, parsePendingFinanceRefund, validateFinancePayment,
   type FinancePaymentMethod, type PendingFinancePayment, type PendingFinanceRefund,
 } from "../lib/finance";
 import {
-  assignFee, cancelFee, loadFeeAssignments, loadFeeGroups, loadFinanceAudit,
+  assignFee, cancelFee, loadFeeAssignments, loadFeeGroups, loadFinanceAudit, loadFinanceStudents,
+  loadFinanceGroupLabels, loadFinanceSessions,
   loadFinancePayments, loadFinanceRefunds, postFinancePayment, refundFinancePayment,
   saveFeeGroup, voidFinancePayment, waiveFee,
-  type FeeAssignment, type FeeGroup, type FinanceAudit, type FinancePayment, type FinanceRefund,
+  type FeeAssignment, type FeeGroup, type FinanceAudit, type FinancePayment, type FinanceRefund, type FinanceStudent, type FinanceOption,
 } from "../lib/financeApi";
-import { loadReportBranches, loadReportSessions, type ReportOption } from "../lib/reports";
-import { supabase } from "../lib/supabase";
+import { loadReportBranches, type ReportOption } from "../lib/reports";
+import { FinanceStatement } from "./finance/FinanceStatement";
 import { PaymentReceipt } from "./finance/PaymentReceipt";
 
 const methods: { value: FinancePaymentMethod; label: string }[] = [
@@ -21,18 +22,21 @@ const statuses: Record<string, string> = {
   unpaid: "غير مدفوع", partial: "مدفوع جزئياً", paid: "مدفوع", waived: "معفى", cancelled: "ملغى",
 };
 const emptyGroup = { id: "", branch: "", session: "", name: "", description: "", amount: "", due: "", active: true };
-type FinanceStudent = {
-  id: string; full_name: string; admission_no: string; branch_id: string; class_id: string | null;
-};
 function message(error: unknown) { return error instanceof Error ? error.message : String(error); }
 function amount(value: number) { return formatYER(String(value)); }
 
 export function Finance({ roles, userId }: { roles: readonly string[]; userId: string | null }) {
+  const [filters, setFilters] = useState({ search: "", classId: "", branch: "", status: "", from: "", to: "" });
+  const [statement, setStatement] = useState(false);
+  const [invoiceId, setInvoiceId] = useState("");
   const permissions = financePermissions(roles);
   const staff = permissions.postPayment;
   const [groups, setGroups] = useState<FeeGroup[]>([]);
+  const [groupLabels, setGroupLabels] = useState<FinanceOption[]>([]);
   const [assignments, setAssignments] = useState<FeeAssignment[]>([]);
   const [payments, setPayments] = useState<FinancePayment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const [refunds, setRefunds] = useState<FinanceRefund[]>([]);
   const refundRequest = useRef(0);
   const [refundsReady, setRefundsReady] = useState(false);
@@ -71,28 +75,6 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   const refundStorageKey = `sai.finance.refund.pending.${userId ?? ""}`;
 
   useEffect(() => {
-    let active = true;
-    void Promise.all([loadReportBranches(), loadReportSessions()])
-      .then(([branchRows, sessionRows]) => {
-        if (!active) return;
-        setBranches(branchRows);
-        setSessions(sessionRows);
-      })
-      .catch((failure: unknown) => {
-        if (active) setError(`تعذر تحميل الفروع والجلسات: ${message(failure)}`);
-      });
-    void supabase.from("students")
-      .select("id,full_name,admission_no,branch_id,class_id")
-      .order("full_name")
-      .then((result) => {
-        if (!active) return;
-        if (result.error) { setError(`تعذر تحميل الطلاب: ${result.error.message}`); return; }
-        setStudents((result.data ?? []) as FinanceStudent[]);
-      });
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
     setRecoveryReady(false); setPendingPayment(null); setPendingRefund(null); setRecoveryError(null);
     if (!staff) { setRecoveryReady(true); return; }
     if (!userId) { setRecoveryError("تعذر التحقق من الحساب؛ تسجيل الدفعات متوقف."); return; }
@@ -124,10 +106,18 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   useEffect(() => {
     let active = true;
     setLoading(true); setError(null);
-    void Promise.all([loadFeeAssignments(), staff ? loadFeeGroups() : Promise.resolve([])])
-      .then(([nextAssignments, nextGroups]) => {
-        if (active) { setAssignments(nextAssignments); setGroups(nextGroups); }
-      }).catch((failure: unknown) => { if (active) { setAssignments([]); setGroups([]); setError(message(failure)); } })
+    void Promise.all([
+      loadFeeAssignments(), staff ? loadFeeGroups() : Promise.resolve([]),
+      loadFinanceStudents(), loadFinanceGroupLabels(), loadReportBranches(),
+      staff ? loadFinanceSessions() : Promise.resolve([]),
+    ]).then(([nextAssignments, nextGroups, nextStudents, nextLabels, nextBranches, nextSessions]) => {
+      if (active) {
+        setAssignments(nextAssignments); setGroups(nextGroups); setStudents(nextStudents);
+        setGroupLabels(nextLabels); setBranches(nextBranches); setSessions(nextSessions);
+      }
+    }).catch((failure: unknown) => {
+      if (active) { setAssignments([]); setGroups([]); setStudents([]); setGroupLabels([]); setError(message(failure)); }
+    })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [staff, version]);
@@ -136,10 +126,12 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     let active = true;
     refundRequest.current += 1;
     setRefundsReady(false);
-    setPayments([]); setSelectedPayment(""); setRefunds([]);
+    setPayments([]); setSelectedPayment(""); setRefunds([]); setPaymentsError(null);
+    setPaymentsLoading(!!selected);
     if (selected) void loadFinancePayments(selected)
       .then((rows) => { if (active) setPayments(rows); })
-      .catch((failure: unknown) => { if (active) setError(message(failure)); });
+      .catch((failure: unknown) => { if (active) setPaymentsError(message(failure)); })
+      .finally(() => { if (active) setPaymentsLoading(false); });
     return () => { active = false; refundRequest.current += 1; };
   }, [selected, version]);
 
@@ -169,6 +161,9 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
   function submitPayment(event: FormEvent) {
     event.preventDefault();
     if (!recoveryReady || !userId || busyRef.current || pendingRefund) return;
+    if (loading || paymentsLoading || paymentsError || (!pendingPayment && !canPayFinanceInvoice(assignments.find((row) => row.id === selected)))) {
+      setError("تحقق من تحميل الفاتورة وسجل الدفعات ووجود رصيد مستحق قبل تسجيل الدفع."); return;
+    }
     const validation = validateFinancePayment(paymentAmount, paymentMethod, reference);
     if (validation) { setError(validation); return; }
     const request = pendingPayment ?? {
@@ -244,9 +239,16 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     event.preventDefault(); setAudit([]); setError(null);
     void loadFinanceAudit(auditBranch).then(setAudit).catch((failure: unknown) => setError(message(failure)));
   }
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const visibleAssignments = filterFinanceInvoices(assignments, filters, students, today);
+  const totals = financeSummary(visibleAssignments, today);
+  const invoiceRows = assignments.filter((row) => row.id === invoiceId);
+  const classIds = [...new Set(assignments.map((row) => row.class_id).filter((id): id is string => !!id))];
   const selectedGroup = groups.find((row) => row.id === assignmentGroup) ?? null;
   const eligibleStudents = selectedGroup
-    ? students.filter((row) => row.branch_id === selectedGroup.branch_id)
+    ? students.filter((row) => row.branch_id === selectedGroup.branch_id && row.status === "active"
+      && (!row.class_id || row.session_id === selectedGroup.academic_session_id))
     : [];
   const studentById = (id: string) => students.find((row) => row.id === id) ?? null;
   const methodSelect = (value: FinancePaymentMethod, change: (value: FinancePaymentMethod) => void, disabled = false) =>
@@ -287,7 +289,7 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
     </section>}
     {permissions.assignFees && <section className="panel management-detail"><h2>إسناد رسوم لطالب</h2>
       <form className="management-form" onSubmit={submitAssignment}>
-        <label>مجموعة الرسوم<select required value={assignmentGroup} onChange={(e) => setAssignmentGroup(e.target.value)}>
+        <label>مجموعة الرسوم<select required value={assignmentGroup} onChange={(e) => { setAssignmentGroup(e.target.value); setStudent(""); }}>
           <option value="">اختر المجموعة</option>{groups.filter((row) => row.is_active).map((row) => <option key={row.id} value={row.id}>{row.name} — {branches.find((branch) => branch.id === row.branch_id)?.name ?? "فرع"}</option>)}
         </select></label>
         <label>الطالب<span className="vocab-required"> *</span><select required value={student} onChange={(e) => setStudent(e.target.value)}>
@@ -300,18 +302,38 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
       </form>
     </section>}
     <section className="panel management-detail"><h2>الأرصدة والرسوم المسندة</h2>
+      <div className="management-form">
+        <label>بحث بالاسم أو الرقم الأكاديمي<input value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} /></label>
+        <label>الفرع<select value={filters.branch} onChange={(e) => setFilters({ ...filters, branch: e.target.value })}><option value="">كل الفروع المتاحة</option>{branches.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+        <label>معرّف الصف<select value={filters.classId} onChange={(e) => setFilters({ ...filters, classId: e.target.value })}><option value="">كل الصفوف المتاحة</option>{classIds.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+        <label>حالة السداد<select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}><option value="">كل الحالات</option><option value="overdue">متأخر</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+        <label>الاستحقاق من<input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} /></label>
+        <label>الاستحقاق إلى<input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} /></label>
+      </div>
+      {filters.from && filters.to && filters.from > filters.to && <p role="alert">تاريخ البداية بعد تاريخ النهاية.</p>}
+      {!loading && !error && <>
+        <p>عدد الفواتير: {visibleAssignments.length} · صافي الرسوم: {totals.invoiced} ر.ي · المستحق: {totals.outstanding} ر.ي · المتأخر: {totals.overdue} ر.ي</p>
+        <p className="muted">الملخص حسب الفلاتر وتاريخ الاستحقاق ويستبعد الملغى. صافي الرسوم بعد الخصم وقبل الإعفاءات.</p>
+        <button type="button" className="button secondary" disabled={!visibleAssignments.length} onClick={() => setStatement(true)}>طباعة كشف الفواتير</button>
+        {!visibleAssignments.length && assignments.length > 0 && <p>لا توجد نتائج تطابق البحث.</p>}
+      </>}
       {!loading && !error && assignments.length === 0 && <p>لا توجد رسوم متاحة.</p>}
       <div className="table-scroll"><table className="management-table"><thead><tr><th>الطالب</th><th>المجموعة</th><th>الاستحقاق</th><th>الحالة</th><th>الرصيد</th><th>التفاصيل</th></tr></thead>
-        <tbody>{assignments.map((row) => <tr key={row.id}><td>{studentById(row.student_id)?.full_name ?? "طالب"}<span className="learn-meta">{studentById(row.student_id)?.admission_no ?? ""}</span></td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? row.fee_group_id}</td>
-          <td>{row.due_date}</td><td>{statuses[row.status] ?? row.status}</td><td>{amount(row.balance)}</td>
-          <td><button className="text-button" type="button" disabled={(!!pendingPayment && pendingPayment.assignment !== row.id) || (!!pendingRefund && pendingRefund.assignment !== row.id)} onClick={() => setSelected(row.id)}>عرض الدفعات</button></td></tr>)}</tbody></table></div>
+        <tbody>{visibleAssignments.map((row) => <tr key={row.id}><td>{studentById(row.student_id)?.full_name ?? "طالب"}<span className="learn-meta">{studentById(row.student_id)?.admission_no ?? ""}</span></td><td>{groups.find((entry) => entry.id === row.fee_group_id)?.name ?? groupLabels.find((entry) => entry.id === row.fee_group_id)?.name ?? "رسوم دراسية"}</td>
+          <td>{row.due_date}{row.balance > 0 && row.status !== "cancelled" && row.due_date < today && <strong className="learn-meta">متأخر</strong>}</td><td>{statuses[row.status] ?? row.status}</td><td>{amount(row.balance)}</td>
+          <td><button className="text-button" type="button" onClick={() => setInvoiceId(row.id)}>طباعة الفاتورة</button><button className="text-button" type="button" disabled={(!!pendingPayment && pendingPayment.assignment !== row.id) || (!!pendingRefund && pendingRefund.assignment !== row.id)} onClick={() => setSelected(row.id)}>عرض الدفعات</button></td></tr>)}</tbody></table></div>
     </section>
+    {statement && <FinanceStatement rows={visibleAssignments} students={students} groups={[...groupLabels, ...groups]} totals={totals} filters={filters} onClose={() => setStatement(false)} />}
+    {invoiceRows.length > 0 && <FinanceStatement invoice rows={invoiceRows} students={students} groups={[...groupLabels, ...groups]} totals={financeSummary(invoiceRows, today)} filters={filters} onClose={() => setInvoiceId("")} />}
     {selected && <section className="panel management-detail"><h2>الدفعات والإيصالات</h2>
+      {paymentsLoading && <p role="status">جارٍ تحميل الدفعات...</p>}
+      {paymentsError && <p className="error-box" role="alert">تعذر تحميل الدفعات: {paymentsError} <button type="button" className="text-button" onClick={() => setVersion((value) => value + 1)}>إعادة المحاولة</button></p>}
+      {!paymentsLoading && !paymentsError && !payments.length && <p className="muted">لا توجد دفعات لهذا الاستحقاق.</p>}
       {permissions.postPayment && <form className="management-form" onSubmit={submitPayment}>
         <label>المبلغ<input required disabled={!!pendingPayment} inputMode="decimal" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} /></label>
         <label>طريقة الدفع{methodSelect(paymentMethod, setPaymentMethod, !!pendingPayment)}</label>
         <label>مرجع المعاملة<input required={paymentMethod !== "cash"} disabled={!!pendingPayment} value={reference} onChange={(e) => setReference(e.target.value)} /></label>
-        <div className="actions"><button className="button primary" disabled={busy || !recoveryReady || !!pendingRefund}>{pendingPayment ? "إعادة محاولة الدفع" : "تسجيل الدفعة"}</button></div>
+        <div className="actions"><button className="button primary" disabled={busy || !recoveryReady || !!pendingRefund || loading || paymentsLoading || !!paymentsError || (!pendingPayment && !canPayFinanceInvoice(assignments.find((row) => row.id === selected)))}>{pendingPayment ? "إعادة محاولة الدفع" : "تسجيل الدفعة"}</button></div>
         <p className="data-note">تُحفظ محاولة الدفع في هذا التبويب لإعادة المحاولة بالمفتاح والبيانات نفسها بعد فقدان الاتصال أو تحديث الصفحة.</p>
       </form>}
       {pendingPayment && <div className="notice"><p>توجد محاولة دفع غير مؤكدة لهذا الإسناد. تحقق من الإيصالات قبل حذف المحاولة.</p>
@@ -324,8 +346,8 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
           {permissions.waive && <button className="button secondary" disabled={busy || !!pendingPayment || !!pendingRefund || !reason.trim()} onClick={() => void perform(() => waiveFee(selected, reason), "تم الإعفاء من الرصيد المتبقي.")}>إعفاء الرصيد</button>}
           {permissions.assignFees && <button className="button secondary" disabled={busy || !!pendingPayment || !!pendingRefund || !reason.trim()} onClick={() => void perform(() => cancelFee(selected, reason), "تم إلغاء الرسوم المسندة.")}>إلغاء الإسناد</button>}
         </div></div>}
-      <div className="table-scroll"><table className="management-table"><thead><tr><th>الإيصال</th><th>المبلغ</th><th>الطريقة</th><th>المرجع</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
-        <tbody>{payments.map((row) => <tr key={row.id}><td>{row.receipt_number}</td><td>{amount(row.amount)}</td><td>{methods.find((m) => m.value === row.method)?.label}</td>
+      <div className="table-scroll"><table className="management-table"><thead><tr><th>الإيصال</th><th>تاريخ السداد</th><th>المبلغ</th><th>الطريقة</th><th>المرجع</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+        <tbody>{payments.map((row) => <tr key={row.id}><td>{row.receipt_number}</td><td>{new Date(row.posted_at).toLocaleString("ar-YE")}</td><td>{amount(row.amount)}</td><td>{methods.find((m) => m.value === row.method)?.label}</td>
           <td>{row.transaction_reference ?? "—"}</td><td>{row.voided_at ? `ملغاة: ${row.void_reason}` : "مرحلة"}</td>
           <td><div className="homework-admin">
             <button className="button secondary quick-action" type="button" onClick={() => {
@@ -366,6 +388,7 @@ export function Finance({ roles, userId }: { roles: readonly string[]; userId: s
       studentName={studentById(receipt.assignment.student_id)?.full_name ?? "—"}
       admissionNo={studentById(receipt.assignment.student_id)?.admission_no ?? "—"}
       group={groups.find((row) => row.id === receipt.assignment.fee_group_id) ?? null}
+      groupName={groupLabels.find((row) => row.id === receipt.assignment.fee_group_id)?.name ?? null}
       branchName={branches.find((row) => row.id === receipt.assignment.branch_id)?.name ?? ""}
       onClose={() => setReceipt(null)}
     />}

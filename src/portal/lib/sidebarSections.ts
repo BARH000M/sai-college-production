@@ -25,7 +25,7 @@ const sections: readonly SectionSpec[] = [
   { id: "front-office", label: "الاستقبال والقبول", icon: "ri-customer-service-2-line", moduleIds: ["admissions", "scanner", "reception"] },
   { id: "student-records", label: "شؤون الطلاب", icon: "ri-group-line", moduleIds: ["students", "classes", "portfolio"] },
   { id: "fees", label: "الرسوم والمالية", icon: "ri-money-dollar-circle-line", moduleIds: ["finance"] },
-  { id: "online-courses", label: "الدورات والتعلم", icon: "ri-book-open-line", moduleIds: ["courses", "vocabulary", "listening", "speaking", "tones", "reading", "handwriting", "review"] },
+  { id: "online-courses", label: "الدورات والتعلم", icon: "ri-book-open-line", moduleIds: ["courses", "vocabulary"] },
   { id: "assessment", label: "الواجبات والتقييم", icon: "ri-task-line", moduleIds: ["homework", "progress", "quizzes", "exams"] },
   { id: "attendance", label: "الحضور والانصراف", icon: "ri-calendar-check-line", moduleIds: ["attendance", "qr"] },
   { id: "academics", label: "الشؤون الأكاديمية", icon: "ri-school-line", moduleIds: ["academics", "timetable"] },
@@ -37,7 +37,7 @@ const sections: readonly SectionSpec[] = [
   { id: "content", label: "إدارة المحتوى والموقع", icon: "ri-layout-4-line", moduleIds: ["authoring", "media", "approvals", "cms", "frontCms"] },
   { id: "organization", label: "الفروع والجلسات", icon: "ri-map-pin-2-line", moduleIds: ["branches", "sessions"] },
   { id: "reports", label: "التقارير", icon: "ri-bar-chart-2-line", moduleIds: ["reports"] },
-  { id: "administration", label: "النظام والصلاحيات", icon: "ri-shield-user-line", moduleIds: ["roles", "settings"] },
+  { id: "administration", label: "النظام والصلاحيات", icon: "ri-shield-user-line", moduleIds: ["roles", "settings", "systemCatalog"] },
 ];
 
 export function visibleSidebarSections(roles: readonly string[]): SidebarSection[] {

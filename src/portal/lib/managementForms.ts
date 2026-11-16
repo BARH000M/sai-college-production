@@ -34,7 +34,7 @@ export function managementPayload(kind: ManagementKind, draft: Draft, editing: b
     full_name: draft.full_name.trim(), admission_no: draft.admission_no.trim(),
     date_of_birth: draft.date_of_birth || null, class_id: draft.class_id || null, status: draft.status,
   };
-  if (!editing) Object.assign(values, { branch_id: draft.branch_id, user_id: draft.user_id.trim() || null });
+  if (!editing) Object.assign(values, { branch_id: draft.branch_id });
   return values;
 }
 
@@ -45,8 +45,8 @@ export function validateManagementDraft(kind: ManagementKind, draft: Draft, edit
   if ((kind === "classes" || kind === "students") && !draft.branch_id) return "يرجى اختيار الفرع.";
   if (kind === "classes" && (!draft.session_id || !draft.program.trim() || !Number.isInteger(Number(draft.capacity)) || Number(draft.capacity) < 1)) return "يرجى اختيار الجلسة وإدخال برنامج وسعة صحيحة.";
   if (kind === "students" && draft.class_id && !draft.session_id) return "يرجى اختيار جلسة الصف.";
-  if (!editing && (kind === "students" || kind === "classes")) {
-    const id = (kind === "students" ? draft.user_id : draft.teacher_id).trim();
+  if (!editing && kind === "classes") {
+    const id = draft.teacher_id.trim();
     if (id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return "معرّف الحساب يجب أن يكون UUID صحيحاً.";
   }
   return null;

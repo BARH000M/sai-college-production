@@ -26,7 +26,7 @@ test("multi-role navigation is exactly the union without duplicates", async () =
   const combined = visibleNavigation(["teacher", "accountant"]).map((item) => item.id);
   assert.equal(combined.length, union.size);
   for (const id of combined) assert.ok(union.has(id));
-  assert.equal(combined.includes("admissions"), true);
+  assert.equal(combined.includes("admissions"), false);
   assert.equal(combined.includes("finance"), true);
 });
 
@@ -47,9 +47,21 @@ test("navigation matches the approved prototype role mapping", async () => {
     const actual = navigation.find((item) => item.id === module.id);
     assert.ok(actual, module.id);
     const expected = [...module.roles];
-    if (module.id === "admissions") expected.push("teacher");
-    if (module.id === "finance") expected.push("receptionist");
-    if (module.id === "attendance") expected.splice(expected.indexOf("accountant"), 1);
+    const removeRole = (role) => {
+      const index = expected.indexOf(role);
+      if (index >= 0) expected.splice(index, 1);
+    };
+    if (module.id === "admissions") {
+      removeRole("teacher");
+      if (!expected.includes("receptionist")) expected.push("receptionist");
+    }
+    if (module.id === "finance") removeRole("receptionist");
+    if (["students", "classes"].includes(module.id)) {
+      for (const role of ["teacher", "student", "parent"]) removeRole(role);
+    }
+    if (module.id === "attendance") {
+      for (const role of ["accountant", "student", "parent"]) removeRole(role);
+    }
     if (module.id === "certificates") expected.splice(expected.indexOf("teacher"), 1);
     if (module.id === "reports") {
       expected.splice(expected.indexOf("student"), 1);

@@ -26,24 +26,56 @@ test("startup errors are explicit and configured authentication options are pres
       .replaceAll("import.meta.env", "globalThis.__startupEnv"));
     return import(`${url}#${Math.random()}`);
   };
+  const prodEnv = { VITE_PUBLIC_SUPABASE_URL: "https://aeryusbrulqdxjdynwfh.supabase.co", VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test" };
+  const prevEnv = {
+    VITE_SAI_TARGET: "preview",
+    VITE_PUBLIC_SUPABASE_URL: "https://mgibjusuglafbnlrkbep.supabase.co",
+    VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test",
+  };
   try {
     await assert.rejects(loadSupabase({}, () => assert.fail("must not create a client")), SupabaseInitializationError);
     const cause = new Error("invalid URL");
     await assert.rejects(
-      loadSupabase(      { VITE_PUBLIC_SUPABASE_URL: "invalid", VITE_PUBLIC_SUPABASE_ANON_KEY: "key" }, () => { throw cause; }),
+      loadSupabase(prodEnv, () => { throw cause; }),
       (error) => error instanceof SupabaseInitializationError && error.cause === cause,
     );
     const client = {};
     const result = await loadSupabase(
-      { VITE_PUBLIC_SUPABASE_URL: "https://example.invalid", VITE_PUBLIC_SUPABASE_ANON_KEY: "key" },
+      prodEnv,
       (url, key, options) => {
-        assert.equal(url, "https://example.invalid");
-        assert.equal(key, "key");
-        assert.deepEqual(options.auth, { autoRefreshToken: true, detectSessionInUrl: true, persistSession: true });
+        assert.equal(url, prodEnv.VITE_PUBLIC_SUPABASE_URL);
+        assert.equal(key, prodEnv.VITE_PUBLIC_SUPABASE_ANON_KEY);
+        assert.deepEqual(options.auth, {
+          autoRefreshToken: true, detectSessionInUrl: true, persistSession: true,
+          storageKey: "sai-production-auth",
+        });
         return client;
       },
     );
     assert.equal(result.supabase, client);
+    assert.equal(result.supabaseTarget, "production");
+
+    // Preview mode: only the Preview project, with environment-scoped storage.
+    const previewResult = await loadSupabase(prevEnv, (url, key, options) => {
+      assert.equal(url, prevEnv.VITE_PUBLIC_SUPABASE_URL);
+      assert.equal(options.auth.storageKey, "sai-preview-auth");
+      return client;
+    });
+    assert.equal(previewResult.supabaseTarget, "preview");
+
+    // Fail closed on every cross-project or unsupported combination.
+    const prodJwt = `x.${Buffer.from(JSON.stringify({ role: "anon", ref: "aeryusbrulqdxjdynwfh" })).toString("base64url")}.x`;
+    const prevJwt = `x.${Buffer.from(JSON.stringify({ role: "anon", ref: "mgibjusuglafbnlrkbep" })).toString("base64url")}.x`;
+    for (const env of [
+      { ...prodEnv, VITE_PUBLIC_SUPABASE_URL: "https://mgibjusuglafbnlrkbep.supabase.co" },
+      { ...prodEnv, VITE_SAI_TARGET: "staging" },
+      { ...prevEnv, VITE_PUBLIC_SUPABASE_URL: "https://aeryusbrulqdxjdynwfh.supabase.co" },
+      { ...prevEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: prodJwt },
+      { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: prevJwt },
+      { ...prodEnv, VITE_PUBLIC_SUPABASE_URL: "https://other.supabase.co" },
+      { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_private" },
+      { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: `x.${Buffer.from(JSON.stringify({ role: "service_role", ref: "aeryusbrulqdxjdynwfh" })).toString("base64url")}.x` },
+    ]) await assert.rejects(loadSupabase(env, () => assert.fail("must reject before client creation")), SupabaseInitializationError);
   } finally {
     delete globalThis.__startupEnv;
     delete globalThis.__startupCreateClient;

@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { isModuleAvailable, navigation, pendingModules } from "../lib/navigation";
+import { canAccessModule, isModuleAvailable, navigation, pendingModules } from "../lib/navigation";
 import { ManagementPage } from "./ManagementPage";
 import { Admissions } from "./Admissions";
 import { Scanner } from "./Scanner";
@@ -17,6 +17,7 @@ import { Library } from "./Library";
 import { Communications } from "./Communications";
 import { Finance } from "./Finance";
 import { SystemSettings } from "./SystemSettings";
+import { SystemInventory } from "./SystemInventory";
 import { UnifiedModulePage } from "./UnifiedModulePage";
 import { unifiedModules, type UnifiedId } from "../lib/unifiedModules";
 
@@ -24,7 +25,7 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   const { moduleId } = useParams();
   const item = navigation.find((entry) => entry.id === moduleId && entry.id !== "home");
   if (!item) return <main className="workspace"><section className="panel"><h1>الصفحة غير موجودة</h1><Link to="/portal/dashboard">العودة للرئيسية</Link></section></main>;
-  if (!item.roles.some((role) => roles.includes(role))) {
+  if (!canAccessModule(item.id, roles)) {
     return <main className="workspace"><section className="panel" role="alert"><h1>الوصول غير متاح</h1><p>هذا القسم غير متاح للأدوار المسندة إلى حسابك.</p><Link to="/portal/dashboard">العودة للرئيسية</Link></section></main>;
   }
   if (!isModuleAvailable(item.id)) {
@@ -53,19 +54,13 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   if (item.id === "timetable") return <Timetable />;
   if (item.id === "academics") return <AcademicAffairs />;
   if (item.id === "qr") return <QrAttendance />;
-  if (["listening", "speaking", "tones", "handwriting", "reading", "review"].includes(item.id)) {
-    return <main className="workspace"><section className="panel">
-      <h1>{item.label}</h1>
-      <p>هذا التدريب غير متاح حالياً؛ المحتوى أو التقييم الموثوق غير مربوط بعد.</p>
-      <Link to="/portal/modules/courses">العودة إلى الدروس المنشورة</Link>
-    </section></main>;
-  }
   if (item.id === "vocabulary") return <VocabularyPage roles={roles} />;
   if (item.id === "notifications") return <NotificationsPage roles={roles} />;
   if (item.id === "library") return <Library roles={roles} userId={userId} />;
   if (item.id === "communications") return <Communications roles={roles} userId={userId} />;
   if (item.id === "finance") return <Finance roles={roles} userId={userId} />;
   if (item.id === "settings") return <SystemSettings roles={roles} />;
+  if (item.id === "systemCatalog") return <SystemInventory />;
   if (Object.prototype.hasOwnProperty.call(unifiedModules, item.id)) {
     return <UnifiedModulePage key={item.id} roles={roles} spec={unifiedModules[item.id as UnifiedId]} />;
   }

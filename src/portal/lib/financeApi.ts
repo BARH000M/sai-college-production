@@ -7,9 +7,14 @@ export type FeeGroup = {
 };
 export type FeeAssignment = {
   id: string; fee_group_id: string; student_id: string; branch_id: string;
-  academic_session_id: string; class_id: string; original_amount: number;
+  academic_session_id: string; class_id: string | null; original_amount: number;
   discount_amount: number; final_amount: number; due_date: string; status: string; balance: number;
 };
+export type FinanceStudent = {
+  id: string; full_name: string; admission_no: string; branch_id: string;
+  class_id: string | null; session_id: string | null; status: string;
+};
+export type FinanceOption = { id: string; name: string };
 export type FinancePayment = {
   id: string; assignment_id: string; amount: number; currency: string; method: FinancePaymentMethod;
   transaction_reference: string | null; receipt_number: string; posted_at: string;
@@ -61,6 +66,9 @@ async function mutate(name: string, args: Record<string, string | boolean | null
 }
 
 export const loadFeeGroups = () => rpcRows<FeeGroup>("sai_finance_groups");
+export const loadFinanceStudents = () => rpcRows<FinanceStudent>("sai_finance_students");
+export const loadFinanceGroupLabels = () => rpcRows<FinanceOption>("sai_finance_group_labels");
+export const loadFinanceSessions = () => rpcRows<FinanceOption>("sai_finance_sessions");
 export const loadFeeAssignments = () => rpcRows<FeeAssignment>("sai_finance_assignments");
 export const loadFinancePayments = (assignment: string) => rpcRows<FinancePayment>("sai_finance_payments", { wanted_assignment: assignment });
 export const loadFinanceRefunds = (payment: string) => rpcRows<FinanceRefund>("sai_finance_refunds", { wanted_payment: payment });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  loadProvisionOverview, provisionLearningAccount, suggestAccountEmail, suggestPassword,
+  loadProvisionOverview, provisionLearningAccount, suggestAccountEmail,
   type CreatedAccount, type ProvisionKind, type ProvisionStudent,
 } from "@/portal/lib/learningAccounts";
 
@@ -16,13 +16,11 @@ export function LearningAccountPanel() {
 
   const [target, setTarget] = useState<Target | null>(null);
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [parentName, setParentName] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedAccount[]>([]);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -38,11 +36,9 @@ export function LearningAccountPanel() {
   function openForm(student: ProvisionStudent, kind: ProvisionKind) {
     setTarget({ student, kind });
     setEmail(suggestAccountEmail(student.admissionNo, kind));
-    setPassword(suggestPassword());
     setParentName(kind === "parent" ? `ولي أمر ${student.studentName}` : "");
     setFormError(null);
     setBulkError(null);
-    setCopied(false);
   }
 
   function closeForm() {
@@ -52,8 +48,8 @@ export function LearningAccountPanel() {
 
   async function submit() {
     if (!target || busy) return;
-    if (!email.trim() || password.trim().length < 8) {
-      setFormError("أدخل بريداً صحيحاً وكلمة مرور لا تقل عن ٨ أحرف.");
+    if (!email.trim()) {
+      setFormError("أدخل البريد الإلكتروني لإرسال دعوة الحساب.");
       return;
     }
     setBusy(true);
@@ -63,7 +59,6 @@ export function LearningAccountPanel() {
         studentId: target.student.studentId,
         kind: target.kind,
         email: email.trim(),
-        password: password.trim(),
         parentName: target.kind === "parent" ? parentName.trim() : undefined,
       });
       setCreated([account]);
@@ -76,18 +71,13 @@ export function LearningAccountPanel() {
     }
   }
 
-  /**
-   * Provisions the student account and then the parent account with generated
-   * credentials. If the second call fails the first account still exists and its
-   * credentials stay visible in the result panel.
-   */
+  /** Sends invitations without linking either account until its owner confirms it. */
   async function createBoth(row: ProvisionStudent) {
     if (busy) return;
     if (row.studentAccount && row.parentAccount) return;
     setBusy(true);
     setBulkError(null);
     setFormError(null);
-    setCopied(false);
     setCreated([]);
     const results: CreatedAccount[] = [];
     try {
@@ -96,7 +86,6 @@ export function LearningAccountPanel() {
           studentId: row.studentId,
           kind: "student",
           email: suggestAccountEmail(row.admissionNo, "student"),
-          password: suggestPassword(),
         }));
       }
       if (!row.parentAccount) {
@@ -104,37 +93,16 @@ export function LearningAccountPanel() {
           studentId: row.studentId,
           kind: "parent",
           email: suggestAccountEmail(row.admissionNo, "parent"),
-          password: suggestPassword(),
           parentName: `ولي أمر ${row.studentName}`,
         }));
       }
       setCreated(results);
     } catch (failure) {
-      setBulkError(`${message(failure)}${results.length ? " — الحساب الأول أُنشئ بالفعل وتجد بياناته أدناه." : ""}`);
+      setBulkError(`${message(failure)}${results.length ? " — أُرسلت الدعوة الأولى ويمكنك مراجعة حالتها أدناه." : ""}`);
       setCreated(results);
     } finally {
       setBusy(false);
       setRetry((value) => value + 1);
-    }
-  }
-
-  async function copyCredentials() {
-    if (!created.length) return;
-    const payload = [
-      "بوابة كلية ساي — بيانات الدخول",
-      ...created.map((account) => [
-        "",
-        `${account.role === "parent" ? "ولي أمر" : "طالب"}: ${account.fullName} (${account.studentName})`,
-        `البريد: ${account.email}`,
-        `كلمة المرور: ${account.password}`,
-      ].join("\n")),
-    ].join("\n");
-    try {
-      await navigator.clipboard.writeText(payload);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2500);
-    } catch {
-      setCopied(false);
     }
   }
 
@@ -146,8 +114,8 @@ export function LearningAccountPanel() {
       <div>
         <h2>حسابات بوابة التعلّم</h2>
         <p className="data-note">
-          أنشئ حساب دخول حقيقي لطالب مسجَّل أو لولي أمره. يُربط الحساب بالسجل مباشرة وتُمنحه الدور المناسب،
-          فيرى صاحبه المقررات والواجبات والتقدم فور تسجيل الدخول.
+          أرسل دعوة إلى بريد الطالب أو ولي أمره. لا يرتبط الحساب بأي سجل ولا يستطيع الدخول حتى يؤكد صاحبه بريده؛
+          بعد ذلك يربط الموظف الحساب ويتحقق من علاقة ولي الأمر بشكل منفصل.
         </p>
       </div>
       <button className="button secondary" type="button" onClick={() => setRetry((value) => value + 1)} disabled={loading}>
@@ -156,21 +124,15 @@ export function LearningAccountPanel() {
     </div>
 
     {!!created.length && <div className="credential-box" role="status">
-      <strong>{created.length > 1 ? "أُنشئ الحسابان بنجاح" : "أُنشئ الحساب بنجاح"}</strong>
+      <strong>{created.length > 1 ? "أُرسلت الدعوتان بنجاح" : "أُرسلت الدعوة بنجاح"}</strong>
       {created.map((account) => <div key={`${account.role}:${account.email}`}>
         <p className="data-note">
           {account.role === "parent" ? "ولي أمر" : "طالب"} — {account.fullName} · سجل {account.studentName}
         </p>
-        <dl>
-          <div><dt>البريد الإلكتروني</dt><dd dir="ltr">{account.email}</dd></div>
-          <div><dt>كلمة المرور</dt><dd dir="ltr">{account.password}</dd></div>
-        </dl>
+        <p className="data-note">رابط التحقق أُرسل إلى <span dir="ltr">{account.email}</span>.</p>
       </div>)}
-      <p className="data-note">انسخ البيانات الآن وسلّمها لصاحب الحساب؛ لن تُعرض كلمة المرور مرة أخرى.</p>
+      <p className="data-note">لن يُربط الحساب بالسجل حتى يؤكد صاحبه البريد. بعد التأكيد، استخدم صفحة تفاصيل الطالب لربط الحساب والتحقق من علاقة ولي الأمر.</p>
       <div className="actions">
-        <button className="button primary" type="button" onClick={() => void copyCredentials()}>
-          {copied ? "نُسخت البيانات" : "نسخ بيانات الدخول"}
-        </button>
         <button className="button secondary" type="button" onClick={() => setCreated([])}>إخفاء</button>
       </div>
     </div>}
@@ -193,8 +155,8 @@ export function LearningAccountPanel() {
       </h3>
       <p className="data-note">
         {target.kind === "parent"
-          ? "سيُربط الحساب بهذا الطالب بعد اعتماد الصلة، ويستطيع ولي الأمر مشاهدة المقررات والواجبات والتقدم للقراءة فقط."
-          : "سيُربط حساب الدخول بسجل الطالب، فيرى مقرراته وواجباته وتقدمه."}
+        ? "ستُرسل دعوة تحقق إلى البريد. بعد تأكيدها، يجب على موظف مخوّل التحقق من صلة ولي الأمر بالطالب قبل الربط."
+        : "ستُرسل دعوة تحقق إلى البريد. بعد تأكيدها، يربط الموظف الحساب الموجود بسجل الطالب."}
       </p>
       <div className="management-form">
         {target.kind === "parent" && <label>اسم ولي الأمر
@@ -203,12 +165,9 @@ export function LearningAccountPanel() {
         <label>البريد الإلكتروني
           <input dir="ltr" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
         </label>
-        <label>كلمة المرور المؤقتة
-          <input dir="ltr" value={password} onChange={(event) => setPassword(event.target.value)} />
-        </label>
         <div className="actions">
           <button className="button primary" type="button" disabled={busy} onClick={() => void submit()}>
-            {busy ? "جارٍ إنشاء الحساب..." : "إنشاء الحساب وربطه"}
+            {busy ? "جارٍ إرسال الدعوة..." : "إرسال دعوة التحقق"}
           </button>
           <button className="button secondary" type="button" disabled={busy} onClick={closeForm}>إلغاء</button>
         </div>

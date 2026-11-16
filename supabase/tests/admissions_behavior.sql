@@ -1,4 +1,4 @@
--- ISOLATED LOCAL SUPABASE ONLY, with migrations 001 through 005 applied.
+-- ISOLATED LOCAL SUPABASE ONLY, with migrations 001 through 031 applied.
 -- The runner sets the local marker; all fixtures are rolled back.
 begin;
 do $$
@@ -27,6 +27,7 @@ declare
   other_enquiry_id uuid;
   affected integer;
   found_count bigint;
+  enrollment_result jsonb;
   denied boolean;
   run_id text := replace(gen_random_uuid()::text, '-', '');
 begin
@@ -83,9 +84,16 @@ begin
   if not denied then raise exception 'Missing branch accepted'; end if;
   insert into public.admissions_enquiries (branch_id, academic_session_id, applicant_full_name, assigned_to)
     values (branch_a, session_id, 'WAVE1_TEST_applicant', teacher_id) returning id into enquiry_id;
-  update public.admissions_enquiries set status = 'accepted' where id = enquiry_id;
-  get diagnostics affected = row_count;
-  if affected <> 1 then raise exception 'Super admin could not update'; end if;
+  denied := false;
+  begin
+    update public.admissions_enquiries set status = 'contacted' where id = enquiry_id;
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Direct status update was not revoked'; end if;
+  perform public.sai_admissions_set_status(enquiry_id, 'accepted');
+  if not exists (select 1 from public.admissions_enquiries where id = enquiry_id and status = 'accepted') then
+    raise exception 'Super admin status RPC could not update';
+  end if;
   select count(*) into found_count from public.audit_logs
     where entity_type = 'admissions_enquiries' and entity_id = enquiry_id
       and metadata ->> 'source' = 'sai_admissions_trigger';
@@ -93,7 +101,7 @@ begin
   perform set_config('sai.admissions_block_audit', 'yes', true);
   denied := false;
   begin
-    update public.admissions_enquiries set status = 'rejected' where id = enquiry_id;
+    perform public.sai_admissions_set_status(enquiry_id, 'rejected');
   exception when check_violation then
     get stacked diagnostics role_name = constraint_name;
     if role_name <> 'wave1_admissions_audit_failure' then raise; end if;
@@ -105,8 +113,8 @@ begin
   end if;
   denied := false;
   begin
-    update public.admissions_enquiries set status = 'invalid' where id = enquiry_id;
-  exception when check_violation then denied := true;
+    perform public.sai_admissions_set_status(enquiry_id, 'invalid');
+  exception when invalid_parameter_value then denied := true;
   end;
   if not denied then raise exception 'Invalid status accepted'; end if;
   select count(*) into found_count from public.audit_logs
@@ -152,9 +160,10 @@ begin
   exception when insufficient_privilege then denied := true;
   end;
   if not denied then raise exception 'Admin deleted academic session'; end if;
-  update public.admissions_enquiries set status = 'contacted' where id = enquiry_id;
-  get diagnostics affected = row_count;
-  if affected <> 1 then raise exception 'Branch admin update denied'; end if;
+  perform public.sai_admissions_set_status(enquiry_id, 'contacted');
+  if not exists (select 1 from public.admissions_enquiries where id = enquiry_id and status = 'contacted') then
+    raise exception 'Branch admin status RPC denied';
+  end if;
   denied := false;
   begin
     insert into public.admissions_enquiries (branch_id, academic_session_id, applicant_full_name)
@@ -164,6 +173,12 @@ begin
   if not denied then raise exception 'Cross-branch admin insert accepted'; end if;
 
   perform set_config('request.jwt.claim.sub', reception_id::text, true);
+  denied := false;
+  begin
+    perform public.sai_admissions_enroll(enquiry_id);
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Receptionist enrolled a student without student-management authority'; end if;
   select count(*) into found_count from public.sai_admissions_sessions(branch_a) s where s.id = session_id;
   if found_count <> 1 then raise exception 'Receptionist cannot list active session'; end if;
   update public.admissions_enquiries set academic_session_id = second_session_id where id = enquiry_id;
@@ -284,6 +299,39 @@ begin
   perform set_config('request.jwt.claim.sub', teacher_id::text, true);
   execute 'set local role authenticated';
   perform public.sai_admissions_sessions(branch_a);
+  execute 'reset role';
+
+  perform set_config('request.jwt.claim.sub', super_id::text, true);
+  execute 'set local role authenticated';
+  if has_function_privilege('anon', 'public.sai_admissions_set_status(uuid,text)', 'execute') then
+    raise exception 'Anonymous role can execute admission status RPC';
+  end if;
+  if has_function_privilege('anon', 'public.sai_admissions_enroll(uuid)', 'execute') then
+    raise exception 'Anonymous role can execute enrollment';
+  end if;
+  perform public.sai_admissions_set_status(enquiry_id, 'accepted');
+  select public.sai_admissions_enroll(enquiry_id) into enrollment_result;
+  if not exists (
+    select 1 from public.students s
+    where s.id::text = enrollment_result ->> 'student_id'
+      and s.admission_enquiry_id = enquiry_id
+      and s.admission_no = enrollment_result ->> 'admission_no'
+  ) then
+    raise exception 'Enrollment did not create its linked student record';
+  end if;
+  if not exists (
+    select 1 from public.admissions_enquiries
+    where id = enquiry_id and status = 'enrolled'
+  ) then
+    raise exception 'Enrollment did not update enquiry status';
+  end if;
+  if (public.sai_admissions_enroll(enquiry_id) ->> 'student_id')
+    is distinct from (enrollment_result ->> 'student_id') then
+    raise exception 'Repeated enrollment created a different student';
+  end if;
+  select count(*) into found_count
+    from public.students where admission_enquiry_id = enquiry_id;
+  if found_count <> 1 then raise exception 'Duplicate enrollment created multiple students'; end if;
   execute 'reset role';
 end;
 $$;
