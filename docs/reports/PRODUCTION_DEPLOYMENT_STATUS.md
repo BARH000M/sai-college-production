@@ -1,5 +1,35 @@
 # Production deployment status and candidate manifest — Phase 7-R
 
+## Execution refresh — 18 November 2026 (Asia/Aden)
+
+The owner explicitly authorized commits, pushes and validated production migrations in this session. Approval is no longer the blocker. **Production deployment remains blocked by failed recovery and incomplete migration/application gates.** No production migrations, migration repairs, maintenance activation or Edge deployments were executed in this session. No dry-run success is claimed.
+
+- Verified origin: `https://github.com/BARH000M/sai-college-production.git`, branch `main`. Fetch and live `ls-remote` confirmed application commit `d43f0f913d733cf7b802c894b04b1ac5f37cdf93` already on `origin/main`. It contains application changes, recovered Main-only migrations, Phase 4B proposals, tests and documentation. The two checked-in GitHub workflows run CI only; no database deployment command or credential was found. External hosting hooks were not independently inspected.
+- Supabase CLI 2.111.0, local project-ref and MCP URL agree on `aeryusbrulqdxjdynwfh`. Live history still contains 16 entries: `001`–`006`, `008`–`014`, `20261110172940`, `20261110173339`, `20261110173506`. **Applied migration versions in this session: none.** Reused the reconciliation report/matrix; the former 27 unmatched versions are not a replay list. Current directory contains 57 SQL migrations, including recovered history and new production proposals.
+- Fresh backup listing succeeded: latest physical backup `2295604002`, `COMPLETED`, `2026-11-17T16:01:35.177Z`; eight listed completed backups, WAL-G enabled, PITR disabled. Snapshot availability does not prove restoration readiness or a write-free cutover recovery point.
+- Executed `supabase/tests/recovery/restore_main_isolated.py` against the protected November 17 archive in a new loopback-only native PostgreSQL cluster. Archive checksum matched; 85 application table-data entries were selected. **Restore failed (exit 1): policy creation required missing role `authenticated`.** The recovery parser reconstructed only one role. Evidence directory: `D:\SAI-Production-Backups\MAIN-20261117-164017\phase7r-recovery-21c85a4f7209483cb66ba8a8f7d2da52`. Maintenance behavior/concurrency tests were not reached. This rehearsal does not establish complete Supabase recovery. A closed-stdin handling correction was made to the local unfinished runner; it remains uncommitted.
+- Six production migration files are empty: `20261117202743`, `20261117202759`, `20261117202817`, `20261117202821`, `20261117202830`, `20261117202835`. Their names promise branch protection, admissions, settings, learning, guard refresh and hold release, but provide no SQL. Do not push this directory to production: its hold/release sequence and functionality are incomplete. The separate maintenance proposal also has newer uncommitted DDL-guard changes absent from the production migration copy. These packages require reconciliation and rehearsal before execution.
+- Live catalog: PostgreSQL 17.11; 47 public tables, all with RLS; all nine `app_role` labels exist; no inspected public/private security-definer function lacks a configured search path. Assigned roles currently cover six labels; `admin`, `librarian`, and `content_editor` have no assignment in the returned aggregate. This is catalog evidence only, not authenticated nine-role authorization certification. Atomic role-management RPC and the queried `public.exams`, `public.exam_results` and `public.learning_assessments` relations returned null. CLI refreshed ACTIVE Edge metadata: `manage-roles` v9, `school-admin` v7, `provision-learning-account` v8 and `link-student-account` v4. The prior deployed Edge/client contract mismatch remains unresolved; no compatible Edge cutover was attempted.
+
+Validation performed in this session:
+
+| Check | Actual result |
+|---|---|
+| Root TypeScript `npm.cmd run type-check` | PASS, exit 0 |
+| Root React `npm.cmd run build` | PASS, exit 0; large chunk warning |
+| Main configuration/workflow integration tests | PASS, 3/3, exit 0 |
+| `web` unit tests | FAIL, 104/105 passed, exit 1; migration-baseline assertion expects 38, observes 55 after excluding two proposals |
+| Flutter analysis | FAIL, 30 issues, exit 1; file-picker API mismatch, duplicate `_notice`, missing homework-open method / URL-launch import, plus warnings and infos |
+| Flutter tests, escalated retry | FAIL, 41 passed and 5 test files failed to compile, exit 1; initial sandbox run also hit Windows application-control restrictions |
+| Isolated Phase 4A examinations | PASS, exit 0 after escalated retry; role/state/negative cases, task-owned cluster stopped |
+| Isolated Phase 4B assessments | PASS, exit 0 after escalated retry; workflow/roles/answer-key/released-result checks; task-owned cluster stopped |
+| Production recovery rehearsal | FAIL, exit 1; missing reconstructed role; maintenance tests not reached |
+| Git whitespace check | PASS before documentation changes |
+
+Credential review: modified/untracked project source was inspected without printing credentials. Existing ignore rules exclude environment files, signing material, dumps, protected connection files, local reconciliation evidence and browser sessions; Python bytecode exclusions were added. Tracked sensitive filename checks returned only `.env.example`. Protected backups remain outside Git. This is not a complete historical secret-exposure audit.
+
+Incomplete recovery/maintenance files are intentionally preserved locally and excluded from this documentation commit. No records were deleted, no database was reset, no Docker or force push was used. Required next gate: repair and rerun recovery, finish/review the forward-only package and hold-release sequence, resolve failing application checks, then rehearse SQL/Edge interleaving and authenticated web/mobile authorization before the authorized production push.
+
 **Disposition: NO-GO.** This report records a read-only preflight on
 17 November 2026. It is not approval to run SQL, deploy Edge Functions, activate
 a maintenance hold, deploy the website, or release a mobile build. No hosted

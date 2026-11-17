@@ -1,6 +1,8 @@
 # Yemen SAI V2 — Building and production roadmap
 
-**Roadmap revision:** 17 November 2026 — Phase 7-R evidence reconciliation
+**Roadmap revision:** 18 November 2026 — authorized deployment execution, blocked by verified safety failures
+
+**Current execution checkpoint:** Application commit `d43f0f913d733cf7b802c894b04b1ac5f37cdf93` is already on GitHub `main`. The owner has authorized commits, pushes and validated production migrations; earlier requirements to seek general approval are superseded. Live Main still has 16 migrations and 47 public tables with RLS. Latest managed backup `2295604002` completed at `2026-11-17T16:01:35.177Z`; PITR remains disabled. A fresh isolated recovery rehearsal failed on missing reconstructed role `authenticated`; maintenance tests were not reached. Six production proposal migrations are empty, including guard refresh and hold release. Root web type-check/build and three integration tests pass; web unit tests and Flutter checks fail. Production SQL/Edge deployment and authenticated nine-role acceptance remain blocked by these technical gates. See [current execution results](reports/PRODUCTION_DEPLOYMENT_STATUS.md#execution-refresh--18-november-2026-asiaaden). Preserve unfinished local recovery work; do not replay the old 27-version backlog.
 
 **Disposition:** Production deployment blocked at recovery, maintenance and approval gates. Phase 4B paused. Existing approved scope preserved; this revision is proposed for incorporation into the authoritative master execution plan.
 
