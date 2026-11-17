@@ -19,6 +19,7 @@ import 'system_settings_screen.dart';
 import 'printing.dart';
 import 'records_screen.dart';
 import 'profile_screen.dart';
+import 'exams_screen.dart';
 
 const features = <PageId, (String, IconData)>{
   PageId.home: ('الرئيسية', Icons.home_rounded),
@@ -451,11 +452,7 @@ class _CollegeShellState extends State<CollegeShell> {
       PageId.attendance when demo == null => const LiveAttendanceScreen(),
       PageId.finance when demo == null => LiveFinanceScreen(roles: roles),
       PageId.admissions when demo == null => LiveAdmissionsScreen(roles: roles),
-      PageId.exams when demo == null => const LiveUnavailableModule(
-        title: 'الاختبارات والنتائج',
-        message:
-            'وحدة الاختبارات غير مربوطة بعد: قاعدة البيانات الحالية لا تحتوي جداول للاختبارات أو الدرجات. أضف مخطط الاختبارات المعتمد قبل تسجيل أي نتائج.',
-      ),
+      PageId.exams when demo == null => LiveExamsScreen(roles: roles),
       PageId.schedule when demo == null => const LiveUnavailableModule(
         title: 'الجدول الدراسي',
         message:

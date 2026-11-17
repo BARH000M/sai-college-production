@@ -6,6 +6,7 @@ import { Scanner } from "./Scanner";
 import { Learning } from "./Learning";
 import { Roles } from "./Roles";
 import { Attendance } from "./Attendance";
+import { Examinations } from "./Examinations";
 import { Reports } from "./Reports";
 import { Cms } from "./Cms";
 import { AcademicAffairs } from "./academics/AcademicAffairs";
@@ -48,6 +49,7 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   if (item.id === "admissions") return <Admissions roles={roles} userId={userId} />;
   if (item.id === "scanner") return <Scanner roles={roles} />;
   if (item.id === "attendance") return <Attendance roles={roles} userId={userId} />;
+  if (item.id === "exams") return <Examinations roles={roles} userId={userId} />;
   if (item.id === "courses") return <Learning key={`courses:${userId}`} view="courses" roles={roles} userId={userId} />;
   if (item.id === "homework") return <Learning key={`homework:${userId}`} view="homework" roles={roles} userId={userId} />;
   if (item.id === "progress") return <Learning key={`progress:${userId}`} view="progress" roles={roles} userId={userId} />;

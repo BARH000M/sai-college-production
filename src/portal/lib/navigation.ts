@@ -77,7 +77,7 @@ export const navigation: readonly NavigationItem[] = [
  */
 const availableModuleIds: readonly string[] = [
   "home", "profile", "notifications", "branches", "sessions", "classes", "students", "admissions", "scanner",
-  "courses", "homework", "progress", "attendance", "roles", "reports", "cms",
+  "courses", "homework", "progress", "attendance", "exams", "roles", "reports", "cms",
   "academics", "timetable", "qr", "vocabulary", "library", "communications", "finance",
   "settings", "systemCatalog",
 ];
@@ -112,7 +112,6 @@ export function visibleNavigation(roles: readonly string[]): NavigationItem[] {
  */
 export const pendingModules: readonly { id: string; label: string; reason: string }[] = [
   { id: "quizzes", label: "الاختبارات القصيرة", reason: "تحتاج جداول أسئلة ومحاولات وحساب درجات." },
-  { id: "exams", label: "الامتحانات", reason: "تحتاج جدولة امتحانات وربطها بالجلسات الأكاديمية." },
   { id: "authoring", label: "تأليف الدروس", reason: "المحرر الكامل للمحتوى غير مبني بعد؛ تُدار الدروس حالياً من المقررات." },
   { id: "media", label: "مكتبة الوسائط", reason: "تحتاج تخزين ملفات وربطه بمساحة Supabase Storage." },
   { id: "approvals", label: "المراجعة والنشر", reason: "تحتاج حالات مراجعة واعتماد للمحتوى." },
