@@ -9,9 +9,7 @@ const phase3bProposals = [
   '20261116142308_atomic_role_management.sql',
   '20261116151509_branch_membership_write_lockdown.sql',
 ];
-const laterProductionProposals = names.filter(name => name.startsWith('202611172'));
-const baselineNames = names.filter(name => !phase3bProposals.includes(name)
-  && !laterProductionProposals.includes(name));
+const baselineNames = names.filter(name => !phase3bProposals.includes(name));
 const service = read('supabase/migrations/20261116013951_phase2b_service_permissions.sql');
 const settings = read('supabase/migrations/20261116013952_phase2b_system_settings.sql');
 
@@ -20,8 +18,7 @@ test('Main migration proposals remain separate from the Phase 2C baseline', () =
   assert.equal(new Set(baselineNames.map(n => n.split('_')[0])).size, baselineNames.length);
   assert.deepEqual(baselineNames.slice(-3), ['20261116013950_learning_scored_exercises.sql',
     '20261116013951_phase2b_service_permissions.sql','20261116013952_phase2b_system_settings.sql']);
-  assert.ok(phase3bProposals.every(name => names.includes(name)));
-  assert.ok(laterProductionProposals.length > 0);
+  assert.deepEqual(names.slice(-2), phase3bProposals);
   for (const sql of [service,settings]) {
     assert.match(sql, /\bbegin;/); assert.match(sql, /commit;\s*$/);
     assert.doesNotMatch(sql.replace(/--[^\n]*/g,''), /\b(?:drop|truncate)\b|disable row level|grant all|to\s+public\b/i);
