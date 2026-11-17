@@ -14,6 +14,8 @@ begin
 end
 $$;
 
+drop event trigger sai_mutation_hold_ddl_guard;
+
 do $$
 declare
   v_relation record;
@@ -61,10 +63,10 @@ begin
   end loop;
 
   if pg_catalog.to_regclass('auth.users') is not null then
-    execute 'drop trigger if exists sai_mutation_hold_account_insert_delete on auth.users';
+    execute 'drop trigger if exists sai_mutation_hold_account_write on auth.users';
   end if;
   if pg_catalog.to_regclass('auth.identities') is not null then
-    execute 'drop trigger if exists sai_mutation_hold_account_insert_delete on auth.identities';
+    execute 'drop trigger if exists sai_mutation_hold_account_write on auth.identities';
   end if;
 end
 $$;

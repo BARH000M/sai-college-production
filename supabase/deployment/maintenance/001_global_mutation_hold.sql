@@ -71,6 +71,21 @@ end
 $$;
 revoke all on function private.sai_mutation_hold_guard() from public, anon, authenticated, service_role;
 
+create function private.sai_mutation_hold_ddl_guard()
+returns event_trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform private.sai_assert_mutations_enabled();
+end
+$$;
+revoke all on function private.sai_mutation_hold_ddl_guard() from public, anon, authenticated, service_role;
+create event trigger sai_mutation_hold_ddl_guard
+  on ddl_command_start
+  execute function private.sai_mutation_hold_ddl_guard();
+
 create function private.sai_install_mutation_hold_guards()
 returns integer
 language plpgsql
@@ -163,11 +178,11 @@ begin
     order by c.relname
   loop
     execute pg_catalog.format(
-      'drop trigger if exists sai_mutation_hold_account_insert_delete on %I.%I',
+      'drop trigger if exists sai_mutation_hold_account_write on %I.%I',
       v_relation.nspname, v_relation.relname
     );
     execute pg_catalog.format(
-      'create trigger sai_mutation_hold_account_insert_delete before insert or delete on %I.%I '
+      'create trigger sai_mutation_hold_account_write before insert or update or delete on %I.%I '
       'for each statement execute function private.sai_mutation_hold_guard()',
       v_relation.nspname, v_relation.relname
     );
@@ -258,6 +273,13 @@ begin
 
   if exists (
     select 1
+    where not exists (
+      select 1 from pg_catalog.pg_event_trigger e
+      where e.evtname = 'sai_mutation_hold_ddl_guard'
+        and e.evtevent = 'ddl_command_start'
+    )
+  ) or exists (
+    select 1
     from pg_catalog.pg_class c
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
     where n.nspname in ('public', 'private', 'storage')
@@ -302,7 +324,7 @@ begin
       and not exists (
         select 1 from pg_catalog.pg_trigger t
         where t.tgrelid = c.oid
-          and t.tgname = 'sai_mutation_hold_account_insert_delete'
+          and t.tgname = 'sai_mutation_hold_account_write'
           and not t.tgisinternal
       )
   ) then
@@ -326,4 +348,5 @@ $$;
 revoke all on function public.sai_set_mutation_hold(boolean, text) from public, anon, service_role;
 grant execute on function public.sai_set_mutation_hold(boolean, text) to authenticated;
 
+notify pgrst, 'reload schema';
 commit;

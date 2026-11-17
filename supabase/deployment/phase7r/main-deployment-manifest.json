@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "project": {
+    "ref": "aeryusbrulqdxjdynwfh",
+    "name": "sai-college-production",
+    "git_branch": "main"
+  },
+  "database": {
+    "host": "db.aeryusbrulqdxjdynwfh.supabase.co",
+    "port": 5432,
+    "name": "postgres",
+    "user": "postgres",
+    "sslmode": "verify-full",
+    "migration_history_policy": "Never replay the historical migration backlog"
+  },
+  "required_source_files": [
+    {
+      "path": "supabase/deployment/maintenance/001_global_mutation_hold.sql",
+      "sha256": "4a682ce38e6c900f2b338f7d5d41896b6efb8ea435753beb4cf7bf8fff5767cf"
+    },
+    {
+      "path": "supabase/deployment/maintenance/rollback_global_mutation_hold.sql",
+      "sha256": "49daa73d598cb15d643c90263dc39e641c8ec449d2510c076393f2a3bb7d0580"
+    },
+    {
+      "path": "supabase/deployment/phase3b-main/01_role_contract.sql",
+      "sha256": "8b2a2db0c4db8b33c0190a3e538414ba1a5781a8d5697e5785683236ce817417"
+    },
+    {
+      "path": "supabase/deployment/phase3b-main/02_teacher_assignment.sql",
+      "sha256": "1f3e35c4897814258a99053ba8b16543aae339d8ebbff0ef77c6879b9814fe4e"
+    },
+    {
+      "path": "supabase/deployment/phase3b-main/03_verified_onboarding.sql",
+      "sha256": "edf88c5e0012762fc781079e996386455b5fd3e97d1fc0d6fb8f1872151fd05c"
+    },
+    {
+      "path": "supabase/deployment/phase3c-main/001_own_contact_validation.sql",
+      "sha256": "17f33774dda9200ed371ccf59eae3ebba8584074bf9eb4600746897ff8d84afe"
+    },
+    {
+      "path": "supabase/deployment/phase4a-examinations/001_examinations.sql",
+      "sha256": "36f90b4ba4e01481731912787144e098ef0efc8a026695ad511a9e7fa6b135f2"
+    },
+    {
+      "path": "supabase/functions/manage-roles/index.ts",
+      "sha256": "28db90d00ad7dab2bdabfa888546f358fec39fe300db87bd0a2739c679fd8217"
+    },
+    {
+      "path": "supabase/functions/school-admin/index.ts",
+      "sha256": "45667f463eaa6992f9dc7dc2c1d25f86eb63c58bf3f45cf1aa21b9cccafaf848"
+    },
+    {
+      "path": "supabase/functions/provision-learning-account/index.ts",
+      "sha256": "dc33a9aef2742747c4bcfd337d0386d3224b526b90d0585e2379a8983cb54490"
+    },
+    {
+      "path": "supabase/functions/link-student-account/index.ts",
+      "sha256": "b22ecd7198708a87b31addad320b77f824294ac7f6432a9a1eee0e7d3bde665c"
+    },
+    {
+      "path": "supabase/functions/admission-reminders/index.ts",
+      "sha256": "301e50fc2d4f1d66223be8e04b88aa7b7fc8b30eada94d6153ca9a9c95a0aa72"
+    },
+    {
+      "path": "supabase/functions/admission-notify/index.ts",
+      "sha256": "d6e8b83aa8686c0233f26779e0107c1f1e3c13d616cdd08fa4a0ebdd4ec0a285"
+    },
+    {
+      "path": "supabase/functions/announcement-email/index.ts",
+      "sha256": "1f1077f56a197dbba4e8105c1923f4c728cdd3d49e3e0e27937cd0dd39367f46"
+    },
+    {
+      "path": "supabase/functions/_shared/role-management-handler.ts",
+      "sha256": "38f1efc49e21f1ad5aae858d7f25c5613919886aea9a11b23c3ce531267753f7"
+    },
+    {
+      "path": "supabase/functions/_shared/mutation-gate.ts",
+      "sha256": "80dd24600a5748116f00aafe36799d332b80d3c888bd78f5b34a6eab4167acef"
+    },
+    {
+      "path": "supabase/functions/_shared/client-ip.ts",
+      "sha256": "015f547c2382273c5639fe4f8970926fecdef7611beaadc2e92091f47ec0b5e7"
+    }
+  ],
+  "steps": [
+    {
+      "id": "install-mutation-hold",
+      "kind": "sql",
+      "path": "supabase/deployment/maintenance/001_global_mutation_hold.sql",
+      "depends_on": []
+    },
+    {
+      "id": "phase3b-role-contract",
+      "kind": "sql",
+      "path": "supabase/deployment/phase3b-main/01_role_contract.sql",
+      "depends_on": ["install-mutation-hold"]
+    },
+    {
+      "id": "phase3b-teacher-assignment",
+      "kind": "sql",
+      "path": "supabase/deployment/phase3b-main/02_teacher_assignment.sql",
+      "depends_on": ["phase3b-role-contract"]
+    },
+    {
+      "id": "phase3b-verified-onboarding",
+      "kind": "sql",
+      "path": "supabase/deployment/phase3b-main/03_verified_onboarding.sql",
+      "depends_on": ["phase3b-role-contract"]
+    },
+    {
+      "id": "phase3c-own-contact-validation",
+      "kind": "sql",
+      "path": "supabase/deployment/phase3c-main/001_own_contact_validation.sql",
+      "depends_on": ["phase3b-verified-onboarding"]
+    },
+    {
+      "id": "phase4a-examinations",
+      "kind": "sql",
+      "path": "supabase/deployment/phase4a-examinations/001_examinations.sql",
+      "depends_on": ["phase3c-own-contact-validation"]
+    },
+    {
+      "id": "refresh-mutation-guards",
+      "kind": "refresh-mutation-guards",
+      "depends_on": ["phase4a-examinations"]
+    },
+    {
+      "id": "activate-mutation-hold",
+      "kind": "activate-mutation-hold",
+      "depends_on": ["refresh-mutation-guards"]
+    },
+    {
+      "id": "deploy-edge-guards",
+      "kind": "edge-functions",
+      "functions": [
+        "manage-roles",
+        "school-admin",
+        "provision-learning-account",
+        "link-student-account",
+        "admission-reminders",
+        "admission-notify",
+        "announcement-email"
+      ],
+      "depends_on": ["activate-mutation-hold"]
+    }
+  ],
+  "edge_function_baseline": [
+    {
+      "slug": "manage-roles",
+      "status": "ACTIVE",
+      "version": 9,
+      "verify_jwt": false,
+      "entrypoint": "supabase/functions/manage-roles/index.ts",
+      "dependencies": ["supabase/functions/_shared/role-management-handler.ts"]
+    },
+    {
+      "slug": "school-admin",
+      "status": "ACTIVE",
+      "version": 7,
+      "verify_jwt": false,
+      "entrypoint": "supabase/functions/school-admin/index.ts",
+      "dependencies": [
+        "supabase/functions/_shared/role-management-handler.ts",
+        "supabase/functions/_shared/mutation-gate.ts"
+      ]
+    },
+    {
+      "slug": "provision-learning-account",
+      "status": "ACTIVE",
+      "version": 8,
+      "verify_jwt": true,
+      "entrypoint": "supabase/functions/provision-learning-account/index.ts",
+      "dependencies": ["supabase/functions/_shared/mutation-gate.ts"]
+    },
+    {
+      "slug": "link-student-account",
+      "status": "ACTIVE",
+      "version": 4,
+      "verify_jwt": true,
+      "entrypoint": "supabase/functions/link-student-account/index.ts",
+      "dependencies": [
+        "supabase/functions/_shared/client-ip.ts",
+        "supabase/functions/_shared/mutation-gate.ts"
+      ]
+    },
+    {
+      "slug": "admission-reminders",
+      "status": "ACTIVE",
+      "version": 7,
+      "verify_jwt": true,
+      "entrypoint": "supabase/functions/admission-reminders/index.ts",
+      "dependencies": ["supabase/functions/_shared/mutation-gate.ts"]
+    },
+    {
+      "slug": "admission-notify",
+      "status": "ACTIVE",
+      "version": 9,
+      "verify_jwt": true,
+      "entrypoint": "supabase/functions/admission-notify/index.ts",
+      "dependencies": [
+        "supabase/functions/_shared/client-ip.ts",
+        "supabase/functions/_shared/mutation-gate.ts"
+      ]
+    },
+    {
+      "slug": "announcement-email",
+      "status": "ACTIVE",
+      "version": 3,
+      "verify_jwt": true,
+      "entrypoint": "supabase/functions/announcement-email/index.ts",
+      "dependencies": ["supabase/functions/_shared/mutation-gate.ts"]
+    }
+  ],
+  "excluded_functions": [
+    {
+      "slug": "admission-tracking",
+      "reason": "Not present in the read-only Main Edge Function inventory; do not create a new endpoint in this cutover."
+    }
+  ],
+  "rollback": {
+    "path": "supabase/deployment/maintenance/rollback_global_mutation_hold.sql",
+    "policy": "Never run automatically. Requires a separate approved safe-exit after hold deactivation and verification."
+  },
+  "execution_gates": {
+    "owner_approval": "External JSON approval must bind project, manifest SHA-256, executor SHA-256, and expiry.",
+    "recovery_attestation": "External JSON must attest a verified Supabase-compatible recovery point and acknowledged limitations.",
+    "external_hold_attestation": "External JSON must attest edge/direct-write containment and paused managed jobs.",
+    "secrets": "Only protected environment variables; never command-line arguments, logs, or repository files.",
+    "post_failure": "Stop immediately; never auto-release the hold or run a reverse migration."
+  }
+}

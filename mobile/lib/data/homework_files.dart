@@ -16,12 +16,13 @@ const homeworkFileExtensions = [
 const homeworkFileLimit = 20 * 1024 * 1024;
 
 Future<PlatformFile?> pickHomeworkFile() async {
-  final result = await FilePicker().pickFiles(
+  final result = await FilePicker.platform.pickFiles(
     type: FileType.custom,
     allowedExtensions: homeworkFileExtensions,
     withData: true,
   );
-  return result?.files.single;
+  if (result == null || result.files.isEmpty) return null;
+  return result.files.single;
 }
 
 String homeworkFileMimeType(PlatformFile file) {

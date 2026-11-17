@@ -1,5 +1,7 @@
 begin;
 
+grant select, update on auth.users to supabase_auth_admin;
+
 create table public.sai_mutation_hold_probe (
   id bigint generated always as identity primary key,
   note text not null,

@@ -100,8 +100,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
         params: {'p_assessment': id},
       );
       if (results is! List) throw StateError('استجابة النتائج غير صالحة.');
-      if (mounted)
+      if (mounted) {
         setState(() => _results = List<Map<String, dynamic>>.from(results));
+      }
     } catch (error) {
       if (mounted) setState(() => _error = 'تعذر تحميل التقييم: $error');
     }
@@ -621,8 +622,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
           },
         );
       }
-      if (mounted)
+      if (mounted) {
         setState(() => _notice = 'حُفظ التقدم، ويمكن استكمال المحاولة لاحقاً.');
+      }
       return true;
     } catch (error) {
       if (mounted) setState(() => _error = 'تعذر حفظ التقدم: $error');
@@ -836,8 +838,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
               trailing: PopupMenuButton<String>(
                 onSelected: (choice) {
                   if (choice == 'edit') _addQuestion(id, current: question);
-                  if (choice == 'delete')
+                  if (choice == 'delete') {
                     _deleteQuestion(id, '${question['id']}');
+                  }
                 },
                 itemBuilder: (_) => const [
                   PopupMenuItem(value: 'edit', child: Text('تعديل')),
@@ -931,8 +934,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       );
     }
 
-    if (_results.isEmpty)
+    if (_results.isEmpty) {
       return const Text('تظهر النتيجة بعد تصحيحها وإتاحتها من المعلم.');
+    }
     return Column(
       children: [
         for (final result in _results)

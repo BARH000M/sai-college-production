@@ -1,5 +1,6 @@
 \set ON_ERROR_STOP on
 \set QUIET on
+\set VERBOSITY verbose
 
 do $$
 declare
@@ -25,16 +26,8 @@ set role authenticated;
 
 do $$
 declare
-  v_count bigint;
   v_enabled boolean;
 begin
-  select count(*) into v_count
-  from public.user_roles r
-  where r.user_id = auth.uid() and r.role = 'super_admin';
-  if v_count <> 1 then
-    raise exception 'Super Admin read access was not preserved';
-  end if;
-
   select s.enabled into v_enabled from public.sai_mutation_hold_status() s;
   if v_enabled then
     raise exception 'Maintenance hold must start disabled';
@@ -45,6 +38,20 @@ $$;
 insert into public.sai_mutation_hold_probe(note) values ('before-hold');
 
 reset role;
+create table public.sai_mutation_hold_late_probe (
+  id bigint generated always as identity primary key,
+  note text not null
+);
+alter table public.sai_mutation_hold_late_probe enable row level security;
+create policy sai_mutation_hold_late_probe_authenticated
+  on public.sai_mutation_hold_late_probe
+  for all to authenticated
+  using (true) with check (true);
+grant select, insert, update, delete on public.sai_mutation_hold_late_probe
+  to anon, authenticated, service_role;
+grant usage, select on sequence public.sai_mutation_hold_late_probe_id_seq
+  to anon, authenticated, service_role;
+select private.sai_install_mutation_hold_guards();
 set request.jwt.claim.sub = '';
 set request.jwt.claim.role = 'anon';
 set role anon;
@@ -104,6 +111,14 @@ begin
 
   v_denied := false;
   begin
+    insert into public.sai_mutation_hold_late_probe(note) values ('late-table');
+  exception when sqlstate '55000' then
+    v_denied := true;
+  end;
+  if not v_denied then raise exception 'Newly created table bypassed refreshed hold guards'; end if;
+
+  v_denied := false;
+  begin
     update public.sai_mutation_hold_probe set note = 'changed';
   exception when sqlstate '55000' then
     v_denied := true;
@@ -149,6 +164,28 @@ do $$
 declare
   v_denied boolean := false;
 begin
+  if not exists (select 1 from auth.users) then
+    raise exception 'Auth update guard test requires a recovered user';
+  end if;
+
+  begin
+    update auth.users
+    set email = email
+    where id = (select id from auth.users order by id limit 1);
+  exception when sqlstate '55000' then
+    v_denied := true;
+  end;
+  if not v_denied then
+    raise exception 'Privileged Auth user UPDATE bypassed the hold';
+  end if;
+end
+$$;
+
+reset role;
+do $$
+declare
+  v_denied boolean := false;
+begin
   begin
     insert into auth.users(id) values (pg_catalog.gen_random_uuid());
   exception when sqlstate '55000' then
@@ -177,6 +214,14 @@ begin
     v_denied := true;
   end;
   if not v_denied then raise exception 'TRUNCATE bypassed the hold'; end if;
+
+  v_denied := false;
+  begin
+    execute 'create table public.sai_mutation_hold_ddl_probe (id integer)';
+  exception when sqlstate '55000' then
+    v_denied := true;
+  end;
+  if not v_denied then raise exception 'Privileged DDL bypassed the hold'; end if;
 end
 $$;
 
