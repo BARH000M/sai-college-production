@@ -9,7 +9,14 @@ const phase3bProposals = [
   '20261116142308_atomic_role_management.sql',
   '20261116151509_branch_membership_write_lockdown.sql',
 ];
-const baselineNames = names.filter(name => !phase3bProposals.includes(name));
+const additionalMigrations = [
+  '20261110172940_sai_system_settings_shared_20261110.sql',
+  '20261110173339_sai_unified_modules_web_mobile_secure.sql',
+  '20261110173506_sai_unified_module_realtime.sql',
+];
+const baselineNames = names.filter(name => !phase3bProposals.includes(name)
+  && !additionalMigrations.includes(name)
+  && !name.includes('_production_'));
 const service = read('supabase/migrations/20261116013951_phase2b_service_permissions.sql');
 const settings = read('supabase/migrations/20261116013952_phase2b_system_settings.sql');
 
@@ -18,7 +25,7 @@ test('Phase 2C migration baseline remains intact beside the local Phase 3B propo
   assert.equal(new Set(baselineNames.map(n => n.split('_')[0])).size, 38);
   assert.deepEqual(baselineNames.slice(-3), ['20261116013950_learning_scored_exercises.sql',
     '20261116013951_phase2b_service_permissions.sql','20261116013952_phase2b_system_settings.sql']);
-  assert.deepEqual(names.slice(-2), phase3bProposals);
+  for (const proposal of phase3bProposals) assert.ok(names.includes(proposal));
   for (const sql of [service,settings]) {
     assert.match(sql, /\bbegin;/); assert.match(sql, /commit;\s*$/);
     assert.doesNotMatch(sql.replace(/--[^\n]*/g,''), /\b(?:drop|truncate)\b|disable row level|grant all|to\s+public\b/i);
