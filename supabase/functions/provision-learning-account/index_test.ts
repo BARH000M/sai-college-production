@@ -19,6 +19,7 @@ Deno.test("invitations never grant access, auto-confirm email, link records or d
       if (url.pathname === "/rest/v1/user_roles") {
         assertEquals(req.method, "GET"); return Response.json(roleAllowed ? { role: "super_admin" } : null);
       }
+      if (url.pathname === "/rest/v1/rpc/sai_assert_mutations_enabled") return Response.json(null);
       if (url.pathname === "/rest/v1/students") {
         assertEquals(req.method, "GET"); return Response.json({ id: "student", full_name: "Student", user_id: null });
       }

@@ -2,7 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/portal/lib/supabase";
 import { learningSeenEvent, loadLearningSeen } from "@/portal/lib/learningNotifications";
 
-type CountRow = { id: string; created_at?: string; published_at?: string | null; graded_at?: string | null; status?: string; is_published?: boolean };
+type CountRow = {
+  id: string;
+  created_at?: string;
+  published_at?: string | null;
+  graded_at?: string | null;
+  status?: string;
+  is_published?: boolean;
+};
 
 /**
  * Counts unread homework releases and released grades for the signed-in learner.
@@ -26,10 +33,12 @@ export function useLearningNotifications(roles: readonly string[]) {
       }
       const seenTime = seenAt ? new Date(seenAt).getTime() : null;
 
-      const [students, homework, submissions] = await Promise.all([
+      const [students, homework, submissions, assessments, attempts] = await Promise.all([
         supabase.from("students").select("id"),
         supabase.from("learning_homework").select("id,published_at,created_at,is_published").eq("is_published", true),
         supabase.from("learning_homework_submissions").select("id,status,graded_at"),
+        supabase.from("learning_assessments").select("id,status,published_at").eq("status", "published"),
+        supabase.from("learning_assessment_attempts").select("id,status,graded_at").eq("status", "graded"),
       ]);
 
       const isNew = (value?: string | null) => {
@@ -45,6 +54,14 @@ export function useLearningNotifications(roles: readonly string[]) {
       }
       if (!submissions.error) {
         total += ((submissions.data ?? []) as CountRow[])
+          .filter((row) => row.status === "graded" && isNew(row.graded_at)).length;
+      }
+      if (!assessments.error) {
+        total += ((assessments.data ?? []) as CountRow[])
+          .filter((row) => isNew(row.published_at)).length;
+      }
+      if (!attempts.error) {
+        total += ((attempts.data ?? []) as CountRow[])
           .filter((row) => row.status === "graded" && isNew(row.graded_at)).length;
       }
       // The students query is only needed to confirm a linked record exists.

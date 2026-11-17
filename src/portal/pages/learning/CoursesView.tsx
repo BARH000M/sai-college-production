@@ -11,6 +11,7 @@ import { LessonExercises } from "@/portal/pages/learning/LessonExercises";
 import { LessonQuestionsPanel } from "@/portal/pages/learning/LessonQuestionsPanel";
 import { LessonQuiz } from "@/portal/pages/learning/LessonQuiz";
 import { LessonResultsPanel } from "@/portal/pages/learning/LessonResultsPanel";
+import { AssessmentsPanel } from "@/portal/pages/learning/AssessmentsPanel";
 
 export function CoursesView({ scope }: { scope: LearningScope }) {
   const { workspace, mode, learnerId, canTrack, canManageContent } = scope;
@@ -130,6 +131,13 @@ export function CoursesView({ scope }: { scope: LearningScope }) {
                 canManage={canManageContent}
                 onSaved={scope.reload}
               />
+              {(canManageContent || !!learnerId) && <AssessmentsPanel
+                key={`assessments-${lesson.id}-${learnerId}`}
+                lessonId={lesson.id}
+                courseId={active.id}
+                canManage={canManageContent}
+                canTake={canTrack}
+              />}
               {mode === "learner" && canTrack && learnerId && <>
                 <LessonQuiz
                   key={`quiz-${lesson.id}`}

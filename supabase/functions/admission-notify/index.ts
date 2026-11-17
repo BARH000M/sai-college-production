@@ -1,4 +1,5 @@
 import { trustedClientIp } from "../_shared/client-ip.ts";
+import { mutationGateOpen } from "../_shared/mutation-gate.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 
 const cors = {
@@ -121,6 +122,9 @@ Deno.serve(async (req) => {
     return json({ ok: false, message: "Unknown notification mode" }, 400);
   }
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  if (!await mutationGateOpen(admin)) {
+    return json({ ok: false, code: "maintenance", message: "تم إيقاف الإشعارات مؤقتاً للصيانة." }, 503);
+  }
 
   const apiKey = Deno.env.get("RESEND_API_KEY");
   const fromDomain = Deno.env.get("RESEND_FROM_DOMAIN");

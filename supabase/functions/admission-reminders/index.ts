@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mutationGateOpen } from "../_shared/mutation-gate.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -110,6 +111,10 @@ Deno.serve(async (req) => {
     if (!roleCheck.data) {
       return json({ ok: false, message: "Only super administrators can run reminders manually." }, 403);
     }
+  }
+
+  if (!await mutationGateOpen(admin)) {
+    return json({ ok: false, code: "maintenance", message: "تم إيقاف التذكيرات مؤقتاً للصيانة." }, 503);
   }
 
   const runDate = businessDate();

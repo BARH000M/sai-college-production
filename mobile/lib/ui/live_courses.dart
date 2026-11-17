@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/access.dart';
 import 'components.dart';
 import 'vocabulary_practice.dart';
+import 'live_assessments.dart';
 
 const _lessonMediaBucket = 'lesson-media';
 
@@ -109,6 +110,11 @@ class _LiveCourseCatalogState extends State<LiveCourseCatalog> {
                   builder: (_) => LiveCourseLessons(
                     course: course,
                     canTrack: widget.roles.contains(Role.student),
+                    canManageAssessments: widget.roles.any((role) =>
+                        role == Role.super_admin || role == Role.admin || role == Role.teacher),
+                    canViewAssessments: widget.roles.any((role) =>
+                        role == Role.super_admin || role == Role.admin || role == Role.teacher
+                        || role == Role.student || role == Role.parent),
                   ),
                 ),
               ),
@@ -132,9 +138,17 @@ class _LiveCourseCatalogState extends State<LiveCourseCatalog> {
 }
 
 class LiveCourseLessons extends StatefulWidget {
-  const LiveCourseLessons({super.key, required this.course, required this.canTrack});
+  const LiveCourseLessons({
+    super.key,
+    required this.course,
+    required this.canTrack,
+    this.canManageAssessments = false,
+    this.canViewAssessments = false,
+  });
   final Map<String, dynamic> course;
   final bool canTrack;
+  final bool canManageAssessments;
+  final bool canViewAssessments;
 
   @override
   State<LiveCourseLessons> createState() => _LiveCourseLessonsState();
@@ -150,12 +164,13 @@ class _LiveCourseLessonsState extends State<LiveCourseLessons> {
   }
 
   void _reload() {
-    lessons = Supabase.instance.client
+    var query = Supabase.instance.client
         .from('learning_lessons')
         .select('id,course_id,title,summary,kind,position,duration_minutes,content_kind,content_url,content_body,content_path,content_file_name')
         .eq('course_id', widget.course['id'])
-        .eq('is_published', true)
-        .order('position');
+        ;
+    if (!widget.canManageAssessments) query = query.eq('is_published', true);
+    lessons = query.order('position');
   }
 
   @override
@@ -218,6 +233,8 @@ class _LiveCourseLessonsState extends State<LiveCourseLessons> {
                     builder: (_) => LiveLessonPage(
                       lesson: lesson,
                       canTrack: widget.canTrack,
+                      canManageAssessments: widget.canManageAssessments,
+                      canViewAssessments: widget.canViewAssessments,
                     ),
                   ),
                 ),
@@ -354,10 +371,14 @@ class LiveLessonPage extends StatefulWidget {
     super.key,
     required this.lesson,
     required this.canTrack,
+    this.canManageAssessments = false,
+    this.canViewAssessments = false,
     this.store,
   });
   final Map<String, dynamic> lesson;
   final bool canTrack;
+  final bool canManageAssessments;
+  final bool canViewAssessments;
   final LessonStudyStore? store;
 
   @override
@@ -603,6 +624,23 @@ class _LiveLessonPageState extends State<LiveLessonPage> {
                   ),
                 );
               },
+            ),
+          if (widget.canViewAssessments)
+            SaiCard(
+              child: ListTile(
+                leading: const Icon(Icons.assignment_turned_in_outlined, color: gold),
+                title: const Text('التقييمات والتمارين'),
+                subtitle: const Text('مسودات المعلم، المحاولات المحفوظة، والنتائج المتاحة'),
+                trailing: const Icon(Icons.chevron_left_rounded),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => LiveAssessmentsPage(
+                    lessonId: lessonId,
+                    courseId: '${widget.lesson['course_id']}',
+                    canManage: widget.canManageAssessments,
+                    canTake: widget.canTrack,
+                  ),
+                )),
+              ),
             ),
           if (widget.canTrack && progressReady && progressError != null)
             EmptyPanel(progressError!, retry: () {

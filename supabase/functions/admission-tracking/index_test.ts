@@ -8,6 +8,8 @@ Deno.test("history preserves snapshots and rejects malformed events", async () =
   const oldKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   let handler: ((request: Request) => Promise<Response>) | undefined;
   let submitError = { code: "22023", message: "local-test-key" };
+  let maintenance = false;
+  let submitCalls = 0;
   let events: unknown = [{
     action: "current_status_snapshot",
     status: "accepted",
@@ -28,10 +30,16 @@ Deno.test("history preserves snapshots and rejects malformed events", async () =
     });
     globalThis.fetch = async (input) => {
       const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith("/rpc/sai_assert_mutations_enabled")) {
+        return maintenance
+          ? Response.json({ code: "55000", message: "maintenance_mode" }, { status: 400 })
+          : Response.json(null);
+      }
       if (url.endsWith("/rpc/admissions_public_rate_limit")) {
         return Response.json(true);
       }
       if (url.endsWith("/rpc/admissions_public_submit")) {
+        submitCalls += 1;
         return Response.json(submitError, { status: 400 });
       }
       if (url.endsWith("/rpc/admissions_public_history")) {
@@ -88,6 +96,11 @@ Deno.test("history preserves snapshots and rejects malformed events", async () =
     const unknownReference = await handler(statusRequest("UNKNOWN", "b".repeat(64)));
     assertEquals(await wrongToken.json(), { ok: true, result: null });
     assertEquals(await unknownReference.json(), { ok: true, result: null });
+    maintenance = true;
+    const callsBeforeHold = submitCalls;
+    const heldSubmission = await handler(submission());
+    assertEquals(heldSubmission.status, 503);
+    assertEquals(submitCalls, callsBeforeHold);
   } finally {
     Object.defineProperty(Deno, "serve", { configurable: true, value: originalServe });
     globalThis.fetch = originalFetch;

@@ -13,6 +13,7 @@ Deno.test("role management enforces authorization, confirmations, branch scope, 
   let superAdmin = true;
   let targetEmailConfirmed = true;
   let rpcError: string | null = null;
+  let mutationHeld = false;
   let invalidAcknowledgement = false;
   let rpcCalls: Record<string, unknown>[] = [];
   let countCalls = 0;
@@ -31,6 +32,11 @@ Deno.test("role management enforces authorization, confirmations, branch scope, 
       }
       if (url.pathname === "/rest/v1/user_roles" && url.searchParams.get("select") === "role") {
         return Response.json(superAdmin ? { role: "super_admin" } : null);
+      }
+      if (url.pathname === "/rest/v1/rpc/sai_assert_mutations_enabled") {
+        return mutationHeld
+          ? Response.json({ code: "55000", message: "maintenance_mode" }, { status: 400 })
+          : Response.json(null);
       }
       if (url.pathname.startsWith("/auth/v1/admin/users/")) {
         return Response.json({ user: {
@@ -141,6 +147,11 @@ Deno.test("role management enforces authorization, confirmations, branch scope, 
     assertEquals(lastAdmin.status, 409);
     assertEquals((await lastAdmin.json()).code, "23514");
     rpcError = null;
+
+    mutationHeld = true;
+    const callsBeforeHold = rpcCalls.length;
+    assertEquals((await grant("student")).status, 503);
+    assertEquals(rpcCalls.length, callsBeforeHold);
   } finally {
     Object.defineProperty(Deno, "serve", { configurable: true, value: serve });
     globalThis.fetch = fetch;

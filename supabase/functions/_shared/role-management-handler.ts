@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
+import { mutationGateOpen } from "./mutation-gate.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -246,6 +247,10 @@ export async function handleManageRoles(req: Request): Promise<Response> {
     .maybeSingle();
   if (superError) return json({ ok: false, message: superError.message }, 500);
   if (!superRole) return json({ ok: false, message: "هذه الصفحة متاحة للمسؤول العام فقط." }, 403);
+
+  if ((action === "grant" || action === "revoke") && !await mutationGateOpen(admin)) {
+    return json({ ok: false, code: "maintenance", message: "تغييرات الصلاحيات متوقفة مؤقتاً للصيانة." }, 503);
+  }
 
   if (action === "summary") {
     try {

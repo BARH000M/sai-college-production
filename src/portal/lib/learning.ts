@@ -101,6 +101,8 @@ export type LearningHomework = {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  attachment_path: string | null;
+  attachment_file_name: string | null;
 };
 
 export type SubmissionStatus = "submitted" | "graded" | "returned";
@@ -115,6 +117,9 @@ export type HomeworkSubmission = {
   score: number | null;
   feedback: string | null;
   graded_at: string | null;
+  submission_path: string | null;
+  submission_file_name: string | null;
+  submission_mime_type: string | null;
 };
 
 export type LearningWorkspace = {
@@ -144,9 +149,9 @@ const workspaceColumns = {
   branches: "id,name",
   courses: "id,class_id,branch_id,session_id,title,description,level,is_active,teacher_id",
   lessons: "id,course_id,title,summary,kind,position,duration_minutes,is_published,content_kind,content_url,content_body,content_path,content_file_name,content_updated_at",
-  homework: "id,course_id,title,instructions,due_at,max_score,position,is_published,published_at,created_at,updated_at",
+  homework: "id,course_id,title,instructions,due_at,max_score,position,is_published,published_at,created_at,updated_at,attachment_path,attachment_file_name",
   progress: "lesson_id,student_id,status,updated_at,completion_basis",
-  submissions: "id,homework_id,student_id,status,content,submitted_at,score,feedback,graded_at",
+  submissions: "id,homework_id,student_id,status,content,submitted_at,score,feedback,graded_at,submission_path,submission_file_name,submission_mime_type",
 } as const;
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null };
@@ -246,10 +251,14 @@ export async function submitHomework(
   homeworkId: string,
   studentId: string,
   content: string,
+  file?: File | null,
 ): Promise<void> {
   const text = content.trim();
-  if (text.length < 10) throw new Error("اكتب إجابة لا تقل عن عشرة أحرف قبل التسليم.");
+  if (!file && text.length < 10) throw new Error("اكتب إجابة لا تقل عن عشرة أحرف أو أرفق ملفاً.");
   if (text.length > 2000) throw new Error("الإجابة أطول من الحد المسموح (٢٠٠٠ حرف).");
+  const uploaded = file
+    ? await uploadHomeworkFile(`${homeworkId}/submissions/${studentId}`, file)
+    : null;
   const result = await supabase
     .from("learning_homework_submissions")
     .upsert(
@@ -257,14 +266,65 @@ export async function submitHomework(
         homework_id: homeworkId,
         student_id: studentId,
         status: "submitted",
-        content: text,
-        submitted_at: new Date().toISOString(),
+        content: text || null,
+        score: null,
+        feedback: null,
+        graded_at: null,
+        graded_by: null,
+        ...(uploaded ? {
+          submission_path: uploaded.path,
+          submission_file_name: uploaded.fileName,
+          submission_mime_type: uploaded.mimeType,
+        } : {}),
       },
       { onConflict: "homework_id,student_id" },
     )
     .select("id");
   if (result.error) throw new Error(result.error.message);
   if (!result.data?.length) throw new Error("لم يُسجّل التسليم؛ قد تكون المهلة انتهت أو لا تملك الصلاحية.");
+}
+
+export const homeworkFileBucket = "homework-files";
+export const homeworkFileAccept = ".pdf,.txt,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg";
+const homeworkFileExtensions = new Set(["pdf", "txt", "doc", "docx", "xls", "xlsx", "png", "jpg", "jpeg"]);
+const homeworkFileLimit = 20 * 1024 * 1024;
+
+export type UploadedHomeworkFile = { path: string; fileName: string; mimeType: string };
+
+async function uploadHomeworkFile(folder: string, file: File): Promise<UploadedHomeworkFile> {
+  if (!file.size || file.size > homeworkFileLimit) {
+    throw new Error("يجب أن يكون الملف أكبر من صفر وألا يتجاوز ٢٠ ميجابايت.");
+  }
+  const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? "" : "";
+  if (!homeworkFileExtensions.has(extension)) {
+    throw new Error("صيغة الملف غير مدعومة. المسموح PDF وTXT وWord وExcel وPNG وJPEG.");
+  }
+  const safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(-70)
+    || `attachment.${extension}`;
+  const path = `${folder}/${Date.now()}-${safeName}`;
+  const { error } = await supabase.storage.from(homeworkFileBucket)
+    .upload(path, file, { contentType: file.type || undefined, upsert: false, cacheControl: "3600" });
+  if (error) throw new Error(`${error.message} — تحقق من الصلاحيات أو جرّب ملفاً أصغر.`);
+  return { path, fileName: file.name, mimeType: file.type || "application/octet-stream" };
+}
+
+export async function uploadHomeworkAttachment(
+  homeworkId: string,
+  file: File,
+): Promise<void> {
+  const uploaded = await uploadHomeworkFile(`${homeworkId}/instructions`, file);
+  const result = await supabase.from("learning_homework")
+    .update({ attachment_path: uploaded.path, attachment_file_name: uploaded.fileName })
+    .eq("id", homeworkId)
+    .select("id");
+  if (result.error) throw new Error(result.error.message);
+  if (!result.data?.length) throw new Error("رُفع الملف لكن تعذر ربطه بالواجب؛ حدّث الصفحة ثم حاول مجدداً.");
+}
+
+export async function homeworkFileUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(homeworkFileBucket).createSignedUrl(path, 300);
+  if (error || !data?.signedUrl) throw new Error(error?.message ?? "تعذر إنشاء رابط آمن للملف.");
+  return data.signedUrl;
 }
 
 export async function saveLessonContent(

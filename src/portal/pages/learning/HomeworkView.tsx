@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  daysUntil, formatDate, setHomeworkPublished, submissionStatusLabels, submitHomework,
+  daysUntil, formatDate, homeworkFileAccept, homeworkFileUrl, setHomeworkPublished,
+  submissionStatusLabels, submitHomework,
   type LearningHomework, type LearningScope,
 } from "@/portal/lib/learning";
 import {
@@ -22,6 +23,8 @@ export function HomeworkView({ scope, seenAt }: { scope: LearningScope; seenAt: 
   const [editingId, setEditingId] = useState("");
   const [publishingId, setPublishingId] = useState("");
   const [content, setContent] = useState("");
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +83,8 @@ export function HomeworkView({ scope, seenAt }: { scope: LearningScope; seenAt: 
     if (!current) return;
     const existing = workspace.submissions.find((row) => row.homework_id === current.id && row.student_id === learnerId);
     setContent(existing?.content ?? "");
+    setSubmissionFile(null);
+    setFileInputKey((key) => key + 1);
     setNotice(null);
     setError(null);
   }, [selectedId, items, workspace.submissions, learnerId]);
@@ -101,13 +106,24 @@ export function HomeworkView({ scope, seenAt }: { scope: LearningScope; seenAt: 
     if (!selected || !learner || !canSubmit || saving) return;
     setSaving(true); setError(null); setNotice(null);
     try {
-      await submitHomework(selected.id, learner.id, content);
+      await submitHomework(selected.id, learner.id, content, submissionFile);
       setNotice("تم تسليم الواجب وحفظه.");
+      setSubmissionFile(null);
+      setFileInputKey((key) => key + 1);
       scope.reload();
     } catch (failure) {
       setError(message(failure));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openPrivateFile(path: string) {
+    try {
+      const url = await homeworkFileUrl(path);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (failure) {
+      setError(message(failure));
     }
   }
 
@@ -316,6 +332,9 @@ export function HomeworkView({ scope, seenAt }: { scope: LearningScope; seenAt: 
         <button className="button secondary" type="button" onClick={() => setSelectedId("")}>إغلاق</button>
       </div>
       {selected.instructions && <p>{selected.instructions}</p>}
+      {selected.attachment_path && <button className="button secondary" type="button" onClick={() => void openPrivateFile(selected.attachment_path!)}>
+        عرض ملف التعليمات: {selected.attachment_file_name ?? "ملف"}
+      </button>}
       {submission && <div className="learn-feedback">
         <strong>{submissionStatusLabels[submission.status]}</strong>
         <p className="data-note">سُلّم في {formatDate(submission.submitted_at, true)}</p>
@@ -324,6 +343,9 @@ export function HomeworkView({ scope, seenAt }: { scope: LearningScope; seenAt: 
           {submission.feedback && <p className="muted">ملاحظات المعلم: {submission.feedback}</p>}
         </>}
         {submission.content && <p className="learn-answer">{submission.content}</p>}
+        {submission.submission_path && <button className="button secondary" type="button" onClick={() => void openPrivateFile(submission.submission_path!)}>
+          عرض ملف التسليم: {submission.submission_file_name ?? "ملف"}
+        </button>}
       </div>}
 
       {!canSubmit && <p className="notice">حساب ولي الأمر للقراءة فقط؛ لا يمكن تسليم الواجب من هذا الحساب.</p>}
@@ -333,17 +355,21 @@ export function HomeworkView({ scope, seenAt }: { scope: LearningScope; seenAt: 
           <textarea
             id="homework-answer"
             value={content}
-            maxLength={500}
+            maxLength={2000}
             rows={6}
-            placeholder="اكتب إجابتك هنا (١٠ أحرف على الأقل)..."
+            placeholder="اكتب إجابتك هنا (١٠ أحرف على الأقل عند عدم إرفاق ملف)..."
             onChange={(event) => setContent(event.target.value)}
           />
         </label>
+        <label>ملف التسليم اختياري
+          <input key={fileInputKey} type="file" accept={homeworkFileAccept} onChange={(event) => setSubmissionFile(event.target.files?.[0] ?? null)} />
+          <small className="data-note">{submissionFile?.name ?? "PDF أو Word أو Excel أو صورة · حتى ٢٠ ميجابايت"}</small>
+        </label>
         <div className="actions">
-          <button className="button primary" type="button" disabled={saving || content.trim().length < 10} onClick={() => void handleSubmit()}>
+          <button className="button primary" type="button" disabled={saving || (!submissionFile && content.trim().length < 10)} onClick={() => void handleSubmit()}>
             {saving ? "جارٍ التسليم..." : submission ? "إعادة التسليم" : "تسليم الواجب"}
           </button>
-          <span className="data-note">{content.trim().length} / 500 حرف</span>
+          <span className="data-note">{content.trim().length} / ٢٠٠٠ حرف</span>
         </div>
       </div>}
 

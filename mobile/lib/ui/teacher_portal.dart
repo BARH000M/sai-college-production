@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'components.dart';
+import '../data/homework_files.dart';
 import 'live_courses.dart';
 
 class TeacherClassData {
@@ -62,7 +64,9 @@ Future<List<TeacherClassData>> loadTeacherClasses() async {
       ? <Map<String, dynamic>>[]
       : await client
             .from('learning_homework')
-            .select('id,course_id,title,due_at,max_score')
+            .select(
+              'id,course_id,title,instructions,due_at,max_score,is_published,attachment_path,attachment_file_name',
+            )
             .inFilter('course_id', courseIds)
             .order('due_at');
   final homeworkIds = homework.map((row) => row['id'] as String).toList();
@@ -79,7 +83,9 @@ Future<List<TeacherClassData>> loadTeacherClasses() async {
       ? <Map<String, dynamic>>[]
       : await client
             .from('learning_homework_submissions')
-            .select('id,homework_id,student_id,status,content,score,feedback')
+            .select(
+              'id,homework_id,student_id,status,content,score,feedback,submitted_at,submission_path,submission_file_name',
+            )
             .inFilter('homework_id', homeworkIds)
             .inFilter('student_id', studentIds);
   return mapTeacherClasses(
@@ -198,14 +204,376 @@ class _TeacherPortalState extends State<TeacherPortal> {
   );
 }
 
-class TeacherClassPage extends StatelessWidget {
+class _HomeworkDraft {
+  const _HomeworkDraft({
+    required this.courseId,
+    required this.title,
+    required this.instructions,
+    required this.dueAt,
+    required this.maxScore,
+    required this.isPublished,
+    this.attachment,
+  });
+  final String courseId;
+  final String title;
+  final String instructions;
+  final DateTime dueAt;
+  final int maxScore;
+  final bool isPublished;
+  final PlatformFile? attachment;
+}
+
+class _HomeworkGrade {
+  const _HomeworkGrade(this.score, this.feedback);
+  final num score;
+  final String feedback;
+}
+
+class TeacherClassPage extends StatefulWidget {
   const TeacherClassPage({super.key, required this.data});
   final TeacherClassData data;
+
+  @override
+  State<TeacherClassPage> createState() => _TeacherClassPageState();
+}
+
+class _TeacherClassPageState extends State<TeacherClassPage> {
+  late TeacherClassData data = widget.data;
+  bool busy = false;
+
+  void _message(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _refresh() async {
+    final loaded = await loadTeacherClasses();
+    final refreshed = loaded.where((item) => item.row['id'] == data.row['id']);
+    if (refreshed.isEmpty) throw StateError('تعذر إعادة تحميل بيانات الشعبة.');
+    if (mounted) setState(() => data = refreshed.first);
+  }
+
+  Future<void> _createHomework() async {
+    if (busy || data.courses.isEmpty) return;
+    final title = TextEditingController();
+    final instructions = TextEditingController();
+    final score = TextEditingController(text: '100');
+    var courseId = data.courses.first['id'] as String;
+    var dueAt = DateTime.now().add(const Duration(days: 7));
+    var isPublished = true;
+    PlatformFile? attachment;
+
+    final draft = await showDialog<_HomeworkDraft>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, update) => AlertDialog(
+          title: const Text('إنشاء واجب'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: courseId,
+                  decoration: const InputDecoration(labelText: 'المقرر'),
+                  items: [
+                    for (final course in data.courses)
+                      DropdownMenuItem(
+                        value: course['id'] as String,
+                        child: Text(
+                          '${course['title']}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) update(() => courseId = value);
+                  },
+                ),
+                TextField(
+                  controller: title,
+                  decoration: const InputDecoration(labelText: 'عنوان الواجب'),
+                ),
+                TextField(
+                  controller: instructions,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'التعليمات'),
+                ),
+                TextField(
+                  controller: score,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'الدرجة العظمى'),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'موعد التسليم: ${dueAt.toLocal().toString().substring(0, 16)}',
+                  ),
+                  trailing: const Icon(Icons.calendar_month),
+                  onTap: () async {
+                    final selected = await showDatePicker(
+                      context: dialogContext,
+                      initialDate: dueAt,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 730)),
+                    );
+                    if (selected != null) {
+                      update(() {
+                        dueAt = DateTime(
+                          selected.year,
+                          selected.month,
+                          selected.day,
+                          23,
+                          59,
+                        );
+                      });
+                    }
+                  },
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('نشر للطلاب'),
+                  value: isPublished,
+                  onChanged: (value) {
+                    if (value != null) update(() => isPublished = value);
+                  },
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final picked = await pickHomeworkFile();
+                      if (picked != null) update(() => attachment = picked);
+                    } catch (error) {
+                      _message('تعذر اختيار الملف: $error');
+                    }
+                  },
+                  icon: const Icon(Icons.attach_file),
+                  label: Text(attachment?.name ?? 'ملف تعليمات اختياري'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final parsedScore = int.tryParse(score.text.trim());
+                if (title.text.trim().length < 4 ||
+                    instructions.text.trim().length > 500 ||
+                    parsedScore == null ||
+                    parsedScore < 1 ||
+                    parsedScore > 1000) {
+                  _message('تحقق من العنوان والتعليمات والدرجة (١–١٠٠٠).');
+                  return;
+                }
+                Navigator.pop(
+                  dialogContext,
+                  _HomeworkDraft(
+                    courseId: courseId,
+                    title: title.text.trim(),
+                    instructions: instructions.text.trim(),
+                    dueAt: dueAt,
+                    maxScore: parsedScore,
+                    isPublished: isPublished,
+                    attachment: attachment,
+                  ),
+                );
+              },
+              child: const Text('حفظ الواجب'),
+            ),
+          ],
+        ),
+      ),
+    );
+    title.dispose();
+    instructions.dispose();
+    score.dispose();
+    if (draft == null || !mounted) return;
+    setState(() => busy = true);
+    String? createdId;
+    try {
+      final client = Supabase.instance.client;
+      final last = await client
+          .from('learning_homework')
+          .select('position')
+          .eq('course_id', draft.courseId)
+          .order('position', ascending: false)
+          .limit(1);
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) throw StateError('انتهت الجلسة. سجّل الدخول مجدداً.');
+      final inserted = await client
+          .from('learning_homework')
+          .insert({
+            'course_id': draft.courseId,
+            'title': draft.title,
+            'instructions': draft.instructions.isEmpty
+                ? null
+                : draft.instructions,
+            'due_at': draft.dueAt.toUtc().toIso8601String(),
+            'max_score': draft.maxScore,
+            'position':
+                ((last.firstOrNull?['position'] as num?)?.toInt() ?? 0) + 1,
+            'is_published': draft.isPublished,
+            'created_by': userId,
+          })
+          .select('id')
+          .single();
+      createdId = inserted['id'] as String;
+      if (draft.attachment != null) {
+        final path = await uploadHomeworkFile(
+          '$createdId/instructions',
+          draft.attachment!,
+        );
+        await client
+            .from('learning_homework')
+            .update({
+              'attachment_path': path,
+              'attachment_file_name': draft.attachment!.name,
+            })
+            .eq('id', createdId);
+      }
+      await _refresh();
+      _message('تم حفظ الواجب في قاعدة البيانات المشتركة.');
+    } catch (error) {
+      if (createdId != null) {
+        var refreshFailure = '';
+        try {
+          await _refresh();
+        } catch (refreshError) {
+          refreshFailure = ' كما تعذر تحديث القائمة: $refreshError';
+        }
+        _message(
+          'حُفظ الواجب، لكن تعذر ربط ملف التعليمات: $error$refreshFailure',
+        );
+      } else {
+        _message('تعذر إنشاء الواجب: $error');
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> _gradeSubmission(
+    Map<String, dynamic> homework,
+    Map<String, dynamic> submission,
+  ) async {
+    if (busy) return;
+    final score = TextEditingController(
+      text: submission['score']?.toString() ?? '',
+    );
+    final feedback = TextEditingController(
+      text: submission['feedback']?.toString() ?? '',
+    );
+    final draft = await showDialog<_HomeworkGrade>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تصحيح الواجب'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: score,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'الدرجة من ${homework['max_score']}',
+              ),
+            ),
+            TextField(
+              controller: feedback,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'ملاحظات للطالب'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = num.tryParse(score.text.trim());
+              final max = (homework['max_score'] as num?)?.toDouble() ?? 0;
+              if (parsed == null || parsed < 0 || parsed > max) {
+                _message('أدخل درجة بين صفر و$max.');
+                return;
+              }
+              Navigator.pop(
+                dialogContext,
+                _HomeworkGrade(parsed, feedback.text.trim()),
+              );
+            },
+            child: const Text('حفظ الدرجة'),
+          ),
+        ],
+      ),
+    );
+    score.dispose();
+    feedback.dispose();
+    if (draft == null || !mounted) return;
+    setState(() => busy = true);
+    try {
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) throw StateError('انتهت الجلسة. سجّل الدخول مجدداً.');
+      final saved = await client
+          .from('learning_homework_submissions')
+          .update({
+            'status': 'graded',
+            'score': draft.score,
+            'feedback': draft.feedback.isEmpty ? null : draft.feedback,
+            'graded_by': userId,
+            'graded_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', submission['id'])
+          .select('id')
+          .maybeSingle();
+      if (saved == null) {
+        throw StateError('لم تُحفظ الدرجة؛ تحقق من صلاحيات المقرر.');
+      }
+      await _refresh();
+      _message('تم حفظ الدرجة والملاحظات.');
+    } catch (error) {
+      _message('تعذر حفظ الدرجة: $error');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> _openFile(String path) async {
+    try {
+      final url = await homeworkSignedUrl(path);
+      if (!await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      )) {
+        throw StateError('تعذر فتح الملف على هذا الجهاز.');
+      }
+    } catch (error) {
+      _message('تعذر فتح الملف: $error');
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       backgroundColor: darkRed,
       title: Text('${data.row['name']}'),
+      actions: [
+        if (busy)
+          const Padding(
+            padding: EdgeInsets.all(14),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(),
+            ),
+          ),
+      ],
     ),
     body: ListView(
       padding: const EdgeInsets.all(14),
@@ -234,8 +602,12 @@ class TeacherClassPage extends StatelessWidget {
           SaiCard(
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) =>
-                    LiveCourseLessons(course: course, canTrack: false),
+                builder: (_) => LiveCourseLessons(
+                  course: course,
+                  canTrack: false,
+                  canManageAssessments: true,
+                  canViewAssessments: true,
+                ),
               ),
             ),
             child: ListTile(
@@ -243,7 +615,16 @@ class TeacherClassPage extends StatelessWidget {
               trailing: const Icon(Icons.chevron_left),
             ),
           ),
-        const SectionHeading('الواجبات والتسليمات'),
+        Row(
+          children: [
+            const Expanded(child: SectionHeading('الواجبات والتسليمات')),
+            IconButton(
+              onPressed: busy || data.courses.isEmpty ? null : _createHomework,
+              tooltip: 'إنشاء واجب',
+              icon: const Icon(Icons.add_task),
+            ),
+          ],
+        ),
         if (data.homework.isEmpty) const EmptyPanel('لا توجد واجبات متاحة.'),
         for (final homework in data.homework)
           SaiCard(
@@ -256,18 +637,42 @@ class TeacherClassPage extends StatelessWidget {
                 ))
                   ListTile(
                     title: Text(
-                      '${data.students.where((s) => s['id'] == submission['student_id']).first['full_name']} · ${submission['status']}',
+                      '${data.students.where((s) => s['id'] == submission['student_id']).firstOrNull?['full_name'] ?? 'طالب'} · ${submission['status']}',
                     ),
                     subtitle: Text(
                       '${submission['content'] ?? 'لا توجد إجابة نصية'}'
                       '${submission['score'] == null ? '' : '\n${submission['score']} / ${homework['max_score']}'}'
                       '${submission['feedback'] == null ? '' : '\n${submission['feedback']}'}',
                     ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (choice) {
+                        if (choice == 'grade') {
+                          _gradeSubmission(homework, submission);
+                        }
+                        if (choice == 'file' &&
+                            submission['submission_path'] is String) {
+                          _openFile(submission['submission_path'] as String);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        if (submission['submission_path'] is String)
+                          PopupMenuItem(
+                            value: 'file',
+                            child: Text(
+                              'عرض ${submission['submission_file_name'] ?? 'الملف'}',
+                            ),
+                          ),
+                        if (submission['status'] != 'graded')
+                          const PopupMenuItem(
+                            value: 'grade',
+                            child: Text('تصحيح'),
+                          ),
+                      ],
+                    ),
                   ),
               ],
             ),
           ),
-        const Text('مراجعة الدرجات متاحة عبر بوابة الويب وفق صلاحيات الخادم.'),
         const SectionHeading('جلسات الحضور'),
         if (data.sessions.isEmpty)
           const EmptyPanel('لا توجد جلسات حضور متاحة.'),

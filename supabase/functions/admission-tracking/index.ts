@@ -1,4 +1,5 @@
 import { trustedClientIp } from "../_shared/client-ip.ts";
+import { mutationGateOpen } from "../_shared/mutation-gate.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 
 const cors = {
@@ -60,6 +61,10 @@ Deno.serve(async (req) => {
 
   const clientKey = await rateKey(ip, serviceKey);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  if (!await mutationGateOpen(admin)) {
+    return json({ ok: false, code: "MAINTENANCE" }, 503);
+  }
+
   const { data: allowed, error: limitError } = await admin.rpc("admissions_public_rate_limit", {
     p_client_key: clientKey,
     p_scope: mode === "submit" ? "submit" : "track",

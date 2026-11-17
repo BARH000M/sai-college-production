@@ -1,4 +1,5 @@
 import { handleManageRoles } from "../_shared/role-management-handler.ts";
+import { mutationGateOpen } from "../_shared/mutation-gate.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.0';
 
 const corsHeaders = {
@@ -103,6 +104,10 @@ Deno.serve(async (req: Request) => {
 
   /* Public: website application becomes a real admissions record */
   if (action === 'submit-application') {
+    if (!await mutationGateOpen(admin)) {
+      return json({ error: 'maintenance', message: 'Admissions are temporarily unavailable.' }, 503);
+    }
+
     const fullName = cleanString(payload.fullName, 120);
     const guardianName = cleanString(payload.guardianName, 120);
     const phone = cleanString(payload.phone, 40);

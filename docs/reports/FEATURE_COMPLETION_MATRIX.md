@@ -1,18 +1,24 @@
 # Feature completion matrix
-See `docs/audits/FEATURE_INVENTORY.md` for 20 tracked features and evidence. No multi-role workflow is marked COMPLETE because a current 9-role end-to-end run was not available.
 
-| Phase | Status | Evidence | Exit condition |
-|---|---|---|---|
-| 1 Audit | PARTIAL | GitHub tree, live DB metadata, local logs | all baseline commands and environment inventory |
-| 2 Design | PARTIAL | Cairo/Noto assets, additive CSS patch | responsive screenshots + accessibility review |
-| 3 Database | PARTIAL | 47 RLS tables, migration drift | migrations reconciled, positive/negative tests |
-| 3C Shared identity and profile | LOCAL COMPLETE | Main-only web/mobile/MCP config; `web/tests/profile-contact.test.cjs`, `mobile/test/profile_contact_test.dart`, `supabase/tests/profile_contact_behavior.sql` (9-role own-contact, immutable identity/email/time, anonymous denial); 91 web + 53 Flutter tests pass 2026-11-17 | approved deployment of `supabase/deployment/phase3c-main/001_own_contact_validation.sql` proposal to Main |
-| 4A Examinations and results (first workflow) | LOCAL COMPLETE | Additive proposal `supabase/deployment/phase4a-examinations/001_examinations.sql` (exams + exam_results, draft→marks_entry→review→published state machine, grade bands, RLS); isolated-cluster behavior test `supabase/tests/examinations_behavior.sql` PASS; web `src/portal/pages/Examinations.tsx` + printable sheets; Flutter `mobile/lib/ui/exams_screen.dart`; 98 web + 58 Flutter tests, lint, type-check, analyze pass 2026-11-17 | approved deployment of the 001 proposal to Main, then hosted acceptance run |
-| 4 Lesson 101 | MISSING | no 101 candidate or media | approved content + end-to-end checkpoint/resume |
-| 5 Learning engines | PARTIAL/NOT VERIFIED | course/vocabulary models | real provider and engine tests |
-| 6 Nine roles | PARTIAL | role enum/nav exists; 9-role SQL behavior test for profiles own-contact | complete 9-role user-journey matrix |
-| 7 Security | PARTIAL | Supabase advisors WARN; profile contact trigger validates name/phone/locale server-side (proposal) | zero critical unresolved security findings |
-| 8 Automation | PARTIAL | mobile-ci and web/tests; `tests/main-integration.test.mjs` added to web-ci push/PR paths | web/mobile/E2E/database CI passing |
-| 9 Deployment | BLOCKED | no Hostinger write credentials, GitHub 403 | authorized reviewed deployment |
+Status is separated by layer; local implementation or a passing isolated test
+does not imply production deployment or live acceptance. Main was inspected
+read-only on 17 November 2026. Its public catalog contained 47 RLS-enabled
+tables; no proposed examination tables were present. The deployment/recovery
+decision and pinned candidate manifest are in
+[`PRODUCTION_DEPLOYMENT_STATUS.md`](./PRODUCTION_DEPLOYMENT_STATUS.md).
 
-Phase 3C note: completion is evidenced locally only. The SQL in `supabase/deployment/phase3c-main/` is an additive proposal and has NOT been executed against Main; no production migration is approved.
+| Phase / feature | Database contract | React web | Flutter mobile | Automated tests / validation | GitHub | Production deploy | Authenticated live acceptance / exit |
+|---|---|---|---|---|---|---|---|
+| 1 Audit and baseline | PARTIAL; catalog and migration history inspected, not fully reconciled | PARTIAL | PARTIAL | No complete nine-role end-to-end baseline | `main` at `0737f84`; dirty worktree | Not applicable | NOT COMPLETE; full baseline evidence required |
+| 2 Design and accessibility | N/A | PARTIAL | PARTIAL | Responsive/accessibility review incomplete | Existing source on `main`; no release commit for current dirty work | Not deployed as a new release | NOT COMPLETE; approved visual/accessibility evidence required |
+| 3 Core database foundation | PARTIAL; Main has deployed legacy contracts and documented migration drift | Existing features | Existing features | Read-only catalog checks only in this preflight | Local `main` matches `origin/main` at `0737f84`; preserve dirty files | Existing contracts only; no new deployment | NOT CERTIFIED; complete RLS and nine-role scenarios remain |
+| 3B Role management, teacher assignment, verified onboarding | Reviewed additive package exists; required atomic RPCs and write lockdown absent on Main | Locally implemented against proposed RPC contracts | Existing onboarding/account flows; live contract not verified | Local package report: web/type/lint, 88 web tests, 7 Deno tests and isolated PostgreSQL behavior passed; no hosted authorization run | Package is present on `main`; Phase 4B and other local edits remain uncommitted | NOT DEPLOYED; hosted legacy Edge versions remain active | BLOCKED by recovery, global write hold, owner approval and coordinated cutover |
+| 3C Shared profile and contact editing | Additive own-contact validation proposal absent on Main | Implemented locally | Implemented locally | Previously reported 91 web, 3 integration and 53 Flutter tests passed; not rerun in this preflight | `87bfc29` reported as implementation commit; current `main` head is `0737f84` | NOT DEPLOYED | NOT LIVE-VERIFIED; requires approved SQL and cross-client acceptance |
+| 4A Examinations and results | Additive `exams`/`exam_results` proposal absent on Main; public catalog has no exam tables | Implemented locally, including print view | Implemented locally | Previously reported isolated SQL, 98 web and 58 Flutter tests, lint, type-check and analysis passed; not rerun in this preflight | `0737f84` implementation commit | NOT DEPLOYED | NOT LIVE-VERIFIED; requires approved SQL and role/family acceptance |
+| 4B Assessments and homework | Existing legacy homework tables are present; assessment-specific additive proposal and tests are local/uncommitted | Assessment and homework changes in progress; focused homework API tests previously passed | Homework/file and assessment changes in progress | Isolated assessment SQL behavior test and 7 focused web tests passed earlier. Web type-check/ESLint after the last fix and Flutter analysis/tests remain unverified | Uncommitted work; preserve and do not stage as part of Phase 7-R | NOT DEPLOYED | PAUSED / INCOMPLETE; finish validation and recovery/deployment gates first |
+| 4 Lesson 101 and 5 Learning engines | PARTIAL; existing learning tables, full lesson/media completion contract not certified | PARTIAL | PARTIAL | Provider, authentic-media, checkpoint/resume and sync tests absent | Existing code; no completion commit claimed | Existing partial contracts only | NOT COMPLETE |
+| 6 Nine-role authorization and security | PARTIAL; Main public tables inspected with RLS enabled; required new contracts absent | Role/navigation support exists; full permission parity unverified | Role/navigation support exists; full permission parity unverified | Some local isolated tests; no current all-nine-role live matrix | Existing `main`; no new release commit | NOT DEPLOYED for proposed contracts | NOT CERTIFIED; require positive/negative role, branch and account isolation tests |
+| 7 Production deployment and acceptance | Main project is active; 16 migration records observed; no new writes; recovery restore is partial | Website responds over HTTPS in prior preflight; build identity/authenticated behavior unverified | No APK/AAB or device acceptance in this preflight | No current authenticated web/mobile production tests | `main` synchronized; current worktree dirty; CI workflows only, no deploy workflow detected | NO-GO; nothing deployed in this task | BLOCKED by recovery proof, enforceable hold, explicit approval and live acceptance |
+
+No phase is marked live-complete from a schema listing, navigation item or local
+test alone. All deployment proposals remain unapproved and unexecuted.

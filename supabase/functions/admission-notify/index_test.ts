@@ -14,6 +14,8 @@ Deno.test("status email excludes untrusted previous status and server credential
   const oldEnv = Object.fromEntries(Object.keys(env).map((key) => [key, Deno.env.get(key)]));
   let handler: ((request: Request) => Promise<Response>) | undefined;
   let emailHtml = "";
+  let emailCalls = 0;
+  let maintenance = false;
   try {
     for (const [key, value] of Object.entries(env)) Deno.env.set(key, value);
     Object.defineProperty(Deno, "serve", {
@@ -22,6 +24,11 @@ Deno.test("status email excludes untrusted previous status and server credential
     });
     globalThis.fetch = async (input, init) => {
       const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith("/rpc/sai_assert_mutations_enabled")) {
+        return maintenance
+          ? Response.json({ code: "55000", message: "maintenance_mode" }, { status: 400 })
+          : Response.json(null);
+      }
       if (url.endsWith("/rpc/sai_admission_status_email_context")) {
         return Response.json([{
           application_no: "ADM-1234", applicant_full_name: "Applicant", email: "applicant@example.test",
@@ -32,6 +39,7 @@ Deno.test("status email excludes untrusted previous status and server credential
       if (url === "https://api.resend.com/emails") {
         const body = JSON.parse(String(init?.body)) as { html: string };
         emailHtml = body.html;
+        emailCalls += 1;
         return Response.json({ id: "local-email" });
       }
       throw new Error(`Unexpected mock request: ${url}`);
@@ -58,6 +66,14 @@ Deno.test("status email excludes untrusted previous status and server credential
     assertEquals(await untrusted.json(), { ok: false, reason: "SERVICE_UNAVAILABLE" });
     assert(!body.includes(env.SUPABASE_SERVICE_ROLE_KEY));
     assert(!emailHtml.includes(env.SUPABASE_SERVICE_ROLE_KEY));
+    maintenance = true;
+    const held = await handler(new Request("https://local-test.invalid", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer local-user-token" },
+      body: JSON.stringify({ mode: "status_update", enquiryId: "12345678-1234-1234-1234-123456789abc" }),
+    }));
+    assertEquals(held.status, 503);
+    assertEquals(emailCalls, 1);
   } finally {
     Object.defineProperty(Deno, "serve", { configurable: true, value: originalServe });
     globalThis.fetch = originalFetch;

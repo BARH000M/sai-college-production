@@ -24,6 +24,7 @@ Deno.test("legacy role routes use the modern confirmed, scoped and atomic contra
         return Response.json(u.searchParams.get("select") === "role"
           ? (single ? (allowed ? { role: "super_admin" } : null) : (allowed ? [{ role: "super_admin" }] : [])) : []);
       }
+      if (u.pathname === "/rest/v1/rpc/sai_assert_mutations_enabled") return Response.json(null);
       if (u.pathname === "/rest/v1/profiles") return Response.json([]);
       if (u.pathname === "/rest/v1/rpc/sai_manage_role_assignment") {
         const body = await req.json(); calls.push(body);

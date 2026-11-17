@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  formatDate, gradeSubmission, submissionStatusLabels,
+  formatDate, gradeSubmission, homeworkFileUrl, submissionStatusLabels,
   type LearningScope,
 } from "@/portal/lib/learning";
 import { exportHomeworkSubmissions } from "@/portal/lib/learningExport";
@@ -110,6 +110,15 @@ export function GradingPanel({
     }
   }
 
+  async function openSubmissionFile(path: string) {
+    try {
+      const url = await homeworkFileUrl(path);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (failure) {
+      setError(message(failure));
+    }
+  }
+
   function handleExport() {
     if (!active) return;
     try {
@@ -205,6 +214,11 @@ export function GradingPanel({
             ? submission.content
             : "لم يُرفق الطالب نصاً مع التسليم."}
         </p>
+        {submission.submission_path && <button
+          type="button"
+          className="button secondary"
+          onClick={() => void openSubmissionFile(submission.submission_path!)}
+        >عرض ملف الطالب: {submission.submission_file_name ?? "ملف مرفق"}</button>}
         <p className="data-note">سُلّم في {formatDate(submission.submitted_at, true)} · الدرجة العظمى {active.max_score}</p>
 
         <label>الدرجة

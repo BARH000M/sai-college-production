@@ -5,6 +5,7 @@
 // already received the announcement are never sent it twice.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mutationGateOpen } from "../_shared/mutation-gate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -190,6 +191,10 @@ Deno.serve(async (request: Request) => {
   );
 
   const candidates = [...recipientIds].filter((id) => !alreadySent.has(id)).slice(0, MAX_RECIPIENTS);
+
+  if (!await mutationGateOpen(db)) {
+    return failure(503, "maintenance", "تم إيقاف الإشعارات مؤقتاً للصيانة.");
+  }
 
   if (!candidates.length) {
     return json({

@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/access.dart';
+import '../data/homework_files.dart';
 import '../data/module_registry.dart';
 import '../data/repository.dart';
 import 'components.dart';
+
+class _HomeworkSubmissionDraft {
+  const _HomeworkSubmissionDraft({required this.content, this.file});
+  final String content;
+  final PlatformFile? file;
+}
 
 /// Live, RLS-protected Supabase-backed module. This never writes demo data.
 /// Existing operational modules stay read-only until their dedicated business
@@ -36,8 +45,8 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
         .limit(100);
   }
 
-  bool get canWrite => widget.spec.writable &&
-      Access.manages(widget.roles, widget.spec.page);
+  bool get canWrite =>
+      widget.spec.writable && Access.manages(widget.roles, widget.spec.page);
 
   Future<void> _edit([Map<String, dynamic>? current]) async {
     if (!canWrite || busy) return;
@@ -83,17 +92,28 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('تأكيد الحذف'),
-        content: Text('هل تريد حذف «${current['title']}» من قاعدة البيانات المشتركة؟'),
+        content: Text(
+          'هل تريد حذف «${current['title']}» من قاعدة البيانات المشتركة؟',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف'),
+          ),
         ],
       ),
     );
     if (accepted != true || !mounted) return;
     setState(() => busy = true);
     try {
-      await Supabase.instance.client.from(widget.spec.table).delete().eq('id', current['id']);
+      await Supabase.instance.client
+          .from(widget.spec.table)
+          .delete()
+          .eq('id', current['id']);
       if (mounted) _notice('تم تنفيذ الحذف وفق صلاحيات الخادم.');
     } on PostgrestException catch (e) {
       if (mounted) _notice('تعذر الحذف: ${e.message}');
@@ -104,54 +124,163 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
     }
   }
 
-  /// Submit real homework to the existing authoritative submissions table.
-  /// Auth and RLS decide whether the current student may submit/replace it.
+  /// Submit text and/or a private file to the shared homework contract.
   Future<void> _submitHomework(Map<String, dynamic> homework) async {
     final studentUserId = Supabase.instance.client.auth.currentUser?.id;
-    if (studentUserId == null) { _notice('يرجى تسجيل الدخول أولاً.'); return; }
+    if (studentUserId == null) {
+      _notice('يرجى تسجيل الدخول أولاً.');
+      return;
+    }
     try {
       final client = Supabase.instance.client;
-      final student = await client.from('students').select('id')
-          .eq('user_id', studentUserId).maybeSingle();
-      if (student == null) { _notice('لا يوجد ملف طالب مرتبط بالحساب.'); return; }
-      final existing = await client.from('learning_homework_submissions')
-          .select('id,content,status').eq('homework_id', homework['id'])
-          .eq('student_id', student['id']).maybeSingle();
+      final student = await client
+          .from('students')
+          .select('id')
+          .eq('user_id', studentUserId)
+          .maybeSingle();
+      if (student == null) {
+        _notice('لا يوجد ملف طالب مرتبط بالحساب.');
+        return;
+      }
+      final existing = await client
+          .from('learning_homework_submissions')
+          .select('id,content,status,submission_path,submission_file_name')
+          .eq('homework_id', homework['id'])
+          .eq('student_id', student['id'])
+          .maybeSingle();
       if (!mounted) return;
       if (existing != null && existing['status'] == 'graded') {
         _notice('تم اعتماد درجة هذا التسليم؛ راجع المعلم لأي تعديل.');
         return;
       }
-      final editor = TextEditingController(text: (existing?['content'] ?? '').toString());
+      final editor = TextEditingController(
+        text: (existing?['content'] ?? '').toString(),
+      );
       try {
-        final content = await showDialog<String>(
+        final draft = await showDialog<_HomeworkSubmissionDraft>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('تسليم الواجب'),
-            content: TextField(controller: editor, minLines: 3, maxLines: 7,
-              decoration: const InputDecoration(labelText: 'إجابتك')),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-              FilledButton(onPressed: () {
-                if (editor.text.trim().isNotEmpty) Navigator.pop(ctx, editor.text.trim());
-              }, child: const Text('تسليم')),
-            ],
-          ),
+          builder: (ctx) {
+            PlatformFile? selectedFile;
+            String? pickError;
+            return StatefulBuilder(
+              builder: (ctx, update) => AlertDialog(
+                title: const Text('تسليم الواجب'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: editor,
+                        minLines: 3,
+                        maxLines: 7,
+                        decoration: const InputDecoration(
+                          labelText: 'إجابتك (اختياري مع ملف)',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          try {
+                            final picked = await pickHomeworkFile();
+                            if (picked != null) {
+                              update(() {
+                                selectedFile = picked;
+                                pickError = null;
+                              });
+                            }
+                          } catch (error) {
+                            update(() => pickError = error.toString());
+                          }
+                        },
+                        icon: const Icon(Icons.attach_file),
+                        label: Text(
+                          selectedFile?.name ??
+                              (existing?['submission_file_name']?.toString() ??
+                                  'إرفاق ملف (حتى ٢٠ ميجابايت)'),
+                        ),
+                      ),
+                      if (pickError != null)
+                        Text(
+                          pickError!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('إلغاء'),
+                  ),
+                  FilledButton(
+                    onPressed:
+                        editor.text.trim().length >= 10 || selectedFile != null
+                        ? () => Navigator.pop(
+                            ctx,
+                            _HomeworkSubmissionDraft(
+                              content: editor.text.trim(),
+                              file: selectedFile,
+                            ),
+                          )
+                        : null,
+                    child: const Text('تسليم'),
+                  ),
+                ],
+              ),
+            );
+          },
         );
-        if (content == null || !mounted) return;
-        if (existing == null) {
-          await client.from('learning_homework_submissions').insert({
-            'homework_id': homework['id'], 'student_id': student['id'],
-            'content': content, 'status': 'submitted',
-          });
-        } else {
-          await client.from('learning_homework_submissions').update({
-            'content': content, 'status': 'submitted',
-          }).eq('id', existing['id']);
+        if (draft == null || !mounted) return;
+        final uploadedPath = draft.file == null
+            ? null
+            : await uploadHomeworkFile(
+                '${homework['id']}/submissions/${student['id']}',
+                draft.file!,
+              );
+        final mimeType = draft.file == null
+            ? null
+            : homeworkFileMimeType(draft.file!);
+        final payload = <String, dynamic>{
+          'homework_id': homework['id'],
+          'student_id': student['id'],
+          'content': draft.content.isEmpty ? null : draft.content,
+          'status': 'submitted',
+          'score': null,
+          'feedback': null,
+          'graded_at': null,
+          'graded_by': null,
+          if (uploadedPath != null) ...{
+            'submission_path': uploadedPath,
+            'submission_file_name': draft.file!.name,
+            'submission_mime_type': mimeType,
+          },
+        };
+        final saved = await client
+            .from('learning_homework_submissions')
+            .upsert(payload, onConflict: 'homework_id,student_id')
+            .select('id')
+            .maybeSingle();
+        if (saved == null) {
+          throw StateError('لم يُسجّل التسليم؛ تحقق من المهلة وصلاحية الحساب.');
         }
         if (mounted) _notice('تم تسليم الواجب إلى قاعدة البيانات المشتركة.');
       } finally {
         editor.dispose();
+      }
+
+      Future<void> openHomeworkFile(String path) async {
+        try {
+          final url = await homeworkSignedUrl(path);
+          if (!await launchUrl(
+            Uri.parse(url),
+            mode: LaunchMode.externalApplication,
+          )) {
+            throw StateError('تعذر فتح الملف على هذا الجهاز.');
+          }
+        } catch (error) {
+          if (mounted) _notice('تعذر فتح الملف: $error');
+        }
       }
     } on PostgrestException catch (e) {
       if (mounted) _notice('تعذر تسليم الواجب: ${e.message}');
@@ -164,10 +293,17 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
   Future<void> _issueLibraryItem(Map<String, dynamic> item) async {
     try {
       final client = Supabase.instance.client;
-      final students = await client.from('students').select('id,full_name')
-          .eq('branch_id', item['branch_id']).order('full_name').limit(250);
+      final students = await client
+          .from('students')
+          .select('id,full_name')
+          .eq('branch_id', item['branch_id'])
+          .order('full_name')
+          .limit(250);
       if (!mounted) return;
-      if (students.isEmpty) { _notice('لا توجد سجلات طلاب متاحة لهذا الفرع.'); return; }
+      if (students.isEmpty) {
+        _notice('لا توجد سجلات طلاب متاحة لهذا الفرع.');
+        return;
+      }
       final studentId = await showDialog<String>(
         context: context,
         builder: (ctx) => SimpleDialog(
@@ -177,21 +313,31 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
               height: 360,
               width: 360,
               child: ListView(
-                children: [for (final student in students)
-                  SimpleDialogOption(
-                    onPressed: () => Navigator.pop(ctx, student['id'] as String),
-                    child: Text('${student['full_name']}'),
-                  )],
+                children: [
+                  for (final student in students)
+                    SimpleDialogOption(
+                      onPressed: () =>
+                          Navigator.pop(ctx, student['id'] as String),
+                      child: Text('${student['full_name']}'),
+                    ),
+                ],
               ),
             ),
           ],
         ),
       );
       if (studentId == null || !mounted) return;
-      await client.rpc('sai_library_issue', params: {
-        'p_item': item['id'], 'p_student': studentId,
-        'p_due': DateTime.now().add(const Duration(days: 14)).toIso8601String().substring(0, 10),
-      });
+      await client.rpc(
+        'sai_library_issue',
+        params: {
+          'p_item': item['id'],
+          'p_student': studentId,
+          'p_due': DateTime.now()
+              .add(const Duration(days: 14))
+              .toIso8601String()
+              .substring(0, 10),
+        },
+      );
       if (mounted) _notice('تم تسجيل الإعارة في قاعدة البيانات المشتركة.');
     } on PostgrestException catch (e) {
       if (mounted) _notice('رفضت قاعدة البيانات الإعارة: ${e.message}');
@@ -203,21 +349,37 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
   Future<void> _returnLibraryItem(Map<String, dynamic> item) async {
     try {
       final client = Supabase.instance.client;
-      final loans = await client.from('library_loans')
-          .select('id,student_id,due_date').eq('item_id', item['id'])
-          .isFilter('returned_at', null).limit(100);
+      final loans = await client
+          .from('library_loans')
+          .select('id,student_id,due_date')
+          .eq('item_id', item['id'])
+          .isFilter('returned_at', null)
+          .limit(100);
       if (!mounted) return;
-      if (loans.isEmpty) { _notice('لا توجد إعارة مفتوحة لهذا الكتاب.'); return; }
+      if (loans.isEmpty) {
+        _notice('لا توجد إعارة مفتوحة لهذا الكتاب.');
+        return;
+      }
       final loanId = await showDialog<String>(
         context: context,
         builder: (ctx) => SimpleDialog(
           title: const Text('اختر الإعارة للإرجاع'),
           children: [
-            SizedBox(width: 360, height: 330, child: ListView(children: [
-              for (final loan in loans)
-                SimpleDialogOption(onPressed: () => Navigator.pop(ctx, loan['id'] as String),
-                  child: Text('الطالب: ${loan['student_id']} • موعد الإرجاع: ${loan['due_date']}')),
-            ])),
+            SizedBox(
+              width: 360,
+              height: 330,
+              child: ListView(
+                children: [
+                  for (final loan in loans)
+                    SimpleDialogOption(
+                      onPressed: () => Navigator.pop(ctx, loan['id'] as String),
+                      child: Text(
+                        'الطالب: ${loan['student_id']} • موعد الإرجاع: ${loan['due_date']}',
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       );
@@ -231,9 +393,9 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
     }
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
+  void _notice(String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) => Column(
@@ -242,7 +404,12 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
         child: Row(
           children: [
-            Expanded(child: Text(widget.spec.subtitle, style: const TextStyle(fontSize: 12))),
+            Expanded(
+              child: Text(
+                widget.spec.subtitle,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
             IconButton(
               tooltip: 'تحديث البيانات',
               onPressed: () => setState(_reload),
@@ -266,7 +433,10 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(22),
-                  child: EmptyPanel('هذه الوحدة لا يمكن تحميلها من قاعدة البيانات الآن. تحقق من وجود الجدول، ونشر ترحيل قاعدة البيانات، وصلاحيات RLS. لا تُعرض بيانات تجريبية مكان البيانات الحقيقية.', retry: () => setState(_reload)),
+                  child: EmptyPanel(
+                    'هذه الوحدة لا يمكن تحميلها من قاعدة البيانات الآن. تحقق من وجود الجدول، ونشر ترحيل قاعدة البيانات، وصلاحيات RLS. لا تُعرض بيانات تجريبية مكان البيانات الحقيقية.',
+                    retry: () => setState(_reload),
+                  ),
                 ),
               );
             }
@@ -275,7 +445,11 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
             }
             final results = snapshot.data!;
             if (results.isEmpty) {
-              return Center(child: EmptyPanel('لا توجد سجلات متاحة لحسابك في ${widget.spec.title}.'));
+              return Center(
+                child: EmptyPanel(
+                  'لا توجد سجلات متاحة لحسابك في ${widget.spec.title}.',
+                ),
+              );
             }
             return ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -283,14 +457,35 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
               itemBuilder: (context, i) {
                 final r = results[i];
                 final label = (r['title'] ?? r['name'] ?? 'سجل').toString();
-                final subtitle = [r['description'], r['instructions'], r['author'], r['category'], r['status']]
-                    .where((v) => v != null && v.toString().trim().isNotEmpty)
-                    .map((v) => v.toString()).take(2).join(' • ');
+                final subtitle =
+                    [
+                          r['description'],
+                          r['instructions'],
+                          r['author'],
+                          r['category'],
+                          r['status'],
+                        ]
+                        .where(
+                          (v) => v != null && v.toString().trim().isNotEmpty,
+                        )
+                        .map((v) => v.toString())
+                        .take(2)
+                        .join(' • ');
                 return SaiCard(
                   padding: 7,
                   child: ListTile(
-                    title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
-                    subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    title: Text(
+                      label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: subtitle.isEmpty
+                        ? null
+                        : Text(
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                     leading: const Icon(Icons.article_outlined, color: gold),
                     trailing: canWrite
                         ? PopupMenuButton<String>(
@@ -299,8 +494,14 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
                               if (choice == 'delete') _delete(r);
                             },
                             itemBuilder: (_) => const [
-                              PopupMenuItem(value: 'edit', child: Text('تعديل')),
-                              PopupMenuItem(value: 'delete', child: Text('حذف')),
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Text('تعديل'),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text('حذف'),
+                              ),
                             ],
                           )
                         : const Icon(Icons.chevron_left_rounded),
@@ -313,21 +514,59 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(label, style: Theme.of(context).textTheme.titleLarge),
+                              Text(
+                                label,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
                               const Divider(),
-                              if (widget.spec.page == PageId.assignments && widget.roles.contains(Role.student))
-                                FilledButton.icon(onPressed: () => _submitHomework(r),
-                                  icon: const Icon(Icons.upload_file), label: const Text('تسليم الواجب')),
-                              if (widget.spec.page == PageId.library && Access.manages(widget.roles, PageId.library)) ...[
-                                FilledButton.icon(onPressed: () => _issueLibraryItem(r),
-                                  icon: const Icon(Icons.bookmark_add_outlined), label: const Text('تسجيل إعارة')),
-                                OutlinedButton.icon(onPressed: () => _returnLibraryItem(r),
-                                  icon: const Icon(Icons.assignment_return_outlined), label: const Text('إرجاع نسخة')),
+                              if (widget.spec.page == PageId.assignments &&
+                                  r['attachment_path'] is String)
+                                OutlinedButton.icon(
+                                  onPressed: () => _openHomeworkFile(
+                                    r['attachment_path'] as String,
+                                  ),
+                                  icon: const Icon(Icons.download_outlined),
+                                  label: Text(
+                                    'ملف التعليمات: ${r['attachment_file_name'] ?? 'عرض'}',
+                                  ),
+                                ),
+                              if (widget.spec.page == PageId.assignments &&
+                                  widget.roles.contains(Role.student))
+                                FilledButton.icon(
+                                  onPressed: () => _submitHomework(r),
+                                  icon: const Icon(Icons.upload_file),
+                                  label: const Text('تسليم الواجب'),
+                                ),
+                              if (widget.spec.page == PageId.library &&
+                                  Access.manages(
+                                    widget.roles,
+                                    PageId.library,
+                                  )) ...[
+                                FilledButton.icon(
+                                  onPressed: () => _issueLibraryItem(r),
+                                  icon: const Icon(Icons.bookmark_add_outlined),
+                                  label: const Text('تسجيل إعارة'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () => _returnLibraryItem(r),
+                                  icon: const Icon(
+                                    Icons.assignment_return_outlined,
+                                  ),
+                                  label: const Text('إرجاع نسخة'),
+                                ),
                               ],
                               for (final item in r.entries)
-                                if (!['id', 'branch_id', 'created_by', 'updated_by'].contains(item.key) && item.value != null)
+                                if (![
+                                      'id',
+                                      'branch_id',
+                                      'created_by',
+                                      'updated_by',
+                                    ].contains(item.key) &&
+                                    item.value != null)
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 5),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 5,
+                                    ),
                                     child: Text('${item.key}: ${item.value}'),
                                   ),
                             ],
@@ -347,7 +586,11 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
 }
 
 class _ModuleEditor extends StatefulWidget {
-  const _ModuleEditor({required this.spec, this.existing, required this.branches});
+  const _ModuleEditor({
+    required this.spec,
+    this.existing,
+    required this.branches,
+  });
   final ModuleSpec spec;
   final Map<String, dynamic>? existing;
   final List<Map<String, dynamic>> branches;
@@ -367,25 +610,33 @@ class _ModuleEditorState extends State<_ModuleEditor> {
   void initState() {
     super.initState();
     title = TextEditingController(text: '${widget.existing?['title'] ?? ''}');
-    description = TextEditingController(text: '${widget.existing?['description'] ?? ''}');
+    description = TextEditingController(
+      text: '${widget.existing?['description'] ?? ''}',
+    );
     extra = {
       for (final field in widget.spec.fields)
         if (!field.boolean)
-        field.key: TextEditingController(text: '${widget.existing?[field.key] ?? ''}'),
+          field.key: TextEditingController(
+            text: '${widget.existing?[field.key] ?? ''}',
+          ),
     };
     booleanExtra = {
       for (final field in widget.spec.fields)
         if (field.boolean)
           field.key: (widget.existing?[field.key] as bool?) ?? false,
     };
-    if (widget.branches.length == 1) branchId = widget.branches.first['id'] as String;
+    if (widget.branches.length == 1) {
+      branchId = widget.branches.first['id'] as String;
+    }
   }
 
   @override
   void dispose() {
     title.dispose();
     description.dispose();
-    for (final c in extra.values) { c.dispose(); }
+    for (final c in extra.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -404,14 +655,18 @@ class _ModuleEditorState extends State<_ModuleEditor> {
       }
       final value = extra[field.key]!.text.trim();
       // An empty optional field means NULL, not the string "null".
-      payload[field.key] = value.isEmpty ? null : (field.numeric ? int.tryParse(value) : value);
+      payload[field.key] = value.isEmpty
+          ? null
+          : (field.numeric ? int.tryParse(value) : value);
     }
     Navigator.pop(context, payload);
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.existing == null ? 'إضافة ${widget.spec.title}' : 'تعديل السجل'),
+    title: Text(
+      widget.existing == null ? 'إضافة ${widget.spec.title}' : 'تعديل السجل',
+    ),
     content: SizedBox(
       width: 440,
       child: SingleChildScrollView(
@@ -425,7 +680,10 @@ class _ModuleEditorState extends State<_ModuleEditor> {
                   initialValue: branchId,
                   items: [
                     for (final b in widget.branches)
-                      DropdownMenuItem(value: b['id'] as String, child: Text('${b['name']}')),
+                      DropdownMenuItem(
+                        value: b['id'] as String,
+                        child: Text('${b['name']}'),
+                      ),
                   ],
                   onChanged: (value) => setState(() => branchId = value),
                   decoration: const InputDecoration(labelText: 'الفرع'),
@@ -435,7 +693,8 @@ class _ModuleEditorState extends State<_ModuleEditor> {
               TextFormField(
                 controller: title,
                 decoration: const InputDecoration(labelText: 'العنوان'),
-                validator: (v) => v == null || v.trim().isEmpty ? 'العنوان مطلوب' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'العنوان مطلوب' : null,
               ),
               const SizedBox(height: 10),
               TextFormField(
@@ -464,20 +723,34 @@ class _ModuleEditorState extends State<_ModuleEditor> {
                   TextFormField(
                     controller: extra[field.key],
                     decoration: InputDecoration(labelText: field.label),
-                    keyboardType: field.numeric ? TextInputType.number : TextInputType.text,
-                    validator: (value) => field.numeric && value != null && value.trim().isNotEmpty && (int.tryParse(value.trim()) == null || int.parse(value.trim()) < 0)
-                        ? 'أدخل عدداً صحيحاً غير سالب' : null,
+                    keyboardType: field.numeric
+                        ? TextInputType.number
+                        : TextInputType.text,
+                    validator: (value) =>
+                        field.numeric &&
+                            value != null &&
+                            value.trim().isNotEmpty &&
+                            (int.tryParse(value.trim()) == null ||
+                                int.parse(value.trim()) < 0)
+                        ? 'أدخل عدداً صحيحاً غير سالب'
+                        : null,
                   ),
               ],
               const SizedBox(height: 9),
-              const Text('العمليات تُحفظ في Supabase فوراً وتخضع لصلاحيات قاعدة البيانات.', style: TextStyle(fontSize: 11)),
+              const Text(
+                'العمليات تُحفظ في Supabase فوراً وتخضع لصلاحيات قاعدة البيانات.',
+                style: TextStyle(fontSize: 11),
+              ),
             ],
           ),
         ),
       ),
     ),
     actions: [
-      TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('إلغاء'),
+      ),
       FilledButton(onPressed: save, child: const Text('حفظ')),
     ],
   );
@@ -495,9 +768,17 @@ class _LiveReportsScreenState extends State<LiveReportsScreen> {
   Future<List<(String, int?)>> _load() async {
     final client = Supabase.instance.client;
     final result = <(String, int?)>[];
-    for (final entry in [('students', 'الطلاب'), ('classes', 'الصفوف'), ('learning_homework', 'الواجبات'), ('library_items', 'كتب المكتبة')]) {
+    for (final entry in [
+      ('students', 'الطلاب'),
+      ('classes', 'الصفوف'),
+      ('learning_homework', 'الواجبات'),
+      ('library_items', 'كتب المكتبة'),
+    ]) {
       try {
-        final response = await client.from(entry.$1).select('id').count(CountOption.exact);
+        final response = await client
+            .from(entry.$1)
+            .select('id')
+            .count(CountOption.exact);
         result.add((entry.$2, response.count));
       } catch (_) {
         result.add((entry.$2, null));
@@ -505,26 +786,41 @@ class _LiveReportsScreenState extends State<LiveReportsScreen> {
     }
     return result;
   }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<List<(String, int?)>>(
     future: future,
     builder: (context, snapshot) {
-      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           const SectionHeading('إحصاءات البيانات المتاحة لحسابك'),
-          const Text('تعرض الأعداد التي تسمح بها سياسات RLS، ولا تعتبر ميزاناً مالياً أو تقريراً إدارياً معتمداً.'),
+          const Text(
+            'تعرض الأعداد التي تسمح بها سياسات RLS، ولا تعتبر ميزاناً مالياً أو تقريراً إدارياً معتمداً.',
+          ),
           const SizedBox(height: 12),
           for (final item in snapshot.data!)
-            SaiCard(child: ListTile(
-              title: Text(item.$1),
-              trailing: Text(item.$2?.toString() ?? 'غير متاح', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: gold)),
-            )),
+            SaiCard(
+              child: ListTile(
+                title: Text(item.$1),
+                trailing: Text(
+                  item.$2?.toString() ?? 'غير متاح',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: gold,
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => setState(() => future = _load()),
-            icon: const Icon(Icons.refresh), label: const Text('تحديث التقرير'),
+            icon: const Icon(Icons.refresh),
+            label: const Text('تحديث التقرير'),
           ),
         ],
       );
@@ -533,11 +829,26 @@ class _LiveReportsScreenState extends State<LiveReportsScreen> {
 }
 
 const systemSettingCategories = <String>[
-  'الإعداد العام', 'إعداد الجلسة', 'الإشعارات', 'الرسائل القصيرة',
-  'واتساب', 'البريد الإلكتروني', 'طرق الدفع', 'الطباعة',
-  'إعداد CMS', 'صلاحيات الأدوار', 'استرجاع البيانات', 'اللغات',
-  'العملات', 'المستخدمون', 'الإضافات', 'الوحدات',
-  'الحقول المخصصة', 'التحقق', 'التحديثات', 'قائمة العناوين المحظورة',
+  'الإعداد العام',
+  'إعداد الجلسة',
+  'الإشعارات',
+  'الرسائل القصيرة',
+  'واتساب',
+  'البريد الإلكتروني',
+  'طرق الدفع',
+  'الطباعة',
+  'إعداد CMS',
+  'صلاحيات الأدوار',
+  'استرجاع البيانات',
+  'اللغات',
+  'العملات',
+  'المستخدمون',
+  'الإضافات',
+  'الوحدات',
+  'الحقول المخصصة',
+  'التحقق',
+  'التحديثات',
+  'قائمة العناوين المحظورة',
 ];
 
 class CollegeSettingsScreen extends StatelessWidget {
@@ -547,7 +858,9 @@ class CollegeSettingsScreen extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     children: [
       const SectionHeading('إعدادات نظام Yemen SAI'),
-      const Text('هذه قائمة إعدادات الإدارة. لا تُحفظ أسرار خدمات الدفع والبريد داخل تطبيق الهاتف. عمليات التهيئة الحساسة تتم من لوحة الويب الآمنة بعد اكتمال تكامل الخادم.'),
+      const Text(
+        'هذه قائمة إعدادات الإدارة. لا تُحفظ أسرار خدمات الدفع والبريد داخل تطبيق الهاتف. عمليات التهيئة الحساسة تتم من لوحة الويب الآمنة بعد اكتمال تكامل الخادم.',
+      ),
       const SizedBox(height: 14),
       for (final entry in systemSettingCategories)
         SaiCard(
@@ -555,7 +868,9 @@ class CollegeSettingsScreen extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.settings_outlined, color: gold),
             title: Text(entry),
-            subtitle: const Text('يلزم ربط إعدادات الخادم المخصصة لهذه الوظيفة'),
+            subtitle: const Text(
+              'يلزم ربط إعدادات الخادم المخصصة لهذه الوظيفة',
+            ),
           ),
         ),
     ],

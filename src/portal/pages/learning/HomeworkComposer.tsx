@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { createHomework, type LearningScope } from "@/portal/lib/learning";
+import {
+  createHomework, homeworkFileAccept, uploadHomeworkAttachment, type LearningScope,
+} from "@/portal/lib/learning";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -24,6 +26,8 @@ export function HomeworkComposer({
   const [instructions, setInstructions] = useState("");
   const [dueAt, setDueAt] = useState(defaultDue);
   const [maxScore, setMaxScore] = useState("100");
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachmentInputKey, setAttachmentInputKey] = useState(0);
   const [isPublished, setIsPublished] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +50,8 @@ export function HomeworkComposer({
     setDueAt(defaultDue());
     setMaxScore("100");
     setIsPublished(true);
+    setAttachment(null);
+    setAttachmentInputKey((key) => key + 1);
     setError(null);
   }
 
@@ -55,8 +61,9 @@ export function HomeworkComposer({
     setBusy(true);
     setError(null);
     setNotice(null);
+    let createdId = "";
     try {
-      await createHomework({
+      createdId = await createHomework({
         courseId: activeCourseId,
         title,
         instructions,
@@ -64,11 +71,18 @@ export function HomeworkComposer({
         maxScore: Number.isFinite(score) ? Math.round(score) : 0,
         isPublished,
       });
+      if (attachment) await uploadHomeworkAttachment(createdId, attachment);
       setNotice(`نُشر الواجب «${title.trim()}» ${isPublished ? "وظهر للطلاب" : "كمسودة غير منشورة"}.`);
       reset();
       onCreated();
     } catch (failure) {
-      setError(message(failure));
+      if (createdId) {
+        setNotice(`حُفظ الواجب «${title.trim()}»، لكن تعذر إرفاق الملف: ${message(failure)}`);
+        reset();
+        onCreated();
+      } else {
+        setError(message(failure));
+      }
     } finally {
       setBusy(false);
     }
@@ -127,6 +141,11 @@ export function HomeworkComposer({
           onChange={(event) => setInstructions(event.target.value)}
         />
         <small className="data-note">{instructions.trim().length} / 500 حرف</small>
+      </label>
+
+      <label>ملف تعليمات اختياري
+        <input key={attachmentInputKey} type="file" accept={homeworkFileAccept} onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
+        <small className="data-note">{attachment ? attachment.name : "PDF أو Word أو Excel أو صورة · حتى ٢٠ ميجابايت"}</small>
       </label>
 
       <div className="learn-form-row">

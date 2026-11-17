@@ -35,6 +35,7 @@ Deno.test("student linking verifies caller, branch and target and uses caller RP
         if (upstreamError) return Response.json({ message: env.SUPABASE_SERVICE_ROLE_KEY, code: "XX000" }, { status: 500 });
         return Response.json([{ role }]);
       }
+      if (url.pathname === "/rest/v1/rpc/sai_assert_mutations_enabled") return Response.json(null);
       if (url.pathname === "/rest/v1/students") {
         return Response.json({ id: "20000000-0000-4000-8000-000000000001", branch_id: branch, user_id: null, full_name: "Student" });
       }

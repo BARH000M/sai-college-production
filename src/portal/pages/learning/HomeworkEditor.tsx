@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
-  deleteHomework, updateHomework, type LearningHomework, type LearningScope,
+  deleteHomework, homeworkFileAccept, homeworkFileUrl, updateHomework,
+  uploadHomeworkAttachment, type LearningHomework, type LearningScope,
 } from "@/portal/lib/learning";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -28,6 +29,7 @@ export function HomeworkEditor({
   const [dueAt, setDueAt] = useState(toLocalInput(homework.due_at));
   const [maxScore, setMaxScore] = useState(String(homework.max_score));
   const [isPublished, setIsPublished] = useState(homework.is_published);
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [busy, setBusy] = useState<"save" | "delete" | "">("");
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -50,6 +52,8 @@ export function HomeworkEditor({
         maxScore: Number.isFinite(score) ? Math.round(score) : 0,
         isPublished,
       });
+      scope.reload();
+      if (attachment) await uploadHomeworkAttachment(homework.id, attachment);
       onDone(isPublished
         ? `حُفظ تعديل «${title.trim()}» وهو منشور للطلاب.`
         : `حُفظ تعديل «${title.trim()}» كمسودة مخفية عن الطلاب.`);
@@ -104,6 +108,19 @@ export function HomeworkEditor({
         />
         <small className="data-note">{instructions.trim().length} / 500 حرف</small>
       </label>
+
+      <label>ملف تعليمات اختياري
+        <input type="file" accept={homeworkFileAccept} onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
+        <small className="data-note">{attachment?.name ?? homework.attachment_file_name ?? "PDF أو Word أو Excel أو صورة · حتى ٢٠ ميجابايت"}</small>
+      </label>
+      {homework.attachment_path && <button className="button secondary" type="button" onClick={async () => {
+        try {
+          const url = await homeworkFileUrl(homework.attachment_path!);
+          window.open(url, "_blank", "noopener,noreferrer");
+        } catch (failure) {
+          setError(message(failure));
+        }
+      }}>عرض الملف المرفق</button>}
 
       <div className="learn-form-row">
         <label>موعد التسليم

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
+import { mutationGateOpen } from "../_shared/mutation-gate.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -82,6 +83,9 @@ Deno.serve(async (req) => {
   }
   const action = typeof body.action === "string" ? body.action : "list";
   if (action !== "list" && Deno.env.get("PHASE3B_MUTATIONS_DISABLED") === "true") {
+    return json({ ok: false, code: "maintenance", message: "ربط الحسابات متوقف مؤقتاً للصيانة." }, 503);
+  }
+  if (action !== "list" && !await mutationGateOpen(admin)) {
     return json({ ok: false, code: "maintenance", message: "ربط الحسابات متوقف مؤقتاً للصيانة." }, 503);
   }
 

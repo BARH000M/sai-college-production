@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../core/supabase.dart';
 import '../shell/app_shell.dart';
 import 'login_page.dart';
@@ -18,7 +16,7 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  late final StreamSubscription<AuthState> _sub;
+  late final StreamSubscription _sub;
   final RecoveryPendingSignOutStore _pendingStore =
       const PrefsRecoveryPendingSignOutStore();
   Profile? _profile;
