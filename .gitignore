@@ -49,6 +49,30 @@ mobile/APK-OUTPUT/
 
 # Local reconciliation evidence, browser sessions and isolated database clusters
 /.tmp-*/
+# Database archives and recovery evidence stay outside version control
+/database-backups/
+*.dump
+*.dump.partial
+*.backup
+*.sql.gz
+# Protected PostgreSQL connection files
+pgpass.conf
+.pgpass
+pg_service.conf
+.pg_service.conf
+# Browser sessions, captured traffic and test-run artifacts
+.playwright/
+.browser-profile/
+browser-profile/
+playwright/.auth/
+playwright-report/
+test-results/
+*.har
+storage-state*.json
+storageState*.json
+auth-state*.json
+# Local workspace safety copies
+/mobile-before-approved-*/
 # Captured Main DDL metadata used by the isolated replay; keep local only
 /supabase/tests/phase3b-main/main_baseline.sql
 # Accidental shell-output artifact (preserve locally)
