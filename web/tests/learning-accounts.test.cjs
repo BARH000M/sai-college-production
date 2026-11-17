@@ -23,6 +23,7 @@ test("staff account provisioning sends an invitation without a password", async 
     fullName: "Student",
     studentName: "Student",
     inviteSent: true,
+    roleActivationPending: true,
   };
   const api = await load("invite", {
     functions: {
@@ -74,4 +75,14 @@ test("account provisioning rejects an unconfirmed invitation response", async ()
     kind: "student",
     email: "student@example.test",
   }), /لم تؤكد الخدمة إرسال دعوة الحساب/);
+});
+
+test("teacher invitation omits passwords and requires pending access acknowledgement", async () => {
+  const calls = [];
+  const account = { userId: 'teacher', fullName: 'Teacher', email: 'teacher@example.test', className: 'Proposed', inviteSent: true, roleActivationPending: true };
+  const api = await load('teacher-invite', { functions: { invoke: async (...args) => { calls.push(args); return { data: { ok: true, account }, error: null }; } } });
+  assert.deepEqual(await api.provisionTeacherAccount({ fullName: 'Teacher', email: 'teacher@example.test', classId: 'class' }), account);
+  assert.equal('password' in calls[0][1].body, false);
+  const stale = await load('teacher-old-response', { functions: { invoke: async () => ({ data: { ok: true, account: { ...account, roleActivationPending: false } }, error: null }) } });
+  await assert.rejects(stale.provisionTeacherAccount({ fullName: 'Teacher', email: 'teacher@example.test', classId: 'class' }));
 });

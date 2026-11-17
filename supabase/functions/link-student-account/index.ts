@@ -35,16 +35,16 @@ Deno.serve(async (req) => {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!token) return json({ ok: false, message: "يلزم تسجيل الدخول." }, 401);
 
-  const authClient = createClient(url, anonKey, { auth: { persistSession: false } });
+  const authClient = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   const { data: callerData, error: callerError } = await authClient.auth.getUser(token);
   if (callerError || !callerData.user) {
     return json({ ok: false, message: "انتهت الجلسة؛ سجّل الدخول من جديد." }, 401);
   }
   const caller = callerData.user;
 
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   const callerClient = createClient(url, anonKey, {
-    auth: { persistSession: false },
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
 
@@ -81,6 +81,9 @@ Deno.serve(async (req) => {
     return json({ ok: false, message: "Invalid JSON request body" }, 400);
   }
   const action = typeof body.action === "string" ? body.action : "list";
+  if (action !== "list" && Deno.env.get("PHASE3B_MUTATIONS_DISABLED") === "true") {
+    return json({ ok: false, code: "maintenance", message: "ربط الحسابات متوقف مؤقتاً للصيانة." }, 503);
+  }
 
   if (action === "list") {
     const accounts: { id: string; email: string; fullName: string }[] = [];

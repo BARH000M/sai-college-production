@@ -31,7 +31,8 @@ test('column grants cover literal selects and filters of both services and exist
   let checked = 0;
   const missing = [];
   for (const fn of ['manage-roles','provision-learning-account','link-student-account']) {
-    const source = read(`supabase/functions/${fn}/index.ts`);
+    const source = read(`supabase/functions/${fn}/index.ts`)
+      + (fn === 'manage-roles' ? read('supabase/functions/_shared/role-management-handler.ts') : '');
     for (const [,table,chain] of source.matchAll(/\.from\("(\w+)"\)([^;]*?)(?=;|\.from\()/gs)) {
       const selected = [...chain.matchAll(/\.select\("([\w, ]+)"/g)].flatMap(m => m[1].split(',').map(c => c.trim()));
       const filtered = [...chain.matchAll(/\.(?:eq|neq|is|in|not|order)\("(\w+)"/g)].map(m => m[1]);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  loadTeacherOverview, provisionTeacherAccount, suggestPassword, suggestTeacherEmail,
-  type CreatedTeacher, type TeacherOverview,
+  loadTeacherOverview, provisionTeacherAccount, suggestTeacherEmail,
+  type InvitedTeacher, type TeacherOverview,
 } from "@/portal/lib/learningAccounts";
 import { TeacherAccountRow } from "@/portal/pages/roles/TeacherAccountRow";
 import { TeacherAssignmentSheet } from "@/portal/pages/roles/TeacherAssignmentSheet";
@@ -19,10 +19,9 @@ export function TeacherAccountPanel() {
   const [classId, setClassId] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [created, setCreated] = useState<CreatedTeacher | null>(null);
+  const [created, setCreated] = useState<InvitedTeacher | null>(null);
   const [copied, setCopied] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -47,14 +46,12 @@ export function TeacherAccountPanel() {
   function resetForm() {
     setFullName("");
     setEmail("");
-    setPassword("");
     setFormError(null);
   }
 
   function openForm(targetClassId: string) {
     resetForm();
     setClassId(targetClassId);
-    setPassword(suggestPassword());
     setCopied(false);
   }
 
@@ -68,17 +65,12 @@ export function TeacherAccountPanel() {
       setFormError("اختر الصف الذي سيدرّسه المعلم.");
       return;
     }
-    if (password.trim().length < 8) {
-      setFormError("كلمة المرور يجب ألا تقل عن ٨ أحرف.");
-      return;
-    }
     setBusy(true);
     setFormError(null);
     try {
       const account = await provisionTeacherAccount({
         fullName: fullName.trim(),
         email: email.trim(),
-        password: password.trim(),
         classId,
       });
       setCreated(account);
@@ -98,7 +90,7 @@ export function TeacherAccountPanel() {
       `الاسم: ${created.fullName}`,
       `الصف: ${created.className}`,
       `البريد: ${created.email}`,
-      `كلمة المرور: ${created.password}`,
+      "أكد البريد من الدعوة، ثم تطلب الإدارة منح دور المعلم ونطاق الفرع وإسناد الصف.",
     ].join("\n");
     try {
       await navigator.clipboard.writeText(payload);
@@ -155,8 +147,7 @@ export function TeacherAccountPanel() {
       <div>
         <h2>حسابات المعلمين</h2>
         <p className="data-note">
-          أنشئ حساب دخول حقيقي لمعلم وأسنده إلى صف. يحصل الحساب على دور المعلم وعضوية الفرع تلقائياً،
-          فيرى طلاب صفه وواجبات مقرراته ويصحح تسليماتهم من داخل البوابة.
+          أرسل دعوة للمعلم. بعد تأكيد بريده، امنحه دور المعلم ونطاق الفرع من قائمة الصلاحيات، ثم أسند الصف.
         </p>
       </div>
       <div className="actions">
@@ -176,16 +167,15 @@ export function TeacherAccountPanel() {
     />}
 
     {created && <div className="credential-box" role="status">
-      <strong>أُنشئ حساب المعلم بنجاح</strong>
+      <strong>أُرسلت دعوة المعلم؛ الصلاحيات والإسناد بانتظار التفعيل</strong>
       <p className="data-note">{created.fullName} · الصف {created.className}</p>
       <dl>
         <div><dt>البريد الإلكتروني</dt><dd dir="ltr">{created.email}</dd></div>
-        <div><dt>كلمة المرور</dt><dd dir="ltr">{created.password}</dd></div>
       </dl>
-      <p className="data-note">انسخ البيانات الآن وسلّمها للمعلم؛ لن تُعرض كلمة المرور مرة أخرى.</p>
+      <p className="data-note">يحدد المعلم كلمة مروره من الدعوة. تأكيد البريد لا يمنح دوراً أو عضوية فرع أو إسناد صف تلقائياً.</p>
       <div className="actions">
         <button className="button primary" type="button" onClick={() => void copyCredentials()}>
-          {copied ? "نُسخت البيانات" : "نسخ بيانات الدخول"}
+          {copied ? "نُسخت البيانات" : "نسخ تفاصيل الدعوة"}
         </button>
         <button className="button secondary" type="button" onClick={() => setCreated(null)}>إخفاء</button>
       </div>
@@ -206,8 +196,8 @@ export function TeacherAccountPanel() {
       <h3>إنشاء حساب معلم</h3>
       <p className="data-note">
         {selectedClass
-          ? `سيُسند الحساب إلى ${selectedClass.name} (${selectedClass.branchName ?? "فرع غير محدد"}).`
-          : "اختر صفاً ليُسند إليه المعلم الجديد."}
+          ? `الصف المقترح بعد تأكيد البريد ومنح الصلاحيات: ${selectedClass.name} (${selectedClass.branchName ?? "فرع غير محدد"}).`
+          : "اختر الصف المقترح للمعلم الجديد؛ الإسناد يتم لاحقاً بعد تأكيد البريد ومنح الصلاحيات."}
       </p>
       <div className="management-form">
         <label>الصف
@@ -233,12 +223,9 @@ export function TeacherAccountPanel() {
         <label>البريد الإلكتروني
           <input dir="ltr" type="email" value={email} disabled={busy} onChange={(event) => setEmail(event.target.value)} />
         </label>
-        <label>كلمة المرور المؤقتة
-          <input dir="ltr" value={password} disabled={busy} onChange={(event) => setPassword(event.target.value)} />
-        </label>
         <div className="actions">
           <button className="button primary" type="button" disabled={busy || !freeClasses.length} onClick={() => void submit()}>
-            {busy ? "جارٍ إنشاء الحساب..." : "إنشاء الحساب وإسناد الصف"}
+            {busy ? "جارٍ إرسال الدعوة..." : "إرسال دعوة المعلم"}
           </button>
           <button className="button secondary" type="button" disabled={busy} onClick={() => { resetForm(); setClassId(freeClasses[0]?.id ?? ""); }}>
             تفريغ النموذج

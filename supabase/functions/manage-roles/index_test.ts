@@ -27,7 +27,7 @@ Deno.test("role management enforces authorization, confirmations, branch scope, 
         return new Response(null, { headers: { "content-range": "0-2/3" } });
       }
       if (url.pathname === "/auth/v1/user") {
-        return Response.json({ id: "caller", aud: "authenticated", app_metadata: {}, user_metadata: {} });
+        return Response.json({ id: "caller", aud: "authenticated", email_confirmed_at: "2026-01-01", app_metadata: {}, user_metadata: {} });
       }
       if (url.pathname === "/rest/v1/user_roles" && url.searchParams.get("select") === "role") {
         return Response.json(superAdmin ? { role: "super_admin" } : null);

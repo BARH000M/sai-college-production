@@ -21,6 +21,7 @@ export type CreatedAccount = {
   fullName: string;
   studentName: string;
   inviteSent: boolean;
+  roleActivationPending: boolean;
 };
 
 type OverviewResponse = { ok?: boolean; students?: ProvisionStudent[]; message?: string };
@@ -50,7 +51,7 @@ export async function provisionLearningAccount(input: {
   parentName?: string;
 }): Promise<CreatedAccount> {
   const data = await invoke<CreateResponse>({ action: "create", ...input });
-  if (!data.account || data.account.inviteSent !== true) {
+  if (!data.account || data.account.inviteSent !== true || data.account.roleActivationPending !== true) {
     throw new Error("لم تؤكد الخدمة إرسال دعوة الحساب.");
   }
   return data.account;
@@ -114,6 +115,11 @@ export type CreatedTeacher = {
   emailReason?: string;
 };
 
+export type InvitedTeacher = Omit<CreatedTeacher, "password"> & {
+  inviteSent: true;
+  roleActivationPending: true;
+};
+
 export type TeacherEmailStatus = { sent: boolean; reason?: string };
 
 export function teacherEmailNote(status: TeacherEmailStatus | undefined): string | null {
@@ -133,7 +139,7 @@ type TeacherOverviewResponse = {
   message?: string;
 };
 
-type TeacherCreateResponse = { ok?: boolean; account?: CreatedTeacher; message?: string };
+type TeacherCreateResponse = { ok?: boolean; account?: InvitedTeacher; message?: string };
 
 export async function loadTeacherOverview(): Promise<TeacherOverview> {
   const data = await invoke<TeacherOverviewResponse>({ action: "teacher-overview" });
@@ -143,11 +149,12 @@ export async function loadTeacherOverview(): Promise<TeacherOverview> {
 export async function provisionTeacherAccount(input: {
   fullName: string;
   email: string;
-  password: string;
   classId: string;
-}): Promise<CreatedTeacher> {
+}): Promise<InvitedTeacher> {
   const data = await invoke<TeacherCreateResponse>({ action: "create-teacher", ...input });
-  if (!data.account) throw new Error("لم تُرجع الخدمة بيانات حساب المعلم.");
+  if (!data.account || data.account.inviteSent !== true || data.account.roleActivationPending !== true) {
+    throw new Error("لم تؤكد الخدمة إرسال دعوة المعلم وانتظار تفعيل صلاحياته.");
+  }
   return data.account;
 }
 

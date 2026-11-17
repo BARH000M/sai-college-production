@@ -90,14 +90,18 @@ Deno.serve(async (req) => {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!token) return json({ ok: false, message: "يلزم تسجيل الدخول." }, 401);
 
-  const authClient = createClient(url, anonKey, { auth: { persistSession: false } });
+  const authClient = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   const { data: callerData, error: callerError } = await authClient.auth.getUser(token);
   if (callerError || !callerData.user) {
     return json({ ok: false, message: "انتهت الجلسة؛ سجّل الدخول من جديد." }, 401);
   }
   const caller = callerData.user;
+  if (!caller.email_confirmed_at || caller.deleted_at
+    || (caller.banned_until && Date.parse(caller.banned_until) > Date.now())) {
+    return json({ ok: false, message: "يلزم حساب إداري مؤكد ومتاح للاستخدام." }, 403);
+  }
 
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   const { data: superRole, error: superError } = await admin
     .from("user_roles")
     .select("role")
@@ -119,6 +123,9 @@ Deno.serve(async (req) => {
   }
   const action = text(body.action);
   if (!action) return json({ ok: false, message: "An action is required" }, 400);
+  if (!["overview", "teacher-overview"].includes(action) && Deno.env.get("PHASE3B_MUTATIONS_DISABLED") === "true") {
+    return json({ ok: false, code: "maintenance", message: "إدارة الحسابات متوقفة مؤقتاً للصيانة." }, 503);
+  }
 
   if (action === "overview") {
     const students = await admin
@@ -236,19 +243,14 @@ Deno.serve(async (req) => {
 
     const userId = invited.data.user.id;
     const rollback = async (reason: string) => {
-      await admin.auth.admin.deleteUser(userId);
-      return json({ ok: false, message: reason }, 500);
+      return json({ ok: false, code: "invite_setup_incomplete", userId,
+        message: `أُرسلت الدعوة، لكن إعداد الحساب غير مكتمل. راجع الحساب قبل إعادة المحاولة. ${reason}` }, 500);
     };
 
     const profileResult = await admin
       .from("profiles")
-      .upsert({ id: userId, full_name: fullName, email }, { onConflict: "id" });
+      .upsert({ id: userId, full_name: fullName, email }, { onConflict: "id", ignoreDuplicates: true });
     if (profileResult.error) return rollback(profileResult.error.message);
-
-    const roleResult = await admin
-      .from("user_roles")
-      .upsert({ user_id: userId, role: kind, assigned_by: caller.id }, { onConflict: "user_id,role", ignoreDuplicates: true });
-    if (roleResult.error) return rollback(roleResult.error.message);
 
     const auditResult = await admin.from("audit_logs").insert({
       actor_user_id: caller.id,
@@ -268,6 +270,7 @@ Deno.serve(async (req) => {
         fullName,
         studentName: student.full_name,
         inviteSent: true,
+        roleActivationPending: true,
       },
     });
   }
@@ -427,14 +430,12 @@ Deno.serve(async (req) => {
     const fullName = text(body.fullName);
     const classId = text(body.classId);
     const email = text(body.email).toLowerCase();
-    const password = text(body.password);
 
     if (fullName.length < 3) return json({ ok: false, message: "اكتب الاسم الكامل للمعلم (٣ أحرف على الأقل)." }, 400);
     if (!classId) return json({ ok: false, message: "اختر الصف الذي سيدرّسه المعلم." }, 400);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json({ ok: false, message: "صيغة البريد الإلكتروني غير صحيحة." }, 400);
     }
-    if (password.length < 8) return json({ ok: false, message: "كلمة المرور يجب ألا تقل عن ٨ أحرف." }, 400);
 
     const { data: cls, error: classError } = await admin
       .from("classes")
@@ -450,11 +451,8 @@ Deno.serve(async (req) => {
       }, 409);
     }
 
-    const created = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName },
+    const created = await admin.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName },
     });
     if (created.error || !created.data.user) {
       const reason = created.error?.message ?? "تعذر إنشاء الحساب.";
@@ -466,52 +464,28 @@ Deno.serve(async (req) => {
 
     const userId = created.data.user.id;
     const rollback = async (reason: string) => {
-      await admin.auth.admin.deleteUser(userId);
-      return json({ ok: false, message: reason }, 500);
+      return json({ ok: false, code: "invite_setup_incomplete", userId,
+        message: `أُرسلت الدعوة، لكن إعداد الحساب غير مكتمل. راجع الحساب قبل إعادة المحاولة. ${reason}` }, 500);
     };
 
     const profileResult = await admin
       .from("profiles")
-      .upsert({ id: userId, full_name: fullName, email }, { onConflict: "id" });
+      .upsert({ id: userId, full_name: fullName, email }, { onConflict: "id", ignoreDuplicates: true });
     if (profileResult.error) return rollback(profileResult.error.message);
 
-    const roleResult = await admin
-      .from("user_roles")
-      .upsert({ user_id: userId, role: "teacher", assigned_by: caller.id }, { onConflict: "user_id,role", ignoreDuplicates: true });
-    if (roleResult.error) return rollback(roleResult.error.message);
-
-    const membershipResult = await admin
-      .from("branch_memberships")
-      .upsert({ user_id: userId, branch_id: cls.branch_id, is_active: true }, { onConflict: "user_id,branch_id" });
-    if (membershipResult.error) return rollback(membershipResult.error.message);
-
-    const classUpdate = await admin
-      .from("classes")
-      .update({ teacher_id: userId })
-      .eq("id", classId);
-    if (classUpdate.error) return rollback(classUpdate.error.message);
-
-    // Give the teacher direct ownership of the class courses when no owner is set yet.
-    await admin
-      .from("learning_courses")
-      .update({ teacher_id: userId })
-      .eq("class_id", classId)
-      .is("teacher_id", null);
-
-    await admin.from("audit_logs").insert({
-      actor_user_id: caller.id,
-      action: "teacher_account_provision",
-      entity_type: "classes",
-      entity_id: classId,
-      metadata: { account_user_id: userId, email, source: "learning_accounts" },
+    const audit = await admin.from("audit_logs").insert({
+      actor_user_id: caller.id, action: "teacher_account_invite", entity_type: "classes", entity_id: classId,
+      metadata: { account_user_id: userId, source: "learning_accounts" },
     });
+    if (audit.error) return rollback("تعذر تأكيد تسجيل الدعوة؛ راجع قائمة الحسابات قبل إعادة المحاولة.");
 
     return json({
       ok: true,
       account: {
         userId,
         email,
-        password,
+        inviteSent: true,
+        roleActivationPending: true,
         fullName,
         className: cls.name,
         role: "teacher",
@@ -624,64 +598,11 @@ Deno.serve(async (req) => {
     if (previous.error) return json({ ok: false, message: previous.error.message }, 500);
     const previousClassNames = ((previous.data ?? []) as { name: string }[]).map((row) => row.name);
 
-    const release = await admin
-      .from("classes")
-      .update({ teacher_id: null })
-      .eq("teacher_id", userId)
-      .neq("id", classId);
-    if (release.error) return json({ ok: false, message: release.error.message }, 500);
-
-    const assign = await admin.from("classes").update({ teacher_id: userId }).eq("id", classId);
-    if (assign.error) return json({ ok: false, message: assign.error.message }, 500);
-
-    // Course ownership follows the class, otherwise the teacher would keep seeing the old class.
-    const releaseCourses = await admin
-      .from("learning_courses")
-      .update({ teacher_id: null })
-      .eq("teacher_id", userId)
-      .neq("class_id", classId);
-    if (releaseCourses.error) return json({ ok: false, message: releaseCourses.error.message }, 500);
-
-    await admin
-      .from("learning_courses")
-      .update({ teacher_id: userId })
-      .eq("class_id", classId)
-      .is("teacher_id", null);
-
-    const membership = await admin
-      .from("branch_memberships")
-      .upsert(
-        { user_id: userId, branch_id: target.data.branch_id, is_active: true },
-        { onConflict: "user_id,branch_id" },
-      );
-    if (membership.error) return json({ ok: false, message: membership.error.message }, 500);
-
-    const remainingClasses = await admin.from("classes").select("branch_id").eq("teacher_id", userId);
-    if (remainingClasses.error) return json({ ok: false, message: remainingClasses.error.message }, 500);
-    const remainingCourses = await admin.from("learning_courses").select("branch_id").eq("teacher_id", userId);
-    if (remainingCourses.error) return json({ ok: false, message: remainingCourses.error.message }, 500);
-
-    const activeBranches = new Set<string>();
-    ((remainingClasses.data ?? []) as { branch_id: string }[]).forEach((row) => activeBranches.add(row.branch_id));
-    ((remainingCourses.data ?? []) as { branch_id: string }[]).forEach((row) => activeBranches.add(row.branch_id));
-    activeBranches.add(target.data.branch_id);
-
-    const memberships = await admin
-      .from("branch_memberships")
-      .select("branch_id,is_active")
-      .eq("user_id", userId);
-    if (memberships.error) return json({ ok: false, message: memberships.error.message }, 500);
-
-    const staleBranches = ((memberships.data ?? []) as { branch_id: string; is_active: boolean }[])
-      .filter((row) => row.is_active && !activeBranches.has(row.branch_id))
-      .map((row) => row.branch_id);
-    if (staleBranches.length) {
-      const deactivate = await admin
-        .from("branch_memberships")
-        .update({ is_active: false })
-        .eq("user_id", userId)
-        .in("branch_id", staleBranches);
-      if (deactivate.error) return json({ ok: false, message: deactivate.error.message }, 500);
+    const assignment = await admin.rpc("sai_manage_teacher_assignment", {
+      p_actor_id: caller.id, p_target_id: userId, p_action: "reassign", p_class_id: classId,
+    });
+    if (assignment.error || assignment.data?.ok !== true) {
+      return json({ ok: false, message: "تعذر تأكيد إسناد المعلم؛ لم يتم تأكيد أي تغيير." }, 409);
     }
 
     const profile = await admin.from("profiles").select("full_name,email").eq("id", userId).maybeSingle();
@@ -768,28 +689,12 @@ Deno.serve(async (req) => {
       branchNames = ((branchResult.data ?? []) as { name: string }[]).map((row) => row.name);
     }
 
-    const clearClasses = await admin.from("classes").update({ teacher_id: null }).eq("teacher_id", userId);
-    if (clearClasses.error) return json({ ok: false, message: clearClasses.error.message }, 500);
-
-    const clearCourses = await admin
-      .from("learning_courses")
-      .update({ teacher_id: null })
-      .eq("teacher_id", userId);
-    if (clearCourses.error) return json({ ok: false, message: clearCourses.error.message }, 500);
-
-    const closeAccess = await admin
-      .from("branch_memberships")
-      .update({ is_active: false })
-      .eq("user_id", userId);
-    if (closeAccess.error) return json({ ok: false, message: closeAccess.error.message }, 500);
-
-    await admin.from("audit_logs").insert({
-      actor_user_id: caller.id,
-      action: "teacher_class_unassignment",
-      entity_type: "profiles",
-      entity_id: userId,
-      metadata: { removed_classes: removedClassNames, source: "learning_accounts" },
+    const assignment = await admin.rpc("sai_manage_teacher_assignment", {
+      p_actor_id: caller.id, p_target_id: userId, p_action: "remove", p_class_id: null,
     });
+    if (assignment.error || assignment.data?.ok !== true) {
+      return json({ ok: false, message: "تعذر تأكيد إزالة الإسناد؛ لم يتم تأكيد أي تغيير." }, 409);
+    }
 
     // Tell the teacher their access ended, so losing the class is never a surprise.
     let emailStatus: EmailResult = { sent: false, reason: "NO_REMOVED_CLASS" };

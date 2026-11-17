@@ -46,3 +46,10 @@ mobile/APK-OUTPUT/
 **/build/
 *.bak
 *.bak-*
+
+# Local reconciliation evidence, browser sessions and isolated database clusters
+/.tmp-*/
+# Captured Main DDL metadata used by the isolated replay; keep local only
+/supabase/tests/phase3b-main/main_baseline.sql
+# Accidental shell-output artifact (preserve locally)
+/t No Stripe or Firebase references found in src, web, or the root package.json.
