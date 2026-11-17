@@ -3,16 +3,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/access.dart';
 
 const _productionRef = 'aeryusbrulqdxjdynwfh';
-const _previewRef = 'mgibjusuglafbnlrkbep';
 const _productionUrl = 'https://$_productionRef.supabase.co';
-const _previewUrl = 'https://$_previewRef.supabase.co';
 
-/// Explicit environment selector: `--dart-define=SAI_TARGET=preview`.
-/// Anything else (including an unset value) stays locked to Production.
-const saiTarget = String.fromEnvironment('SAI_TARGET', defaultValue: 'production');
-const isPreviewTarget = saiTarget == 'preview';
-const backendUrl = isPreviewTarget ? _previewUrl : _productionUrl;
-const backendRef = isPreviewTarget ? _previewRef : _productionRef;
+/// Only the approved Main backend is supported.
+const saiTarget = String.fromEnvironment(
+  'SAI_TARGET',
+  defaultValue: 'production',
+);
+const backendUrl = _productionUrl;
+const backendRef = _productionRef;
 const previewMode = bool.fromEnvironment('SAI_PREVIEW', defaultValue: false);
 const publicKey = String.fromEnvironment('SUPABASE_PUBLIC_KEY');
 

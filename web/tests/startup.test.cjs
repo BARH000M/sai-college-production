@@ -55,13 +55,8 @@ test("startup errors are explicit and configured authentication options are pres
     assert.equal(result.supabase, client);
     assert.equal(result.supabaseTarget, "production");
 
-    // Preview mode: only the Preview project, with environment-scoped storage.
-    const previewResult = await loadSupabase(prevEnv, (url, key, options) => {
-      assert.equal(url, prevEnv.VITE_PUBLIC_SUPABASE_URL);
-      assert.equal(options.auth.storageKey, "sai-preview-auth");
-      return client;
-    });
-    assert.equal(previewResult.supabaseTarget, "preview");
+    // Retired targets fail before client creation, even with their own key.
+    await assert.rejects(loadSupabase(prevEnv, () => assert.fail("retired target")), SupabaseInitializationError);
 
     // Fail closed on every cross-project or unsupported combination.
     const prodJwt = `x.${Buffer.from(JSON.stringify({ role: "anon", ref: "aeryusbrulqdxjdynwfh" })).toString("base64url")}.x`;

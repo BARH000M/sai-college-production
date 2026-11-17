@@ -9,6 +9,8 @@ coverage/
 .codex/config-backups/
 .env
 .env.*
+/mobile/config/live.json
+/mobile/config/*.local.json
 !.env.example
 *.pem
 *.key
@@ -43,6 +45,7 @@ mobile/APK-OUTPUT/
 
 **/.gradle/
 **/.dart_tool/
+**/android/.kotlin/
 **/build/
 *.bak
 *.bak-*

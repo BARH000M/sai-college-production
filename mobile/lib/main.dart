@@ -17,7 +17,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   String? startupError;
   DemoWorkspace? demo;
-  if (saiTarget != 'production' && saiTarget != 'preview') {
+  if (saiTarget != 'production') {
     startupError = 'بيئة التشغيل غير مدعومة.';
   } else if (previewMode) {
     try {
@@ -31,8 +31,7 @@ Future<void> main() async {
       startupError = keyError;
     } else {
       try {
-        // Environment-scoped persistence prevents reusing a Production
-        // session in a Preview build (and vice versa) on the same device.
+        // Preserve Main sessions; no other backend target is supported.
         await Supabase.initialize(
           url: backendUrl,
           publishableKey: publicKey,
@@ -47,7 +46,7 @@ Future<void> main() async {
       }
     }
   }
-  runApp(SaiApp(startupError: startupError, demo: demo, previewTarget: isPreviewTarget));
+  runApp(SaiApp(startupError: startupError, demo: demo));
 }
 
 String? _publicKeyError(String key) {
@@ -60,7 +59,9 @@ String? _publicKeyError(String key) {
   if (key.startsWith('sb_publishable_')) return null;
 
   final parts = key.split('.');
-  if (parts.length != 3) return 'المفتاح غير صالح؛ استخدم anon أو sb_publishable للمشروع.';
+  if (parts.length != 3) {
+    return 'المفتاح غير صالح؛ استخدم anon أو sb_publishable للمشروع.';
+  }
   try {
     final payload = jsonDecode(
       utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
@@ -82,10 +83,9 @@ String? _publicKeyError(String key) {
 }
 
 class SaiApp extends StatelessWidget {
-  const SaiApp({super.key, this.startupError, this.demo, this.previewTarget = false});
+  const SaiApp({super.key, this.startupError, this.demo});
   final String? startupError;
   final DemoWorkspace? demo;
-  final bool previewTarget;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -108,38 +108,8 @@ class SaiApp extends StatelessWidget {
           )
         : demo != null
         ? PreviewGate(demo: demo!)
-        : PreviewBanner(visible: previewTarget, child: const AuthGate()),
+        : const AuthGate(),
   );
-}
-
-/// Clearly marks Preview-targeted builds so testers never confuse environments.
-class PreviewBanner extends StatelessWidget {
-  const PreviewBanner({super.key, required this.visible, required this.child});
-  final bool visible;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!visible) return child;
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          color: red,
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: const SafeArea(
-            bottom: false,
-            child: Text(
-              'بيئة المعاينة (Preview) — بيانات اختبار فقط',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ink),
-            ),
-          ),
-        ),
-        Expanded(child: child),
-      ],
-    );
-  }
 }
 
 class PreviewGate extends StatelessWidget {

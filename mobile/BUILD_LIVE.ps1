@@ -8,6 +8,7 @@ try {
 }
 if ($config -isnot [PSCustomObject]) { throw 'config/live.json must contain a JSON object.' }
 if ($config.SAI_PREVIEW -ne 'false') { throw 'Live builds require SAI_PREVIEW=false.' }
+if ($config.SAI_TARGET -and $config.SAI_TARGET -ne 'production') { throw 'Only the approved Main target is supported.' }
 $key = $config.SUPABASE_PUBLIC_KEY
 if ($key -isnot [string] -or -not $key -or $key -eq 'PASTE_PUBLIC_KEY_HERE') { throw 'Enter a public anon or sb_publishable key.' }
 if ($key.StartsWith('sb_secret_')) { throw 'Never put an sb_secret key in a mobile build.' }

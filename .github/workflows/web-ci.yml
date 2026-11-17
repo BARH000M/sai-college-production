@@ -6,6 +6,10 @@ on:
       - 'web/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'tests/main-integration.test.mjs'
+      - '.mcp.json'
+      - '.codex/config.toml'
+      - '.vscode/**'
       - '.github/workflows/web-ci.yml'
   pull_request:
     paths:
@@ -13,6 +17,10 @@ on:
       - 'web/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'tests/main-integration.test.mjs'
+      - '.mcp.json'
+      - '.codex/config.toml'
+      - '.vscode/**'
       - '.github/workflows/web-ci.yml'
   workflow_dispatch:
 permissions:
@@ -28,6 +36,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: node --test tests/main-integration.test.mjs
       - run: npm run type-check
       - run: npm run build
   secondary-web:

@@ -18,6 +18,7 @@ import 'live_modules.dart';
 import 'system_settings_screen.dart';
 import 'printing.dart';
 import 'records_screen.dart';
+import 'profile_screen.dart';
 
 const features = <PageId, (String, IconData)>{
   PageId.home: ('الرئيسية', Icons.home_rounded),
@@ -664,6 +665,10 @@ class _CollegeShellState extends State<CollegeShell> {
   ]);
 
   Widget profile() {
+    if (demo == null) {
+      return ProfileScreen(email: widget.account.email,
+        roleNames: roles.map((role) => roleLabels[role]!).toList());
+    }
     final details = [
       ['الاسم', widget.account.name],
       if (widget.account.email.isNotEmpty)

@@ -1,3 +1,3 @@
-[mcp_servers.supabase-preview]
-url = "https://mcp.supabase.com/mcp?project_ref=mgibjusuglafbnlrkbep&read_only=true&features=database,development,debugging"
+[mcp_servers.supabase-main]
+url = "https://mcp.supabase.com/mcp?project_ref=aeryusbrulqdxjdynwfh&read_only=true&features=database,development,debugging"
 enabled = true

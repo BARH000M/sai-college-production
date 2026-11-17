@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { loadMyProfile, saveMyProfile, type ProfileRecord } from "../lib/profile";
 import { isAppRole, roleLabels } from "../lib/navigation";
+import "../styles-profile.css";
 
 type State =
   | { status: "loading"; record: null; error: null }
@@ -92,14 +93,16 @@ export function Profile({ userId, email, roles }: {
       <button type="button" className="text-button" onClick={() => setRetry((value) => value + 1)}>إعادة المحاولة</button>
     </p>}
 
-    {state.status === "ready" && <section className="panel">
+    {state.status === "ready" && !state.record && <p role="alert" className="error-box">الملف الشخصي غير موجود. أعد تسجيل الدخول لإكمال إعداد الحساب.</p>}
+    {state.status === "ready" && state.record && <section className="panel">
       <h2>تعديل البيانات</h2>
-      <form className="management-form" onSubmit={(event) => void submit(event)}>
+      <form className="management-form" aria-busy={saving} onSubmit={(event) => void submit(event)}>
+        <fieldset disabled={saving} className="profile-contact-fields">
         <label>الاسم الكامل
-          <input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" required />
+          <input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" required maxLength={240} />
         </label>
         <label>رقم الهاتف
-          <input value={phone} onChange={(event) => setPhone(event.target.value)} type="tel" dir="ltr" autoComplete="tel" placeholder="+967 7xx xxx xxx" />
+          <input value={phone} onChange={(event) => setPhone(event.target.value)} type="tel" dir="ltr" autoComplete="tel" maxLength={32} placeholder="+967 7xx xxx xxx" />
         </label>
         <label>اللغة المفضلة
           <select value={locale} onChange={(event) => setLocale(event.target.value === "en" ? "en" : "ar")}>
@@ -107,6 +110,7 @@ export function Profile({ userId, email, roles }: {
             <option value="en">English</option>
           </select>
         </label>
+        </fieldset>
         {formError && <p className="error-box" role="alert">{formError}</p>}
         {saved && <p className="success-box" role="status">{saved}</p>}
         <div className="actions">

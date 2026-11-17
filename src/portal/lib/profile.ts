@@ -28,18 +28,24 @@ export async function saveMyProfile(
   values: { fullName: string; phone: string; locale: "ar" | "en" },
 ): Promise<void> {
   const fullName = values.fullName.trim();
-  if (fullName.length < 2) throw new Error("الاسم الكامل مطلوب (حرفان على الأقل).");
+  const characters = Array.from(fullName);
+  const hasControl = characters.some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127);
+  if (characters.length < 2 || characters.length > 120 || hasControl) {
+    throw new Error("الاسم الكامل يجب أن يكون بين حرفين و١٢٠ حرفاً دون محارف تحكم.");
+  }
   const phone = values.phone.trim();
-  if (phone && !/^[+\d][\d\s()-]{5,}$/.test(phone)) {
+  const digits = phone.replace(/[^0-9]/g, "").length;
+  if (phone && (!/^[+0-9][0-9 ()-]{5,31}$/.test(phone) || digits < 6 || digits > 20)) {
     throw new Error("رقم الهاتف غير صالح. استخدم أرقاماً مع رمز الدولة عند الحاجة.");
   }
+  if (values.locale !== "ar" && values.locale !== "en") throw new Error("لغة التواصل غير مدعومة.");
+  if (!userId) throw new Error("انتهت الجلسة. يرجى تسجيل الدخول.");
   const result = await supabase
     .from("profiles")
     .update({
       full_name: fullName,
       phone: phone || null,
       preferred_locale: values.locale,
-      updated_at: new Date().toISOString(),
     })
     .eq("id", userId)
     .select("id");

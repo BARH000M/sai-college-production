@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [{
+    "name": "Yemen SAI — Main",
+    "type": "dart",
+    "request": "launch",
+    "cwd": "${workspaceFolder}/mobile",
+    "program": "lib/main.dart",
+    "toolArgs": ["--dart-define-from-file=config/live.json"]
+  }]
+}

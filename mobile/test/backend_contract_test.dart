@@ -7,7 +7,7 @@ void main() {
     // Tests run without SAI_TARGET, so the default stays Production-locked.
     expect(backendUrl, 'https://aeryusbrulqdxjdynwfh.supabase.co');
     expect(backendUrl.startsWith('https://'), isTrue);
-    expect(isPreviewTarget, isFalse);
+    expect(saiTarget, 'production');
     expect(backendRef, 'aeryusbrulqdxjdynwfh');
   });
 

@@ -14,7 +14,9 @@ One workspace, repository, branch and production database. No Preview environmen
 
 ## Current checkpoint
 
-Phase 3B local development completed at `4610b20`. Task 2 reviewed changes were pushed normally to `main`; independently verified GitHub commit: `d4930fa0df349ac84c59b5e0f1a6ed4a3ea5eac3`. This roadmap is published in a subsequent documentation-only commit, identifiable in Git history.
+Phase 3C shared identity and profile functionality finalized on 2026-11-17 in commit `feat: complete Phase 3C shared profile and Main integration` (identifiable in Git history). Task 3 unified integration is complete: web, mobile, VS Code and MCP configurations are Main-only (`aeryusbrulqdxjdynwfh`), retired Preview selection paths were removed, and validation passed locally (91 web tests, 3 Main-integration tests, type-check, production build, 53 Flutter tests). The additive SQL proposal `supabase/deployment/phase3c-main/001_own_contact_validation.sql` remains unexecuted pending deployment approval. Phase 4A (examinations and academic results) implementation has begun.
+
+Previously: Phase 3B local development completed at `4610b20`. Task 2 reviewed changes were pushed normally to `main`; independently verified GitHub commit: `d4930fa0df349ac84c59b5e0f1a6ed4a3ea5eac3`. This roadmap is published in a subsequent documentation-only commit, identifiable in Git history.
 
 Previously verified: 88 web tests, 7 Deno tests, isolated PostgreSQL security tests, TypeScript and ESLint passed. Do not repeat these completed checks unnecessarily. Supabase production deployment and complete backup/recovery verification remain pending.
 
@@ -83,9 +85,17 @@ Verified execution on 2026-11-17:
 
 Task 3 is ready to begin when requested; it has not started. Preserve the Task 1 partial recovery result. Full managed-platform recovery is unverified, and production deployment remains blocked until the recovery risks are reviewed and deployment is explicitly approved.
 
-### Task 3 — Unified integration — NOT STARTED
+### Task 3 — Unified integration — COMPLETE (2026-11-17)
 
 Connect all application components, development tools and deployment configurations to the approved GitHub repository and Supabase Main project. Eliminate active references to obsolete environments. Protect credentials.
+
+Verified execution evidence (Phase 3C finalization commit):
+
+- All MCP clients (`.mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`) share the single Main read-only endpoint; retired `supabase-preview` labels removed. Enforced by `tests/main-integration.test.mjs`, wired into `web-ci.yml` push/PR paths.
+- Web portal (`src/portal/lib/supabase.ts`) and secondary web (`web/src/lib/supabase.ts`) are Main-only; the Preview target map, preview banner and environment-scoped session split were removed. Mobile (`mobile/lib/data/repository.dart`, `mobile/lib/main.dart`) rejects any non-`production` `SAI_TARGET`; `BUILD_LIVE.ps1` and `config/live.example.json` enforce the same.
+- Shared profile editing ships in web (`src/portal/pages/Profile.tsx`, `lib/profile.ts`, `styles-profile.css`) and Flutter (`mobile/lib/ui/profile_screen.dart`, `data/profile_repository.dart`) with identical name/phone/locale validation; identity, email and timestamps are never client-writable. Server-side validation exists as the unexecuted additive proposal `supabase/deployment/phase3c-main/001_own_contact_validation.sql`.
+- Tests: `web/tests/profile-contact.test.cjs`, `mobile/test/profile_contact_test.dart` and the isolated-cluster `supabase/tests/profile_contact_behavior.sql` (nine roles, own-row only, immutable identity/email/time, anonymous denial). 91 web tests, 3 Main-integration tests, type-check, build and 53 Flutter tests passed on 2026-11-17.
+- Hygiene: tracked backup `mobile/test/backend_contract_test.dart.bak` removed; `mobile/android/.kotlin/` temp sessions ignored. No credentials, test clusters or local secrets were staged. The tracked `web/src/lib/supabase.yaml` credential-shaped file was deleted.
 
 ### Task 4 — Production deployment — NOT STARTED
 
@@ -109,4 +119,4 @@ This file is the single authoritative project roadmap. Update task status only w
 
 ## Active instruction
 
-Stop after Task 2 synchronization and this roadmap checkpoint. Do not start Tasks 3–7 during this task. Task 1 remains at partial recovery; do not repeat backups, database authentication troubleshooting or extension installation attempts. Task 3 integration is the next authorized scope only when requested. Production SQL writes and deployment remain blocked pending recovery-risk review and explicit deployment approval.
+Phase 3C finalization (Task 3) is complete. Current authorized scope: Phase 4A — examinations and academic results — implement the first complete end-to-end workflow locally with additive, unexecuted SQL proposals only. Task 1 remains at partial recovery; do not repeat backups, database authentication troubleshooting or extension installation attempts. Production SQL writes and deployment remain blocked pending recovery-risk review and explicit deployment approval. Tasks 4–6 remain not started.

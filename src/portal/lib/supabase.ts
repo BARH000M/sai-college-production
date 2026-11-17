@@ -5,16 +5,12 @@ const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
 const saiTarget = import.meta.env.VITE_SAI_TARGET;
 
-const targets = {
-  production: { url: "https://aeryusbrulqdxjdynwfh.supabase.co", ref: "aeryusbrulqdxjdynwfh" },
-  preview: { url: "https://mgibjusuglafbnlrkbep.supabase.co", ref: "mgibjusuglafbnlrkbep" },
-} as const;
+const expected = { url: "https://aeryusbrulqdxjdynwfh.supabase.co", ref: "aeryusbrulqdxjdynwfh" };
 
-if (saiTarget !== undefined && saiTarget !== "production" && saiTarget !== "preview") {
+if (saiTarget !== undefined && saiTarget !== "production") {
   throw new SupabaseInitializationError("Unsupported SAI target environment.");
 }
-export const supabaseTarget = saiTarget === "preview" ? "preview" : "production";
-const expected = targets[supabaseTarget];
+export const supabaseTarget = "production";
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new SupabaseInitializationError("Supabase environment variables are missing.");
@@ -42,8 +38,7 @@ function initializeSupabase() {
         autoRefreshToken: true,
         detectSessionInUrl: true,
         persistSession: true,
-        // Environment-scoped storage key prevents reusing a Production session
-        // in a Preview build (and vice versa) in the same browser profile.
+        // Preserve the existing Main session key across configuration changes.
         storageKey: `sai-${supabaseTarget}-auth`,
       },
     });
