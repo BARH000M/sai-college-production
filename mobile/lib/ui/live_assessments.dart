@@ -59,14 +59,6 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
         .order('created_at', ascending: false);
   }
 
-  void _notice(String value) {
-    if (!mounted) return;
-    setState(() {
-      _notice = value;
-      _error = null;
-    });
-  }
-
   Future<void> _open(Map<String, dynamic> assessment) async {
     if (_openId == assessment['id']) {
       setState(() => _openId = null);
@@ -740,18 +732,21 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     final options = List<String>.from(question['choices'] as List? ?? const []);
     final value = _answers[id];
     if (kind == 'multiple_choice' || kind == 'true_false') {
-      return Column(
-        children: [
-          for (var index = 0; index < options.length; index++)
-            RadioListTile<int>(
-              value: index,
-              groupValue: value is num ? value.toInt() : null,
-              title: Text(options[index]),
-              onChanged: _submitted
-                  ? null
-                  : (answer) => setState(() => _answers[id] = answer),
-            ),
-        ],
+      return RadioGroup<int>(
+        groupValue: value is num ? value.toInt() : null,
+        onChanged: (answer) {
+          if (!_submitted) setState(() => _answers[id] = answer);
+        },
+        child: Column(
+          children: [
+            for (var index = 0; index < options.length; index++)
+              RadioListTile<int>(
+                value: index,
+                title: Text(options[index]),
+                enabled: !_submitted,
+              ),
+          ],
+        ),
       );
     }
     if (kind == 'matching') {

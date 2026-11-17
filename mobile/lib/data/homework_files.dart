@@ -16,13 +16,10 @@ const homeworkFileExtensions = [
 const homeworkFileLimit = 20 * 1024 * 1024;
 
 Future<PlatformFile?> pickHomeworkFile() async {
-  final result = await FilePicker.platform.pickFiles(
+  return FilePicker.pickFile(
     type: FileType.custom,
     allowedExtensions: homeworkFileExtensions,
-    withData: true,
   );
-  if (result == null || result.files.isEmpty) return null;
-  return result.files.single;
 }
 
 String homeworkFileMimeType(PlatformFile file) {
@@ -50,17 +47,19 @@ String homeworkFileMimeType(PlatformFile file) {
 }
 
 String validateHomeworkFile(PlatformFile file) {
-  final bytes = file.bytes;
-  if (bytes == null || bytes.isEmpty || bytes.length > homeworkFileLimit) {
+  final size = file.lengthSync();
+  if (size != null && (size == 0 || size > homeworkFileLimit)) {
     throw const FormatException('يجب اختيار ملف صالح لا يتجاوز ٢٠ ميجابايت.');
   }
   return homeworkFileMimeType(file);
 }
 
 Future<String> uploadHomeworkFile(String folder, PlatformFile file) async {
-  final bytes = file.bytes;
   final mimeType = validateHomeworkFile(file);
-  if (bytes == null) throw const FormatException('تعذر قراءة الملف المختار.');
+  final bytes = await file.readAsBytes();
+  if (bytes.isEmpty || bytes.length > homeworkFileLimit) {
+    throw const FormatException('يجب اختيار ملف صالح لا يتجاوز ٢٠ ميجابايت.');
+  }
   final safeName = file.name
       .replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '-')
       .replaceAll(RegExp(r'^-+|-+$'), '');

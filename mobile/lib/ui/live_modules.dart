@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/access.dart';
 import '../data/homework_files.dart';
@@ -42,6 +43,20 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
         .limit(100);
+  }
+
+  Future<void> _openHomeworkFile(String path) async {
+    try {
+      final url = await homeworkSignedUrl(path);
+      if (!await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      )) {
+        throw StateError('تعذر فتح الملف على هذا الجهاز.');
+      }
+    } catch (error) {
+      if (mounted) _notice('تعذر فتح الملف: $error');
+    }
   }
 
   bool get canWrite =>

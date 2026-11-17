@@ -2,38 +2,34 @@
 
 ## Execution refresh — 18 November 2026 (Asia/Aden)
 
-The owner explicitly authorized commits, pushes and validated production migrations in this session. Approval is no longer the blocker. **Production deployment remains blocked by failed recovery and incomplete migration/application gates.** No production migrations, migration repairs, maintenance activation or Edge deployments were executed in this session. No dry-run success is claimed.
+**Disposition: NO-GO.** Local recovery and safety tooling were exercised, but no production SQL, maintenance activation, Edge deployment, website deployment, migration repair, APK/AAB publication or authenticated live acceptance occurred. The owner must approve the exact final manifest before any production write; this report is not that approval.
 
-- Verified origin: `https://github.com/BARH000M/sai-college-production.git`, branch `main`. Fetch and live `ls-remote` confirmed application commit `d43f0f913d733cf7b802c894b04b1ac5f37cdf93` already on `origin/main`. It contains application changes, recovered Main-only migrations, Phase 4B proposals, tests and documentation. The two checked-in GitHub workflows run CI only; no database deployment command or credential was found. External hosting hooks were not independently inspected.
-- Supabase CLI 2.111.0, local project-ref and MCP URL agree on `aeryusbrulqdxjdynwfh`. Live history still contains 16 entries: `001`–`006`, `008`–`014`, `20261110172940`, `20261110173339`, `20261110173506`. **Applied migration versions in this session: none.** Reused the reconciliation report/matrix; the former 27 unmatched versions are not a replay list. Current directory contains 57 SQL migrations, including recovered history and new production proposals.
-- Fresh backup listing succeeded: latest physical backup `2295604002`, `COMPLETED`, `2026-11-17T16:01:35.177Z`; eight listed completed backups, WAL-G enabled, PITR disabled. Snapshot availability does not prove restoration readiness or a write-free cutover recovery point.
-- Executed `supabase/tests/recovery/restore_main_isolated.py` against the protected November 17 archive in a new loopback-only native PostgreSQL cluster. Archive checksum matched; 85 application table-data entries were selected. **Restore failed (exit 1): policy creation required missing role `authenticated`.** The recovery parser reconstructed only one role. Evidence directory: `D:\SAI-Production-Backups\MAIN-20261117-164017\phase7r-recovery-21c85a4f7209483cb66ba8a8f7d2da52`. Maintenance behavior/concurrency tests were not reached. This rehearsal does not establish complete Supabase recovery. A closed-stdin handling correction was made to the local unfinished runner; it remains uncommitted.
-- Six production migration files are empty: `20261117202743`, `20261117202759`, `20261117202817`, `20261117202821`, `20261117202830`, `20261117202835`. Their names promise branch protection, admissions, settings, learning, guard refresh and hold release, but provide no SQL. Do not push this directory to production: its hold/release sequence and functionality are incomplete. The separate maintenance proposal also has newer uncommitted DDL-guard changes absent from the production migration copy. These packages require reconciliation and rehearsal before execution.
-- Live catalog: PostgreSQL 17.11; 47 public tables, all with RLS; all nine `app_role` labels exist; no inspected public/private security-definer function lacks a configured search path. Assigned roles currently cover six labels; `admin`, `librarian`, and `content_editor` have no assignment in the returned aggregate. This is catalog evidence only, not authenticated nine-role authorization certification. Atomic role-management RPC and the queried `public.exams`, `public.exam_results` and `public.learning_assessments` relations returned null. CLI refreshed ACTIVE Edge metadata: `manage-roles` v9, `school-admin` v7, `provision-learning-account` v8 and `link-student-account` v4. The prior deployed Edge/client contract mismatch remains unresolved; no compatible Edge cutover was attempted.
+- Git branch `main`, HEAD `f2ca63f08ed59455cd8cebb64f99aa0272c93af2`, and live `origin/main` matched in a read-only `ls-remote`; the worktree was clean before this documentation update. GitHub API reported zero hooks and zero deployments. The two active root workflows perform CI only. Hostinger control-panel/server deployment settings remain unverified, so no commit or push was made.
+- The configured Supabase Main identity is `aeryusbrulqdxjdynwfh`. No production SQL or Edge write was attempted. The latest managed backup status/PITR evidence available in this task remains the prior recorded result; it was not refreshed here.
+- Isolated recovery runner: PASS in disposable native PostgreSQL; archive checksum verified; 85 application tables, 860 rows, 355 constraints, 105 functions, 44 triggers and 113 policies verified; no row-count mismatch. It reports the original raw restore's 56 errors and does not restore original role attributes, memberships or passwords. Evidence: `D:\SAI-Production-Backups\MAIN-20261117-164017\phase7r-recovery-9f6531a069a94427b6ba7c4fba73f012`. Supabase Auth, Storage, Realtime, Edge runtime/secrets, managed Cron, Vault and hosted-only extensions are outside this native recovery.
+- Maintenance protection: local authorization, concurrent write barrier and rollback tests PASS. The local database mechanism and fail-closed Edge gates are not active on Main. External containment of legacy ingress, direct API access, managed jobs and privileged/platform writers remains an operator prerequisite. Recovery security checks also warn that 14 public wrappers still grant `EXECUTE` to `authenticated`; the Phase 3B grant restrictions must be applied and reverified before any cutover.
+- Deployment executor `supabase/deployment/phase7r/Invoke-MainDeployment.ps1`: default dry-run PASS with no writes; wrong project ref and `-Execute` without attestations each failed safely. Executor SHA-256: `6268a825b37e29337bc924673a68be6cd4375ad66d066072574122f57da94e5e`. Manifest SHA-256: `341d66205f065a4ea31a28fde09f627eb7e80d0a073e00f184cd4d4b09d858fd`. Execution remains prohibited until every external attestation is valid and explicit owner approval binds these hashes and the commit.
+- Read-only hosted Edge inventory: `manage-roles` v9 (`verify_jwt=false`), `school-admin` v7 (`false`), `provision-learning-account` v8 (`true`), `link-student-account` v4 (`true`), `admission-reminders` v7 (`true`), `admission-notify` v9 (`true`), `announcement-email` v3 (`true`). No function was deployed.
 
-Validation performed in this session:
-
-| Check | Actual result |
+| Check | Latest actual result |
 |---|---|
-| Root TypeScript `npm.cmd run type-check` | PASS, exit 0 |
-| Root React `npm.cmd run build` | PASS, exit 0; large chunk warning |
-| Main configuration/workflow integration tests | PASS, 3/3, exit 0 |
-| `web` unit tests | FAIL, 104/105 passed, exit 1; migration-baseline assertion expects 38, observes 55 after excluding two proposals |
-| Flutter analysis | FAIL, 30 issues, exit 1; file-picker API mismatch, duplicate `_notice`, missing homework-open method / URL-launch import, plus warnings and infos |
-| Flutter tests, escalated retry | FAIL, 41 passed and 5 test files failed to compile, exit 1; initial sandbox run also hit Windows application-control restrictions |
-| Isolated Phase 4A examinations | PASS, exit 0 after escalated retry; role/state/negative cases, task-owned cluster stopped |
-| Isolated Phase 4B assessments | PASS, exit 0 after escalated retry; workflow/roles/answer-key/released-result checks; task-owned cluster stopped |
-| Production recovery rehearsal | FAIL, exit 1; missing reconstructed role; maintenance tests not reached |
-| Git whitespace check | PASS before documentation changes |
+| Root TypeScript type-check, lint and React production build | PASS, exit 0; build retains existing large-chunk warning |
+| Root Main configuration/workflow integration tests | PASS, 3/3, exit 0 |
+| Web test suite | PASS, 105 tests, exit 0 |
+| Deno focused tests / changed-file checks | PASS, 7 tests; `deno check` passed for 10 changed entrypoint/shared files |
+| Native isolated recovery and application integrity | PASS; counts and scope above; not a Supabase-compatible platform restore |
+| Maintenance authorization / concurrency / rollback | PASS in isolation; production hold not activated |
+| Deployment executor dry-run | PASS, exit 0; no database or Edge writes |
+| Executor wrong-project / missing-attestation gates | Expected failures, exit 1 before writes |
+| Flutter `pub get --offline` | PASS, exit 0, Flutter 3.47.9 / Dart 3.13.7 |
+| Flutter analysis | FAIL, exit 1, 30 issues including file-picker API mismatch, duplicate `_notice`, missing homework-file method and missing `launchUrl` |
+| Flutter tests | FAIL, exit 1; 41 passed and 5 files failed to compile, including abstract `PlatformFile` construction and the analyzer errors above |
+| Android debug APK | FAIL, exit 1 after Gradle entered `assembleDebug`; Dart compilation errors stopped the build |
+| Java / Android toolchain | OpenJDK 21.0.13 LTS verified. Gradle wrapper 8.14.3 and AGP 8.11.1; this attempt failed at Dart compilation, so it does not establish a Java/Gradle incompatibility or Android readiness. |
+| Android release signing | NOT VERIFIED; `android/key.properties` absent; no signed AAB produced |
+| Production writes / releases / live nine-role acceptance | NONE |
 
-Credential review: modified/untracked project source was inspected without printing credentials. Existing ignore rules exclude environment files, signing material, dumps, protected connection files, local reconciliation evidence and browser sessions; Python bytecode exclusions were added. Tracked sensitive filename checks returned only `.env.example`. Protected backups remain outside Git. This is not a complete historical secret-exposure audit.
-
-Incomplete recovery/maintenance files are intentionally preserved locally and excluded from this documentation commit. No records were deleted, no database was reset, no Docker or force push was used. Required next gate: repair and rerun recovery, finish/review the forward-only package and hold-release sequence, resolve failing application checks, then rehearse SQL/Edge interleaving and authenticated web/mobile authorization before the authorized production push.
-
-**Disposition: NO-GO.** This report records a read-only preflight on
-17 November 2026. It is not approval to run SQL, deploy Edge Functions, activate
-a maintenance hold, deploy the website, or release a mobile build. No hosted
-writes or deployments were performed.
+The archive-level recovery result supersedes the earlier missing-`authenticated`-role rehearsal: the updated runner reconstructs local role names and completes application-scope testing, but not source grants/role attributes or managed services. This remains partial recovery, not a rollback certificate. Preserve paused Phase 4B code; no backup, credential or generated release artifact was added to the repository. No reset, Docker, force push, production operation or push was performed.
 
 ## 1. Main and Git identity
 
@@ -42,19 +38,24 @@ writes or deployments were performed.
 | Supabase project | `aeryusbrulqdxjdynwfh` (`sai-college-production`) |
 | Project status / region | `ACTIVE_HEALTHY`, `ap-northeast-1` |
 | Database | PostgreSQL 17.11 |
-| Git branch / HEAD | `main` / `0737f84b1e06be009cf6a5bc46c01ff2364fdac8` |
-| `origin/main` | `0737f84b1e06be009cf6a5bc46c01ff2364fdac8` |
-| Worktree | Dirty; preserve Phase 4B, other code and local documentation changes |
-| GitHub Actions | `web-ci.yml` and `mobile-ci.yml` are CI only. No migration or production deploy action found. |
+| Git branch / HEAD | `main` / `f2ca63f08ed59455cd8cebb64f99aa0272c93af2` |
+| Live `origin/main` | `f2ca63f08ed59455cd8cebb64f99aa0272c93af2` at read-only `ls-remote` |
+| Worktree | Clean before this documentation update; preserve paused Phase 4B source |
+| GitHub Actions / hook inventory | Two active root workflows run CI only; authenticated GitHub API reported zero hooks/deployments. Hostinger control-panel settings remain unverified. |
 | Main public catalog | 47 listed tables; RLS enabled on all listed tables. Proposed examination tables are absent. Existing legacy homework tables are present. |
 | Main migration history | 16 records: `001`–`006`, `008`–`014`, `20261110172940`, `20261110173339`, `20261110173506`. Do not replay old migrations or repair history by inference. |
 
-These are metadata/catalog observations, not proof of application behavior,
-production authorization, or successful restore.
+The project/catalog values are earlier read-only observations, not proof of
+application behavior, production authorization or successful restore. The
+Git identity and recovery result above are the latest 18 November checks.
 
 ## 2. Recovery gate and limits
 
 ### Existing evidence
+
+The earlier raw `pg_restore` attempt documented below failed; the updated
+isolated runner result is recorded in the execution refresh above. Its PASS
+applies only to reconstructed application schema/data in native PostgreSQL.
 
 - The archive `D:\SAI-Production-Backups\MAIN-20261117-164017\MAIN_DATABASE.dump`
   has recorded SHA-256
@@ -106,15 +107,23 @@ assumed equivalent to a local file SHA-256.
 | `manage-roles` | ACTIVE v9 | false | `17bbfaab3103d98e6c3303154188aa0a00091e141636ba0e6d4595558f72076f` |
 | `school-admin` | ACTIVE v7 | false | `de829b86793f9f515b329ad3c58d34b5ec500e2dd6b88b7c7971e6a4bd738289` |
 | `provision-learning-account` | ACTIVE v8 | true | `387c1be9769a97ffc9c0b4e19d322adfe4503ce4b18546d62a2c2040479b9cc5` |
-| `link-student-account` | ACTIVE v4 | true | `e685c77004a122e884762644a46ede56bfb360ebd3f8b4152ba49b3d2ba7c27a` |
+| `link-student-account` | ACTIVE v4 | true | `e685c77004a122e884762644a46ede56bfb360eb0ad48b7f5e2755984a7db7076` |
+| `admission-reminders` | ACTIVE v7 | true | Platform fingerprint not captured in the current record |
+| `admission-notify` | ACTIVE v9 | true | Platform fingerprint not captured in the current record |
+| `announcement-email` | ACTIVE v3 | true | Platform fingerprint not captured in the current record |
 
 | Local candidate source | SHA-256 |
 |---|---|
 | `supabase/functions/manage-roles/index.ts` | `28db90d00ad7dab2bdabfa888546f358fec39fe300db87bd0a2739c679fd8217` |
-| `supabase/functions/school-admin/index.ts` | `bd17a5130cb166b9b7246aaafc1a11ccb7c29b72652cd2de7ca42e271494312a` |
-| `supabase/functions/provision-learning-account/index.ts` | `e9b53695ea2280d2d570d533b984faef498912bed33505810b85731a860e7fef` |
-| `supabase/functions/link-student-account/index.ts` | `ab096838ef66e63be050c585d80de97559969eb0ad48b7f5e2755984a7db7076` |
-| `supabase/functions/_shared/role-management-handler.ts` | `2e5fc63c5686e0926c26210cd350bdf492066be772d702644227b3c911c63389` |
+| `supabase/functions/school-admin/index.ts` | `45667f463eaa6992f9dc7dc2c1d25f86eb63c58bf3f45cf1aa21b9cccafaf848` |
+| `supabase/functions/provision-learning-account/index.ts` | `dc33a9aef2742747c4bcfd337d0386d3224b526b90d0585e2379a8983cb54490` |
+| `supabase/functions/link-student-account/index.ts` | `b22ecd7198708a87b31addad320b77f824294ac7f6432a9a1eee0e7d3bde665c` |
+| `supabase/functions/admission-reminders/index.ts` | `301e50fc2d4f1d66223be8e04b88aa7b7fc8b30eada94d6153ca9a9c95a0aa72` |
+| `supabase/functions/admission-notify/index.ts` | `d6e8b83aa8686c0233f26779e0107c1f1e3c13d616cdd08fa4a0ebdd4ec0a285` |
+| `supabase/functions/announcement-email/index.ts` | `1f1077f56a197dbba4e8105c1923f4c728cdd3d49e3e0e27937cd0dd39367f46` |
+| `supabase/functions/_shared/role-management-handler.ts` | `38f1efc49e21f1ad5aae858d7f25c5613919886aea9a11b23c3ce531267753f7` |
+| `supabase/functions/_shared/mutation-gate.ts` | `80dd24600a5748116f00aafe36799d332b80d3c888bd78f5b34a6eab4167acef` |
+| `supabase/functions/_shared/client-ip.ts` | `015f547c2382273c5639fe4f8970926fecdef7611beaadc2e92091f47ec0b5e7` |
 
 The deployed legacy functions remain active. Their inspected code does not
 enforce `PHASE3B_MUTATIONS_DISABLED`; `manage-roles` and `school-admin` also
@@ -127,6 +136,10 @@ not an enforceable hold for already deployed versions.
 All files below are reviewed **proposals**, not migrations approved for
 execution. Each listed file contains its own transaction boundary; the set is
 not one atomic transaction and is not atomic with Edge deployments.
+The tested executor pins these reviewed SQL and function sources. Its current
+manifest and executor hashes are recorded in the execution refresh above;
+owner approval must bind those exact current hashes rather than this table
+alone.
 
 | Order | File | SHA-256 | Dependency / purpose | Rollback boundary |
 |---:|---|---|---|---|
