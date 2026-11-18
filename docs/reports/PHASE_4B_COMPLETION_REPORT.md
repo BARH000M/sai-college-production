@@ -5,6 +5,46 @@ accepted. The production manifest remains `release_ready=false`; no SQL,
 Edge Function, website or mobile deployment has been performed. Phase 7-M
 commit `7de6eeff03e2552be7bf7243e79da57c0abe7f6b` remains local and unpushed.
 
+## Latest local verification refresh — 18 November 2026
+
+Added true/false lesson practice using the existing question and answer
+contract, with fixed Arabic choices, server-side grading, React authoring,
+Flutter student interaction and focused positive/negative tests. Formal
+assessment answer keys remain protected. Implementation commit:
+`5c61b7b0d87df23a042d1b8fbf20915b741de31d`.
+
+| Verification | Actual result |
+|---|---|
+| Learning assessment SQL harness | PASS; concurrency, answer-key protection, practice grading and assessment integrity |
+| Native contracts and Phase 3B reconciliation | PASS |
+| Migration integrity validator and tamper tests | PASS; 6/6 tamper tests |
+| TypeScript check and lint | PASS |
+| Web compatibility suite | PASS; 112/112, no skipped tests |
+| Flutter package resolution and analysis | PASS; no analyzer issues |
+| Flutter tests | PASS; 64/64 |
+| Production React build | PASS; `out/`, 19,295,908 bytes; Vite reported the existing large-chunk warning |
+| Public web artifact credential scan | PASS; no secret API key value or service-role JWT found |
+| Mobile configured publishable-key binding | PASS; non-mutating Auth health returned HTTP 200 for Main, with the key value suppressed |
+| Android production signing | BLOCKED; `mobile/android/key.properties` is absent; no signed APK/AAB was built |
+| Git synchronization | Clean `main`; 11 commits ahead and 0 behind the live `origin/main` ref; no push |
+
+The web JavaScript bundle is
+`out/assets/index-BAmm5zIQ.js` (1,446,340 bytes; SHA-256
+`5938bc49c6b6638a89a615578f7f8b26d990c2e8c025dfacd0deb3668bbe8ec1`).
+The index is `out/index.html` (1,599 bytes; SHA-256
+`2c94df0d293b7e6c39c3fda66ca463ac343174b4bf025515b2c6e35b3940c2de`).
+These are local artifacts, not deployed releases.
+
+Phase 4B remains **PARTIAL** and Phase 4C has not started. Production remains
+**NO-GO**: `release_ready=false`, leaked-password protection and other
+production security findings remain unresolved, a fresh recovery point and
+Supabase-compatible restore are not verified, hosting/backend binding and
+security headers remain unverified, hosted Storage and authenticated role
+acceptance are incomplete, and release signing is unavailable. No production
+write, backup, push or deployment was performed. This section supersedes older
+test-count and key-binding statements below; historical checkpoint rows retain
+the evidence available when they were written.
+
 ## Functional completion sprint refresh — 18 November 2026
 
 The latest local assessment work adds scheduling windows, timed attempts,
@@ -61,7 +101,7 @@ untested requirements are absent from every part of the application.
 |---|---|---|---|---|
 | 01 Web regression | One of 105 web tests failed because it assumed historical migrations were the latest. Reused the migration lock, integrity validator and deployment manifest. | Updated `web/tests/phase2c-migration-review.test.cjs` to check full migration/lock inventory and checksums, unique versions, pinned historical hashes and relative order, deployment dependency order, pinned SQL package paths, and Phase 4B exclusion/NO-GO without assuming no later migrations. Existing SQL security assertions remain. | Focused test: 3/3 passed. `npm --prefix web test`: 105/105 passed, none skipped. `python supabase/tools/validate_migrations.py --base-ref origin/main`: passed. `python supabase/tests/test_migration_validation.py`: 6/6 passed, including migration and manifest tamper cases. | **PASS.** Future additive migrations remain supported when included in the lock and integrity review. |
 | 02 Assessments | Partial: existing SQL proposal and React/Flutter screens support attempts and objective/written grading. | Preserved question locking, practice separation and answer-key protections; reused the common question table and native PostgreSQL harness. | Added scheduled/timed attempts, random-order snapshots, assignments, duplication, lifecycle guards, categorized reusable questions, multiple-select and ordering types, teacher previews, debounced autosave, closed history access. Updated the assessment SQL proposal, native behavior tests, React service/panel, Flutter assessment page and focused tests. | Isolated assessment suite PASS, including timeouts, concurrency, protected question-bank import/denial, multiple-answer and ordering grading, save/resume, closure/result release and history access. Focused web workflow tests 10/10; TypeScript check PASS; Flutter focused analysis clean and settings tests 2/2. | **PARTIAL.** SQL is not deployed; all-role/device acceptance and full regression/build suites remain. |
-| 03 Interactive exercises | Partial: scored vocabulary/listening practice and five assessment kinds existed. | Reused the common question/answer table, server-side grading and existing practice separation. | Added validated multiple-select and ordering questions to the shared assessment contract and both student clients, with server-side correctness checks and focused tests. | Native PostgreSQL acceptance and focused web/mobile checks passed as recorded for Checkpoint 02. | **PARTIAL.** Image/audio authoring and rendering, Chinese character/pinyin/tone, translation, sentence-arrangement and full reusable practice-engine coverage remain. |
+| 03 Interactive exercises | Partial: scored vocabulary/listening practice and five assessment kinds existed. | Reused the common question/answer table, server-side grading and existing practice separation. | Added validated multiple-select and ordering assessment questions, plus true/false lesson practice to the existing proposal, React authoring and Flutter student flow; server-side correctness checks and focused tests cover the supported paths. | Native PostgreSQL acceptance, web validation and Flutter interaction tests passed; the latest full suites pass 112 web and 64 Flutter tests. | **PARTIAL.** Image/audio authoring and rendering, Chinese character/pinyin/tone, translation, sentence-arrangement and full reusable practice-engine coverage remain. |
 | 04 Homework | Partial: existing homework screens, private attachment proposal and text/file submissions. | Reused existing homework guard and storage policies; no new homework feature was claimed complete. | Isolated assessment suite exercised protected homework grading. Web homework file tests passed as part of 105/105. | **PARTIAL.** Full lifecycle, multiple attachments, resubmission, notifications and managed Storage acceptance remain unverified/incomplete. |
 | 05 Grading and analytics | Partial: objective and written grading, homework grading, progress views and exports exist. | Reused existing grading and progress contracts; added an invalid written-score regression in `supabase/tests/learning_assessments_behavior.sql`. | Isolated assessment suite passed automatic grading, written grading and score-bound checks. | **PARTIAL.** Multiple-answer/partial scoring, grade corrections, audit/history, comprehensive analytics and reporting remain. |
 | 06 Role-based web/mobile integration | Partial: existing React and Flutter learning, assessment and homework screens. | Reused current clients and practice filters; no claim of complete parity. Relevant files include `src/portal/pages/learning/AssessmentsPanel.tsx` and `mobile/lib/ui/live_assessments.dart`. | Web type-check and lint passed; Flutter analysis reported no issues and 61 tests passed in this run; all 105 web tests passed. | **PARTIAL.** Full role/branch isolation, content-editor contract, accessibility, responsive and cross-client acceptance remain. |

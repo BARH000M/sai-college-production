@@ -6,21 +6,22 @@ publication or authenticated live acceptance occurred.
 
 ## Latest local evidence — 18 November 2026
 
-The Phase 4B local refresh supersedes the prior Flutter analyzer/test/APK
-failure entries in the historical checklist below. Phase 4B is still partial;
-this is not a production release approval.
+The latest local integration refresh supersedes earlier local suite counts
+and key-binding uncertainty in the historical checklist below. Phase 4B is
+still partial; this is not production release approval.
 
 | Area | Result |
 |---|---|
 | Isolated application recovery | PASS: checksum verified; 85 tables, 860 rows, 355 constraints, 105 functions, 44 triggers and 113 policies; no row-count mismatch. Not a Supabase-compatible platform restore. |
 | Maintenance protection | Local authorization, concurrent write barrier and rollback tests PASS. Not active on Main; external ingress/jobs/privileged writer hold remains unverified. |
 | Deployment executor | Default dry-run PASS; wrong project and missing-attestation gates failed safely. No production writes. |
-| Web | Type-check, lint, production build and 105 tests PASS; 3 configuration/workflow integration tests PASS. |
-| Edge | 7 focused Deno tests and checks of 10 changed files PASS. |
-| Flutter | `pub get` PASS; analysis PASS with no issues; tests PASS 61/61. |
-| Android | Configured debug APK PASS (194,102,078 bytes; SHA-256 `ce925355b2a9c9b347ec4b9e799eabc4d3d7b65b7d583b08b3618325bcbd5d46`). Project URL and runtime variable match; key ownership is not proven. Release signing not verified; `android/key.properties` absent. |
-| Phase 4B status | PARTIAL. Assessment locking/practice separation and current test/build gates pass; broad feature, authorization, hosted Storage and authenticated acceptance requirements remain. |
-| Git / publication | Phase 4B partial progress is locally committed on `main`; local branch is ahead of the `origin/main` tracking ref. No push; live remote synchronization is not claimed. |
+| Database and migration tests | Assessment and native contract suites PASS; Phase 3B reconciliation PASS; migration validator PASS; tamper tests 6/6 PASS. |
+| Web | TypeScript check, lint and production build PASS; tests 112/112 PASS; built public assets contain no secret API-key value or service-role JWT. Vite reports a large-chunk warning. |
+| Flutter | `flutter pub get` PASS; analysis PASS with no issues; tests PASS 64/64. |
+| Mobile runtime configuration | Main project URL and runtime variable are configured; publishable-key Auth health request returned HTTP 200 without logging the key. This verifies project binding only, not authenticated application workflows. |
+| Android | Prior configured debug APK evidence remains; no new APK/AAB was built in this refresh. Release signing is blocked because `mobile/android/key.properties` is absent. |
+| Phase 4B status | PARTIAL. True/false lesson practice is added and locally tested; broad exercise, homework, analytics, authorization and role-parity requirements remain. |
+| Git / publication | Commit `5c61b7b0d87df23a042d1b8fbf20915b741de31d`; clean `main`, 11 ahead / 0 behind the live remote ref. No push. Remote auto-deployment linkage remains unverified. |
 
 ## Recovery and change safety
 

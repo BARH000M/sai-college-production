@@ -2,6 +2,27 @@
 
 **Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
 
+## Latest local feature and release-preparation update — 18 November 2026
+
+Commit `5c61b7b0d87df23a042d1b8fbf20915b741de31d` adds true/false lesson
+practice to the existing learning question contract, React authoring, Flutter
+student interaction and isolated server-grading tests. The web and Flutter
+full suites pass at 112/112 and 64/64, respectively; assessment, native
+database, Phase 3B reconciliation and migration integrity suites pass. The
+React production artifact builds and its credential-value scan passes. The
+configured mobile publishable key returned HTTP 200 from Main's non-mutating
+Auth health endpoint. Local `main` is clean, 11 commits ahead and 0 behind the
+live remote ref; no push or deployment occurred.
+
+Interactive exercises remain **PARTIAL**; image/audio and specialized Chinese
+practice types remain incomplete. Phase 4B is **PARTIAL**, Phase 4C is not
+started, and production remains **NO-GO**. Android release signing is blocked
+by absent `mobile/android/key.properties`; hosting/backend binding, fresh
+recovery verification, production security findings, hosted Storage and
+authenticated role acceptance remain unresolved. The earlier dated rows
+below preserve their checkpoint-specific evidence and are superseded where
+test counts or key-binding status differ.
+
 ## Phase 4B local refresh — 18 November 2026
 
 Phase 4B remains **PARTIAL**. The previously uncommitted assessment integrity
