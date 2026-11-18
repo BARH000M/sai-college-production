@@ -67,10 +67,15 @@ alter table public.learning_exercise_questions
     check (
       (assessment_id is null
         and bank_category is null
-        and kind in ('vocabulary','listening')
+        and kind in ('vocabulary','listening','true_false')
         and correct_choice is not null
         and jsonb_typeof(choices) = 'array'
-        and jsonb_array_length(choices) between 2 and 6)
+        and (
+          (kind = 'true_false' and jsonb_array_length(choices) = 2
+            and correct_choice in (0,1))
+          or (kind in ('vocabulary','listening')
+            and jsonb_array_length(choices) between 2 and 6)
+        ))
       or
       (assessment_id is null
         and bank_category is not null

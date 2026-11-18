@@ -74,6 +74,27 @@ test("question creation writes the answer key server-side and appends position",
   await assert.rejects(api2.createExerciseQuestion(input), /permission denied/);
 });
 
+test("true/false exercises require exactly two choices and use server-side grading", async () => {
+  const client = fakeClient();
+  const api = await load(client, "true-false");
+  assert.equal(await api.createExerciseQuestion({
+    ...input,
+    kind: "true_false",
+    vocabularyId: null,
+    choices: ["صح", "خطأ"],
+    correctChoice: 1,
+  }), "q1");
+  const insert = client.calls.find((call) => call[0] === "insert");
+  assert.equal(insert[1].kind, "true_false");
+  assert.equal(insert[1].correct_choice, 1);
+  assert.equal(insert[1].vocabulary_id, null);
+  await assert.rejects(api.createExerciseQuestion({
+    ...input,
+    kind: "true_false",
+    choices: ["صح", "خطأ", "ربما"],
+  }), /صح أو خطأ خيارين/);
+});
+
 test("student question loads never request the answer key column", async () => {
   const client = fakeClient({ writeResult: { data: [], error: null } });
   const api = await load(client, "read");
@@ -81,7 +102,7 @@ test("student question loads never request the answer key column", async () => {
   const select = client.calls.find((call) => call[0] === "select");
   assert.ok(!String(select[1]).includes("correct_choice"));
   assert.deepEqual(client.calls.find((call) => call[0] === "in"),
-    ["in", "kind", ["vocabulary", "listening"]]);
+    ["in", "kind", ["vocabulary", "listening", "true_false"]]);
   await assert.rejects(
     load(fakeClient(), "bad-shape").then((m) => m.submitExercise("l1", [])),
     /سؤال واحد/,

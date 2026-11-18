@@ -232,7 +232,9 @@ insert into public.learning_exercise_questions
  (id,lesson_id,kind,prompt,choices,correct_choice,position)
 values
  ('00000000-0000-0000-0000-000000000807','00000000-0000-0000-0000-000000000501',
-  'vocabulary','Practice question','["A","B"]',0,7);
+  'vocabulary','Practice question','["A","B"]',0,7),
+ ('00000000-0000-0000-0000-000000000808','00000000-0000-0000-0000-000000000501',
+  'true_false','هل نينغشيا في الصين؟','["صح","خطأ"]',0,8);
 update public.learning_assessments set status='published'
   where id='00000000-0000-0000-0000-000000000701';
 insert into public.learning_assessments
@@ -480,10 +482,12 @@ update public.learning_assessments set status='published'
 do $$
 begin
   if (select count(*) from public.sai_learning_exercise_questions_admin(
-        '00000000-0000-0000-0000-000000000501')) <> 1
+        '00000000-0000-0000-0000-000000000501')) <> 2
     or not exists (select 1 from public.sai_learning_exercise_questions_admin(
         '00000000-0000-0000-0000-000000000501')
-      where id='00000000-0000-0000-0000-000000000807') then
+      where id in ('00000000-0000-0000-0000-000000000807',
+        '00000000-0000-0000-0000-000000000808')
+      group by lesson_id having count(*) = 2) then
     raise exception 'Practice authoring included assessment questions';
   end if;
 end $$;
@@ -515,10 +519,17 @@ begin
   end;
   v_practice := public.sai_learning_submit_exercise(
     '00000000-0000-0000-0000-000000000501',
-    '[{"question":"00000000-0000-0000-0000-000000000807","choice":0}]');
-  if (v_practice->>'total')::int <> 1 or (v_practice->>'score')::int <> 100
-    or jsonb_array_length(v_practice->'results') <> 1 then
-    raise exception 'Practice grading included assessment questions: %', v_practice;
+    '[{"question":"00000000-0000-0000-0000-000000000807","choice":0},'
+    '{"question":"00000000-0000-0000-0000-000000000808","choice":0}]');
+  if (v_practice->>'total')::int <> 2 or (v_practice->>'score')::int <> 100
+    or jsonb_array_length(v_practice->'results') <> 2 then
+    raise exception 'Practice grading did not include both supported practice types: %', v_practice;
+  end if;
+  v_practice := public.sai_learning_submit_exercise(
+    '00000000-0000-0000-0000-000000000501',
+    '[{"question":"00000000-0000-0000-0000-000000000808","choice":1}]');
+  if (v_practice->>'score')::int <> 0 or (v_practice->>'passed')::boolean then
+    raise exception 'True/false wrong answer was not graded as incorrect: %', v_practice;
   end if;
   v_started := public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000701');
   if jsonb_array_length(v_started->'questions') <> 5 then

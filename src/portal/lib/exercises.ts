@@ -1,11 +1,12 @@
 import { supabase } from "./supabase";
 
-export const exerciseKinds = ["vocabulary", "listening"] as const;
+export const exerciseKinds = ["vocabulary", "listening", "true_false"] as const;
 export type ExerciseKind = typeof exerciseKinds[number];
 
 export const exerciseKindLabels: Record<ExerciseKind, string> = {
   vocabulary: "تعرّف على المفردات",
   listening: "استماع",
+  true_false: "صح أم خطأ",
 };
 
 export type ExerciseQuestion = {
@@ -48,8 +49,12 @@ function parseChoices(value: unknown): string[] {
   return value as string[];
 }
 
+function isExerciseKind(value: unknown): value is ExerciseKind {
+  return typeof value === "string" && (exerciseKinds as readonly string[]).includes(value);
+}
+
 function asQuestion(row: Record<string, unknown>): ExerciseQuestion {
-  if (row.kind !== "vocabulary" && row.kind !== "listening") throw new Error("نوع سؤال غير صالح.");
+  if (!isExerciseKind(row.kind)) throw new Error("نوع سؤال غير صالح.");
   return { ...(row as unknown as Omit<ExerciseQuestion, "choices" | "kind">), kind: row.kind, choices: parseChoices(row.choices) };
 }
 
@@ -101,6 +106,7 @@ function cleanQuestionInput(input: ExerciseQuestionInput) {
   if (prompt.length < 2 || prompt.length > 200) throw new Error("نص السؤال يجب أن يكون بين حرفين و ٢٠٠ حرف.");
   const choices = input.choices.map((choice) => choice.trim());
   if (choices.length < 2 || choices.length > 6) throw new Error("أدخل بين خيارين وستة خيارات.");
+  if (input.kind === "true_false" && choices.length !== 2) throw new Error("يتطلب سؤال صح أو خطأ خيارين فقط.");
   if (choices.some((choice) => !choice || choice.length > 200)) throw new Error("كل خيار يجب أن يكون نصاً غير فارغ (حتى ٢٠٠ حرف).");
   if (new Set(choices).size !== choices.length) throw new Error("الخيارات المكررة غير مسموحة.");
   if (!Number.isInteger(input.correctChoice) || input.correctChoice < 0 || input.correctChoice >= choices.length) {

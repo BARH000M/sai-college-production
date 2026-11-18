@@ -89,7 +89,9 @@ export function LessonQuestionsPanel({
         vocabularyId: form.vocabularyId || null,
         kind: form.kind,
         prompt: form.prompt,
-        choices: form.choices.split(/\r?\n/).map((choice) => choice.trim()).filter(Boolean),
+        choices: form.kind === "true_false"
+          ? ["صح", "خطأ"]
+          : form.choices.split(/\r?\n/).map((choice) => choice.trim()).filter(Boolean),
         correctChoice: form.correct,
         isPublished: form.published,
       };
@@ -128,7 +130,9 @@ export function LessonQuestionsPanel({
     }
   }
 
-  const choiceList = form.choices.split(/\r?\n/).map((choice) => choice.trim()).filter(Boolean);
+  const choiceList = form.kind === "true_false"
+    ? ["صح", "خطأ"]
+    : form.choices.split(/\r?\n/).map((choice) => choice.trim()).filter(Boolean);
 
   return <section className="panel management-detail" aria-label="أسئلة التقييم">
     <div className="page-heading">
@@ -167,7 +171,14 @@ export function LessonQuestionsPanel({
       <label>نوع السؤال
         <select value={form.kind} onChange={(event) => {
           if ((exerciseKinds as readonly string[]).includes(event.target.value)) {
-            setForm({ ...form, kind: event.target.value as ExerciseKind });
+            const kind = event.target.value as ExerciseKind;
+            setForm({
+              ...form,
+              kind,
+              choices: kind === "true_false" ? "صح\nخطأ" : form.kind === "true_false" ? "" : form.choices,
+              correct: 0,
+              vocabularyId: kind === "vocabulary" ? form.vocabularyId : "",
+            });
           }
         }}>
           {exerciseKinds.map((kind) => <option key={kind} value={kind}>{exerciseKindLabels[kind]}</option>)}
@@ -182,10 +193,12 @@ export function LessonQuestionsPanel({
           {words.map((word) => <option key={word.id} value={word.id}>{word.hanzi} — {word.meaning_ar}</option>)}
         </select>
       </label>}
-      <label>الخيارات (خيار واحد في كل سطر، ٢–٦ خيارات)<span className="vocab-required"> *</span>
-        <textarea required rows={4} value={form.choices}
-          onChange={(event) => setForm({ ...form, choices: event.target.value, correct: 0 })} />
-      </label>
+      {form.kind === "true_false"
+        ? <p className="data-note">يُعرض للطالب خيارا «صح» و«خطأ».</p>
+        : <label>الخيارات (خيار واحد في كل سطر، ٢–٦ خيارات)<span className="vocab-required"> *</span>
+          <textarea required rows={4} value={form.choices}
+            onChange={(event) => setForm({ ...form, choices: event.target.value, correct: 0 })} />
+        </label>}
       <label>الإجابة الصحيحة
         <select value={form.correct} onChange={(event) => setForm({ ...form, correct: Number(event.target.value) })}>
           {choiceList.map((choice, index) => <option key={`${index}-${choice}`} value={index}>{index + 1}. {choice}</option>)}
