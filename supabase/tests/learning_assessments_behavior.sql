@@ -272,10 +272,12 @@ values ('00000000-0000-0000-0000-000000000501','multiple_choice','Bank question'
 insert into public.learning_exercise_questions
   (lesson_id,kind,prompt,choices,correct_choice,assessment_id,points,answer_key,bank_category)
 values ('00000000-0000-0000-0000-000000000501','multiple_select','Select two',
-  '["A","B","C"]',null,null,2,'[0,2]','قواعد');
+  '["A","B","C"]',null,null,2,'[0,2]','قواعد'),
+ ('00000000-0000-0000-0000-000000000501','ordering','Order three',
+  '["C","A","B"]',null,null,2,'["A","B","C"]','ترتيب');
 do $$
 declare v_copy uuid; v_roster record; v_bank_id uuid; v_added_id uuid;
-  v_multi_id uuid;
+  v_multi_id uuid; v_order_id uuid;
 begin
   v_copy := public.sai_learning_assessment_duplicate(
     '00000000-0000-0000-0000-000000000701', 'نسخة قابلة للتحرير');
@@ -313,6 +315,15 @@ begin
       '00000000-0000-0000-0000-000000000714')
       where id=v_multi_id and kind='multiple_select' and answer_key='[0,2]'::jsonb) then
     raise exception 'Multiple-select bank import did not preserve its answer set';
+  end if;
+  select id into v_bank_id from public.sai_learning_assessment_question_bank(
+    '00000000-0000-0000-0000-000000000401','ترتيب');
+  v_order_id := public.sai_learning_assessment_add_from_bank(
+    '00000000-0000-0000-0000-000000000714',v_bank_id);
+  if not exists (select 1 from public.sai_learning_assessment_questions_admin(
+      '00000000-0000-0000-0000-000000000714')
+      where id=v_order_id and kind='ordering' and answer_key='["A","B","C"]'::jsonb) then
+    raise exception 'Ordering question import did not preserve the answer sequence';
   end if;
   begin
     perform public.sai_learning_assessment_assign(
@@ -365,11 +376,22 @@ begin
     raise exception 'Duplicate multiple-select answers were accepted';
   exception when check_violation then null;
   end;
+  select (question->>'id')::uuid into v_multiple
+    from jsonb_array_elements(v_start->'questions') question
+    where question->>'kind'='ordering';
+  begin
+    perform public.sai_learning_assessment_save(v_attempt,v_multiple,'["A","A","C"]');
+    raise exception 'Duplicate ordering answer was accepted';
+  exception when check_violation then null;
+  end;
   for v_question in select value from jsonb_array_elements(v_start->'questions')
   loop
     if v_question->>'kind'='multiple_select' then
       perform public.sai_learning_assessment_save(
         v_attempt,(v_question->>'id')::uuid,'[0,2]');
+    elsif v_question->>'kind'='ordering' then
+      perform public.sai_learning_assessment_save(
+        v_attempt,(v_question->>'id')::uuid,'["A","B","C"]');
     else
       perform public.sai_learning_assessment_save(
         v_attempt,(v_question->>'id')::uuid,'1');
@@ -377,7 +399,7 @@ begin
   end loop;
   v_result := public.sai_learning_assessment_submit(v_attempt);
   if v_result->>'status' <> 'graded'
-    or (select score from public.learning_assessment_attempts where id=v_attempt) <> 4 then
+    or (select score from public.learning_assessment_attempts where id=v_attempt) <> 6 then
     raise exception 'Multiple-answer questions were not automatically graded: %',v_result;
   end if;
 end $$;
