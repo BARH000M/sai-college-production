@@ -45,6 +45,7 @@ const question = {
   kind: "matching",
   prompt: "طابق الكلمات",
   points: 2,
+  bankCategory: "مفردات",
   choices: ["صباح", "مساء", "早", "晚"],
   correctChoice: null,
   answerKey: { صباح: "早", مساء: "晚" },
@@ -69,7 +70,36 @@ test("authoring persists a validated matching answer key with lesson and assessm
   assert.equal(inserted.lesson_id, "lesson-1");
   assert.deepEqual(inserted.choices, question.choices);
   assert.deepEqual(inserted.answer_key, question.answerKey);
+  assert.equal(inserted.bank_category, "مفردات");
   assert.equal(inserted.is_published, false);
+});
+
+test("categorized assessment questions load from the protected bank and import via RPC", async () => {
+  const row = {
+    id: "bank-question-1",
+    category: "مفردات",
+    kind: "multiple_choice",
+    prompt: "اختر الكلمة",
+    choices: ["A", "B"],
+    correct_choice: 1,
+    answer_key: null,
+    points: 2,
+    position: 1,
+    lesson_id: "lesson-1",
+  };
+  const bankClient = fakeClient({ rpcResult: { data: [row], error: null } });
+  const bankApi = await load(bankClient, "question-bank");
+  const questions = await bankApi.loadAssessmentQuestionBank("course-1");
+  assert.equal(questions[0].bank_category, "مفردات");
+  assert.equal(bankClient.calls[0][1], "sai_learning_assessment_question_bank");
+
+  const importClient = fakeClient({ rpcResult: { data: "assessment-question-1", error: null } });
+  const importApi = await load(importClient, "question-bank-import");
+  await importApi.addAssessmentQuestionFromBank("assessment-1", "bank-question-1");
+  assert.deepEqual(importClient.calls[0], ["rpc", "sai_learning_assessment_add_from_bank", {
+    p_assessment: "assessment-1",
+    p_question: "bank-question-1",
+  }]);
 });
 
 test("student start parses only safe question fields and save delegates to server RPC", async () => {

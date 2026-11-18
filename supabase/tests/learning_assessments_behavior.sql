@@ -246,7 +246,10 @@ values
   'Individual assignment',null,now()+interval '2 hours',null,1,70,false),
  ('00000000-0000-0000-0000-000000000713',
   '00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000501',
-  'Timed assessment',null,now()+interval '2 hours',1,1,70,false);
+  'Timed assessment',null,now()+interval '2 hours',1,1,70,false),
+ ('00000000-0000-0000-0000-000000000714',
+  '00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000501',
+  'Question bank target',null,null,null,1,70,false);
 insert into public.learning_exercise_questions
  (id,lesson_id,kind,prompt,choices,correct_choice,position,assessment_id,points)
 values
@@ -262,8 +265,12 @@ update public.learning_assessments set status='published'
   where id in ('00000000-0000-0000-0000-000000000711',
     '00000000-0000-0000-0000-000000000712',
     '00000000-0000-0000-0000-000000000713');
+insert into public.learning_exercise_questions
+  (lesson_id,kind,prompt,choices,correct_choice,assessment_id,points,bank_category)
+values ('00000000-0000-0000-0000-000000000501','multiple_choice','Bank question',
+  '["A","B"]',1,null,2,'مفردات');
 do $$
-declare v_copy uuid; v_roster record;
+declare v_copy uuid; v_roster record; v_bank_id uuid; v_added_id uuid;
 begin
   v_copy := public.sai_learning_assessment_duplicate(
     '00000000-0000-0000-0000-000000000701', 'نسخة قابلة للتحرير');
@@ -282,6 +289,16 @@ begin
     where student_id='00000000-0000-0000-0000-000000000601';
   if v_roster.assigned or v_roster.class_wide then
     raise exception 'Individual student assignment did not restrict the class roster';
+  end if;
+  select id into v_bank_id from public.sai_learning_assessment_question_bank(
+    '00000000-0000-0000-0000-000000000401','مفردات');
+  if v_bank_id is null then raise exception 'Teacher could not load categorized bank questions'; end if;
+  v_added_id := public.sai_learning_assessment_add_from_bank(
+    '00000000-0000-0000-0000-000000000714',v_bank_id);
+  if not exists (select 1 from public.sai_learning_assessment_questions_admin(
+      '00000000-0000-0000-0000-000000000714')
+      where id=v_added_id and bank_category='مفردات' and correct_choice=1) then
+    raise exception 'Question bank import did not preserve the protected answer key';
   end if;
   begin
     perform public.sai_learning_assessment_assign(
@@ -400,6 +417,16 @@ select public.as_user('00000000-0000-0000-0000-000000000102');
 do $$
 declare v_started jsonb; v_attempt uuid; v_result jsonb; v_answer uuid; v_practice jsonb;
 begin
+  if exists (select 1 from public.learning_exercise_questions
+      where bank_category='مفردات') then
+    raise exception 'Student can read the assessment question bank';
+  end if;
+  begin
+    perform * from public.sai_learning_assessment_question_bank(
+      '00000000-0000-0000-0000-000000000401',null);
+    raise exception 'Student queried protected question bank';
+  exception when insufficient_privilege then null;
+  end;
   if exists (select 1 from public.learning_exercise_questions
       where assessment_id='00000000-0000-0000-0000-000000000701') then
     raise exception 'Student can read assessment questions outside an attempt';

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   assessmentKindLabels,
   assessmentKinds,
+  addAssessmentQuestionFromBank,
   assignAssessmentStudents,
   createAssessment,
   createAssessmentQuestion,
@@ -9,6 +10,7 @@ import {
   deleteAssessmentQuestion,
   gradeAssessmentAnswer,
   loadAssessmentRoster,
+  loadAssessmentQuestionBank,
   loadAssessmentQuestionsAdmin,
   loadAssessmentResults,
   loadAssessments,
@@ -85,6 +87,7 @@ export function AssessmentsPanel({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [openId, setOpenId] = useState("");
   const [questions, setQuestions] = useState<AssessmentQuestionAdmin[]>([]);
+  const [bankQuestions, setBankQuestions] = useState<AssessmentQuestionAdmin[]>([]);
   const [results, setResults] = useState<AssessmentResultRow[]>([]);
   const [attempt, setAttempt] = useState<Awaited<ReturnType<typeof startAssessment>> | null>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
@@ -104,6 +107,7 @@ export function AssessmentsPanel({
   const [randomizeQuestions, setRandomizeQuestions] = useState(false);
   const [editing, setEditing] = useState("");
   const [questionForm, setQuestionForm] = useState<QuestionForm>(emptyQuestion);
+  const [questionCategory, setQuestionCategory] = useState("");
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null);
   const [assignmentFor, setAssignmentFor] = useState("");
   const [roster, setRoster] = useState<AssessmentStudent[] | null>(null);
@@ -132,17 +136,20 @@ export function AssessmentsPanel({
     if (openId === item.id) return;
     if (canManage) {
       try {
-        const [loadedQuestions, loadedResults] = await Promise.all([
+        const [loadedQuestions, loadedResults, loadedBank] = await Promise.all([
           loadAssessmentQuestionsAdmin(item.id),
           loadAssessmentResults(item.id),
+          loadAssessmentQuestionBank(item.course_id),
         ]);
         setQuestions(loadedQuestions);
         setResults(loadedResults);
+        setBankQuestions(loadedBank);
       } catch (failure) {
         setError(message(failure));
       }
     } else {
       setQuestions([]);
+      setBankQuestions([]);
       try {
         setResults(await loadAssessmentResults(item.id));
       } catch (failure) {
@@ -248,6 +255,7 @@ export function AssessmentsPanel({
       kind: questionForm.kind,
       prompt: questionForm.prompt,
       points: Number(questionForm.points),
+      bankCategory: questionCategory,
       choices,
       correctChoice: questionForm.kind === "multiple_choice" || questionForm.kind === "true_false"
         ? questionForm.correct
@@ -262,6 +270,7 @@ export function AssessmentsPanel({
     const key = question.answer_key && !Array.isArray(question.answer_key) ? question.answer_key : {};
     const matchingKey = question.choices.slice(0, choiceCount).map((left) => key[left] ?? "").join("\n");
     setEditingQuestion(question.id);
+    setQuestionCategory(question.bank_category ?? "");
     setQuestionForm({
       kind: question.kind,
       prompt: question.prompt,
@@ -282,10 +291,31 @@ export function AssessmentsPanel({
       const input = questionInput(item);
       if (editingQuestion) await updateAssessmentQuestion(editingQuestion, input);
       else await createAssessmentQuestion(input);
-      setQuestions(await loadAssessmentQuestionsAdmin(item.id));
+      const [updatedQuestions, updatedBank] = await Promise.all([
+        loadAssessmentQuestionsAdmin(item.id),
+        loadAssessmentQuestionBank(item.course_id),
+      ]);
+      setQuestions(updatedQuestions);
+      setBankQuestions(updatedBank);
       setQuestionForm(emptyQuestion);
+      setQuestionCategory("");
       setEditingQuestion(null);
       setNotice("حُفظ السؤال في قاعدة البيانات المشتركة.");
+    } catch (failure) {
+      setError(message(failure));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addBankQuestion(item: LearningAssessment, questionId: string) {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await addAssessmentQuestionFromBank(item.id, questionId);
+      setQuestions(await loadAssessmentQuestionsAdmin(item.id));
+      setNotice("أُضيف السؤال المصنف إلى مسودة التقييم.");
     } catch (failure) {
       setError(message(failure));
     } finally {
@@ -604,10 +634,19 @@ export function AssessmentsPanel({
 
         {canManage && <>
           <h5>بنك أسئلة التقييم</h5>
+          {item.status === "draft" && bankQuestions.length > 0 && <section className="management-form" aria-label="الأسئلة المصنفة القابلة لإعادة الاستخدام">
+            <h6>أسئلة مصنفة قابلة لإعادة الاستخدام</h6>
+            {bankQuestions.map((question) => <div className="actions" key={question.id}>
+              <span>{question.bank_category} · {question.prompt}</span>
+              <button type="button" className="text-button" disabled={saving}
+                onClick={() => void addBankQuestion(item, question.id)}>إضافة للمسودة</button>
+            </div>)}
+          </section>}
           {!questions.length && <p className="muted">أضف سؤالاً واحداً على الأقل قبل النشر.</p>}
           {questions.map((question) => <div className="learn-exercise" key={question.id}>
             <strong>{question.prompt}</strong>
             <small className="learn-meta">{assessmentKindLabels[question.kind]} · {question.points} درجة</small>
+            {question.bank_category && <small className="learn-meta">تصنيف البنك: {question.bank_category}</small>}
             {question.kind === "matching" && <p className="data-note">
               {Object.entries(question.answer_key ?? {}).map(([left, right]) => `${left} ← ${right}`).join(" · ")}
             </p>}
@@ -631,6 +670,8 @@ export function AssessmentsPanel({
             </select></label>
             <label>نص السؤال<input required maxLength={200} value={questionForm.prompt}
               onChange={(event) => setQuestionForm({ ...questionForm, prompt: event.target.value })} /></label>
+            <label>تصنيف بنك الأسئلة (اختياري)<input maxLength={80} value={questionCategory}
+              onChange={(event) => setQuestionCategory(event.target.value)} /></label>
             <label>الدرجة<input type="number" min={0.01} max={1000} step={0.01} value={questionForm.points}
               onChange={(event) => setQuestionForm({ ...questionForm, points: Number(event.target.value) })} /></label>
             {(questionForm.kind === "multiple_choice" || questionForm.kind === "true_false") && <>

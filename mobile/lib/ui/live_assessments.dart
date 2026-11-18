@@ -51,6 +51,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
   late Future<List<Map<String, dynamic>>> _assessments;
   String? _openId;
   List<Map<String, dynamic>> _questions = [];
+  List<Map<String, dynamic>> _bankQuestions = [];
   List<Map<String, dynamic>> _results = [];
   Map<String, dynamic>? _attempt;
   Map<String, dynamic> _answers = {};
@@ -90,9 +91,30 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       _error = null;
       _notice = null;
       _questions = [];
+      _bankQuestions = [];
       _results = [];
     });
     await _loadDetail('${assessment['id']}');
+    if (widget.canManage) {
+      await _loadBank('${assessment['course_id']}');
+    }
+  }
+
+  Future<void> _loadBank(String courseId) async {
+    try {
+      final result = await _client.rpc(
+        'sai_learning_assessment_question_bank',
+        params: {'p_course': courseId, 'p_category': null},
+      );
+      if (result is! List) throw StateError('استجابة بنك الأسئلة غير صالحة.');
+      if (mounted) {
+        setState(
+          () => _bankQuestions = List<Map<String, dynamic>>.from(result),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = 'تعذر تحميل بنك الأسئلة: $error');
+    }
   }
 
   Future<void> _loadDetail(String id) async {
@@ -217,7 +239,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       if (values == null) return;
       if ((values['title'] as String).length < 2 ||
           (values['title'] as String).length > 200) {
-        throw const FormatException('عنوان التقييم يجب أن يكون بين حرفين و٢٠٠ حرف.');
+        throw const FormatException(
+          'عنوان التقييم يجب أن يكون بين حرفين و٢٠٠ حرف.',
+        );
       }
       final settings = AssessmentSettings.fromInput(
         startsAt: values['starts'] as String,
@@ -262,6 +286,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     String kind = '${current?['kind'] ?? 'multiple_choice'}';
     final prompt = TextEditingController(text: '${current?['prompt'] ?? ''}');
     final points = TextEditingController(text: '${current?['points'] ?? 1}');
+    final category = TextEditingController(
+      text: '${current?['bank_category'] ?? ''}',
+    );
     final choices = TextEditingController(
       text: current == null
           ? ''
@@ -313,6 +340,13 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                         decimal: true,
                       ),
                       decoration: const InputDecoration(labelText: 'الدرجة'),
+                    ),
+                    TextField(
+                      controller: category,
+                      maxLength: 80,
+                      decoration: const InputDecoration(
+                        labelText: 'تصنيف بنك الأسئلة (اختياري)',
+                      ),
                     ),
                     if (kind == 'multiple_choice' || kind == 'true_false')
                       TextField(
@@ -374,6 +408,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                   'kind': kind,
                   'prompt': prompt.text.trim(),
                   'points': double.tryParse(points.text),
+                  'category': category.text.trim(),
                   'choices': choices.text,
                   'answer': answer.text,
                   'correct': correct,
@@ -413,7 +448,8 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       final numericPoints = values['points'] as double?;
       if ((values['prompt'] as String).length < 2 ||
           numericPoints == null ||
-          numericPoints <= 0) {
+          numericPoints <= 0 ||
+          (values['category'] as String).length > 80) {
         throw StateError('أدخل نص السؤال ودرجة صحيحة أكبر من صفر.');
       }
       final payload = {
@@ -428,6 +464,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
             : null,
         'answer_key': key,
         'points': numericPoints,
+        'bank_category': (values['category'] as String).isEmpty
+            ? null
+            : values['category'],
         'is_published': false,
       };
       if (current == null) {
@@ -454,12 +493,14 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
             .eq('assessment_id', assessmentId);
       }
       await _loadDetail(assessmentId);
+      await _loadBank(widget.courseId);
       if (mounted) setState(() => _notice = 'حُفظ السؤال.');
     } catch (error) {
       if (mounted) setState(() => _error = 'تعذر حفظ السؤال: $error');
     } finally {
       prompt.dispose();
       points.dispose();
+      category.dispose();
       choices.dispose();
       answer.dispose();
     }
@@ -488,7 +529,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
             'archived' => 'أرشفة التقييم؟',
             _ => 'إعادة التقييم إلى المسودات؟',
           }),
-          content: const Text('سيُطبّق التغيير على الطلاب المعيّنين وفق صلاحياتهم.'),
+          content: const Text(
+            'سيُطبّق التغيير على الطلاب المعيّنين وفق صلاحياتهم.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -629,7 +672,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       if (values == null) return;
       final titleValue = values['title'] as String;
       if (titleValue.length < 2 || titleValue.length > 200) {
-        throw const FormatException('عنوان التقييم يجب أن يكون بين حرفين و٢٠٠ حرف.');
+        throw const FormatException(
+          'عنوان التقييم يجب أن يكون بين حرفين و٢٠٠ حرف.',
+        );
       }
       final settings = AssessmentSettings.fromInput(
         startsAt: values['starts'] as String,
@@ -692,7 +737,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
         'sai_learning_assessment_roster',
         params: {'p_assessment': assessmentId},
       );
-      if (response is! List) throw StateError('استجابة قائمة الطلاب غير صالحة.');
+      if (response is! List) {
+        throw StateError('استجابة قائمة الطلاب غير صالحة.');
+      }
       final roster = List<Map<String, dynamic>>.from(response);
       final selected = roster
           .where((student) => student['assigned'] == true)
@@ -715,7 +762,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                           CheckboxListTile(
                             title: Text('${student['full_name']}'),
                             subtitle: Text('${student['admission_no']}'),
-                            value: selected.contains('${student['student_id']}'),
+                            value: selected.contains(
+                              '${student['student_id']}',
+                            ),
                             onChanged: (checked) => setDialogState(() {
                               final id = '${student['student_id']}';
                               if (checked == true) {
@@ -807,6 +856,19 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     }
   }
 
+  Future<void> _addFromBank(String assessmentId, String questionId) async {
+    try {
+      await _client.rpc(
+        'sai_learning_assessment_add_from_bank',
+        params: {'p_assessment': assessmentId, 'p_question': questionId},
+      );
+      await _loadDetail(assessmentId);
+      if (mounted) setState(() => _notice = 'أُضيف سؤال البنك إلى المسودة.');
+    } catch (error) {
+      if (mounted) setState(() => _error = 'تعذر إضافة سؤال البنك: $error');
+    }
+  }
+
   Future<void> _start(String assessmentId) async {
     setState(() {
       _busy = true;
@@ -879,8 +941,8 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     });
     try {
       final expiresAt = DateTime.tryParse('${_attempt?['expires_at'] ?? ''}');
-      final expiredByClock = expiresAt != null &&
-          !DateTime.now().toUtc().isBefore(expiresAt);
+      final expiredByClock =
+          expiresAt != null && !DateTime.now().toUtc().isBefore(expiresAt);
       if (!await _saveAttempt() &&
           !expiredByClock &&
           !(_error?.contains('Assessment time limit has passed') ?? false)) {
@@ -1101,6 +1163,22 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                 ),
             ],
           ),
+          if (status == 'draft' && _bankQuestions.isNotEmpty) ...[
+            const Text('أسئلة مصنفة قابلة لإعادة الاستخدام'),
+            for (final question in _bankQuestions)
+              ListTile(
+                title: Text('${question['prompt']}'),
+                subtitle: Text('${question['bank_category']}'),
+                trailing: canEditQuestions
+                    ? TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _addFromBank(id, '${question['id']}'),
+                        child: const Text('إضافة'),
+                      )
+                    : null,
+              ),
+          ],
           if (_questions.isEmpty)
             const Text('لا توجد أسئلة بعد. أضف سؤالاً قبل النشر.'),
           for (final question in _questions)
@@ -1112,7 +1190,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
               trailing: canEditQuestions
                   ? PopupMenuButton<String>(
                       onSelected: (choice) {
-                        if (choice == 'edit') _addQuestion(id, current: question);
+                        if (choice == 'edit') {
+                          _addQuestion(id, current: question);
+                        }
                         if (choice == 'delete') {
                           _deleteQuestion(id, '${question['id']}');
                         }
@@ -1153,17 +1233,19 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     if (widget.canTake) {
       if (_attempt == null) {
         final startsAt = DateTime.tryParse('${item['starts_at'] ?? ''}');
-        final waitingForStart = startsAt != null &&
-            DateTime.now().toUtc().isBefore(startsAt);
+        final waitingForStart =
+            startsAt != null && DateTime.now().toUtc().isBefore(startsAt);
         return Align(
           alignment: AlignmentDirectional.centerStart,
           child: FilledButton(
             onPressed: _busy || !_assessmentIsOpen(item)
                 ? null
                 : () => _start(id),
-            child: Text(waitingForStart
-                ? 'يفتح في ${item['starts_at']}'
-                : 'بدء أو استكمال المحاولة المحفوظة'),
+            child: Text(
+              waitingForStart
+                  ? 'يفتح في ${item['starts_at']}'
+                  : 'بدء أو استكمال المحاولة المحفوظة',
+            ),
           ),
         );
       }
@@ -1231,7 +1313,11 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                 'النتيجة: ${result['score']} من ${result['max_score']}',
               ),
               subtitle: Text(
-                '${result['passed'] == null ? '' : result['passed'] == true ? 'مجتاز' : 'لم يجتز'}'
+                '${result['passed'] == null
+                    ? ''
+                    : result['passed'] == true
+                    ? 'مجتاز'
+                    : 'لم يجتز'}'
                 '${result['feedback'] == null ? '' : ' · ${result['feedback']}'}',
               ),
             ),
@@ -1309,9 +1395,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                                   if (item['status'] == 'draft' ||
                                       item['status'] == 'published')
                                     const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('تعديل الإعدادات'),
-                                  ),
+                                      value: 'edit',
+                                      child: Text('تعديل الإعدادات'),
+                                    ),
                                 ],
                               )
                             : const Icon(Icons.chevron_left),

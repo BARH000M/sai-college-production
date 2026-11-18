@@ -48,6 +48,7 @@ export type AssessmentQuestion = {
 export type AssessmentQuestionAdmin = AssessmentQuestion & {
   correct_choice: number | null;
   answer_key: Record<string, string> | string[] | null;
+  bank_category: string | null;
 };
 
 export type AssessmentStart = {
@@ -290,8 +291,45 @@ export async function loadAssessmentQuestionsAdmin(
       ...question,
       correct_choice: correctChoice as number | null,
       answer_key: row.answer_key as Record<string, string> | string[] | null,
+      bank_category: typeof row.bank_category === "string" ? row.bank_category : null,
     };
   });
+}
+
+export async function loadAssessmentQuestionBank(
+  courseId: string,
+): Promise<AssessmentQuestionAdmin[]> {
+  const { data, error } = await supabase.rpc("sai_learning_assessment_question_bank", {
+    p_course: courseId,
+    p_category: null,
+  });
+  if (error) message(error, "تعذر تحميل بنك الأسئلة");
+  if (!Array.isArray(data)) throw new Error("استجابة بنك الأسئلة غير صالحة.");
+  return data.map((item) => {
+    const row = item as Record<string, unknown>;
+    const question = parseQuestion(row);
+    if (typeof row.category !== "string" || !row.category.trim()) {
+      throw new Error("تصنيف سؤال البنك غير صالح.");
+    }
+    return {
+      ...question,
+      correct_choice: typeof row.correct_choice === "number" ? row.correct_choice : null,
+      answer_key: row.answer_key as Record<string, string> | string[] | null,
+      bank_category: row.category,
+    };
+  });
+}
+
+export async function addAssessmentQuestionFromBank(
+  assessmentId: string,
+  questionId: string,
+): Promise<void> {
+  const { data, error } = await supabase.rpc("sai_learning_assessment_add_from_bank", {
+    p_assessment: assessmentId,
+    p_question: questionId,
+  });
+  if (error) message(error, "تعذر إضافة سؤال البنك");
+  if (typeof data !== "string") throw new Error("لم يُضف سؤال بنك الأسئلة.");
 }
 
 export type AssessmentQuestionInput = {
@@ -300,6 +338,7 @@ export type AssessmentQuestionInput = {
   kind: AssessmentQuestionKind;
   prompt: string;
   points: number;
+  bankCategory?: string | null;
   choices: string[];
   correctChoice: number | null;
   answerKey: Record<string, string> | string[] | null;
@@ -307,8 +346,10 @@ export type AssessmentQuestionInput = {
 
 function questionPayload(input: AssessmentQuestionInput) {
   const prompt = input.prompt.trim();
+  const bankCategory = input.bankCategory?.trim() || null;
   const choices = input.choices.map((choice) => choice.trim());
   if (prompt.length < 2 || prompt.length > 200) throw new Error("نص السؤال يجب أن يكون بين حرفين و٢٠٠ حرف.");
+  if (bankCategory !== null && bankCategory.length > 80) throw new Error("التصنيف يجب ألا يتجاوز ٨٠ حرفاً.");
   if (!Number.isFinite(input.points) || input.points <= 0 || input.points > 1000) throw new Error("درجة السؤال يجب أن تكون أكبر من صفر وحتى ١٠٠٠.");
   if (input.kind === "multiple_choice" || input.kind === "true_false") {
     if (choices.length < 2 || choices.length > 6 || choices.some((item) => !item || item.length > 300)) {
@@ -351,6 +392,7 @@ function questionPayload(input: AssessmentQuestionInput) {
       : null,
     answer_key: input.answerKey,
     points: input.points,
+    bank_category: bankCategory,
     is_published: false,
   };
 }

@@ -52,7 +52,9 @@ create table public.learning_assessments (
 alter table public.learning_exercise_questions
   add column assessment_id uuid references public.learning_assessments(id) on delete cascade,
   add column points numeric(7,2) not null default 1 check (points > 0 and points <= 1000),
-  add column answer_key jsonb;
+  add column answer_key jsonb,
+  add column bank_category text
+    check (bank_category is null or length(btrim(bank_category)) between 1 and 80);
 alter table public.learning_exercise_questions alter column correct_choice drop not null;
 alter table public.learning_exercise_questions
   drop constraint if exists learning_exercise_questions_kind_check,
@@ -63,10 +65,15 @@ alter table public.learning_exercise_questions
   add constraint learning_exercise_questions_assessment_shape_check
     check (
       (assessment_id is null
+        and bank_category is null
         and kind in ('vocabulary','listening')
         and correct_choice is not null
         and jsonb_typeof(choices) = 'array'
         and jsonb_array_length(choices) between 2 and 6)
+      or
+      (assessment_id is null
+        and bank_category is not null
+        and kind in ('multiple_choice','true_false','matching','fill_blank','written'))
       or
       (assessment_id is not null
         and kind in ('multiple_choice','true_false','matching','fill_blank','written'))
@@ -351,13 +358,13 @@ grant update (title, instructions, starts_at, due_at, time_limit_minutes,
   attempt_limit, passing_score, randomize_questions, status, results_released)
   on public.learning_assessments to authenticated;
 grant select (id, lesson_id, vocabulary_id, kind, prompt, choices, position,
-  is_published, created_at, assessment_id, points)
+  is_published, created_at, assessment_id, points, bank_category)
   on public.learning_exercise_questions to authenticated;
 grant insert (id, lesson_id, vocabulary_id, kind, prompt, choices, correct_choice,
-  position, is_published, assessment_id, points, answer_key)
+  position, is_published, assessment_id, points, answer_key, bank_category)
   on public.learning_exercise_questions to authenticated;
 grant update (vocabulary_id, kind, prompt, choices, correct_choice, position,
-  is_published, assessment_id, points, answer_key)
+  is_published, assessment_id, points, answer_key, bank_category)
   on public.learning_exercise_questions to authenticated;
 grant delete on public.learning_exercise_questions to authenticated;
 grant select on public.learning_assessment_attempts,
@@ -587,14 +594,82 @@ begin
   returning id into v_id;
   insert into public.learning_exercise_questions (
     lesson_id, vocabulary_id, kind, prompt, choices, correct_choice,
-    position, is_published, assessment_id, points, answer_key
+    position, is_published, assessment_id, points, answer_key, bank_category
   )
   select q.lesson_id, q.vocabulary_id, q.kind, q.prompt, q.choices,
-    q.correct_choice, q.position, false, v_id, q.points, q.answer_key
+    q.correct_choice, q.position, false, v_id, q.points, q.answer_key,
+    q.bank_category
   from public.learning_exercise_questions q
   where q.assessment_id = p_assessment
   order by q.position, q.id;
   return v_id;
+end;
+$$;
+
+create function public.sai_learning_assessment_question_bank(
+  p_course uuid, p_category text default null
+)
+returns table (
+  id uuid, category text, kind text, prompt text, choices jsonb,
+  correct_choice integer, answer_key jsonb, points numeric, "position" integer,
+  lesson_id uuid
+)
+language plpgsql stable security definer
+set search_path = pg_catalog, public, private, auth
+as $$
+begin
+  if (select auth.uid()) is null
+    or not private.sai_learning_can_manage_course(p_course) then
+    raise exception 'Question bank is not available to this account' using errcode = '42501';
+  end if;
+  return query
+    select q.id, q.bank_category, q.kind, q.prompt, q.choices,
+      q.correct_choice, q.answer_key, q.points, q.position, q.lesson_id
+    from public.learning_exercise_questions q
+    join public.learning_lessons l on l.id = q.lesson_id
+    where l.course_id = p_course and q.bank_category is not null
+      and (p_category is null or q.bank_category = btrim(p_category))
+    order by q.bank_category, q.created_at desc, q.id;
+end;
+$$;
+
+create function public.sai_learning_assessment_add_from_bank(
+  p_assessment uuid, p_question uuid
+)
+returns uuid language plpgsql security definer
+set search_path = pg_catalog, public, private, auth
+as $$
+declare
+  v_assessment public.learning_assessments%rowtype;
+  v_question public.learning_exercise_questions%rowtype;
+  v_new_question uuid;
+  v_position integer;
+begin
+  select a.* into v_assessment from public.learning_assessments a
+    where a.id = p_assessment and a.status = 'draft' for update;
+  if v_assessment.id is null
+    or not private.sai_learning_assessment_manage(p_assessment) then
+    raise exception 'Assessment cannot accept bank questions' using errcode = '42501';
+  end if;
+  select q.* into v_question
+    from public.learning_exercise_questions q
+    join public.learning_lessons l on l.id = q.lesson_id
+    where q.id = p_question and q.bank_category is not null
+      and l.course_id = v_assessment.course_id;
+  if v_question.id is null then
+    raise exception 'Question is not in this course question bank' using errcode = '42501';
+  end if;
+  select coalesce(max(q.position), 0) + 1 into v_position
+    from public.learning_exercise_questions q where q.assessment_id = p_assessment;
+  insert into public.learning_exercise_questions (
+    lesson_id, kind, prompt, choices, correct_choice, position,
+    is_published, assessment_id, points, answer_key, bank_category
+  ) values (
+    v_assessment.lesson_id, v_question.kind, v_question.prompt, v_question.choices,
+    v_question.correct_choice, v_position, false, p_assessment, v_question.points,
+    v_question.answer_key, v_question.bank_category
+  ) returning id into v_new_question;
+  return v_new_question;
 end;
 $$;
 
@@ -789,11 +864,20 @@ begin
       where a.id = new.assessment_id and a.lesson_id = new.lesson_id) then
       raise exception 'Question must belong to the assessment lesson' using errcode = '23514';
     end if;
+    new.is_published := exists (select 1 from public.learning_assessments a
+      where a.id = new.assessment_id and a.status = 'published');
+  elsif new.bank_category is not null then
+    new.bank_category := btrim(new.bank_category);
+    if length(new.bank_category) not between 1 and 80 then
+      raise exception 'Question category must be between 1 and 80 characters'
+        using errcode = '23514';
+    end if;
+    new.is_published := false;
+  end if;
+  if new.assessment_id is not null or new.bank_category is not null then
     if jsonb_typeof(new.choices) is distinct from 'array' then
       raise exception 'Question options must be a JSON array' using errcode = '23514';
     end if;
-    new.is_published := exists (select 1 from public.learning_assessments a
-      where a.id = new.assessment_id and a.status = 'published');
     if new.kind in ('multiple_choice','true_false') then
       if jsonb_typeof(new.choices) <> 'array'
         or jsonb_array_length(new.choices) < 2 or jsonb_array_length(new.choices) > 6
@@ -1209,13 +1293,13 @@ create or replace function public.sai_learning_assessment_questions_admin(p_asse
 returns table (
   id uuid, lesson_id uuid, kind text, prompt text, choices jsonb,
   correct_choice integer, answer_key jsonb, points numeric,
-  "position" integer, is_published boolean
+  "position" integer, is_published boolean, bank_category text
 )
 language sql stable security definer
 set search_path = pg_catalog, public, private
 as $$
   select q.id, q.lesson_id, q.kind, q.prompt, q.choices, q.correct_choice,
-    q.answer_key, q.points, q.position, q.is_published
+    q.answer_key, q.points, q.position, q.is_published, q.bank_category
   from public.learning_exercise_questions q
   where q.assessment_id = p_assessment
     and private.sai_learning_assessment_manage(p_assessment)
@@ -1262,6 +1346,7 @@ as $$
     q.position, q.is_published, q.created_at, q.updated_at
   from public.learning_exercise_questions q
   where q.lesson_id = p_lesson and q.assessment_id is null
+    and q.bank_category is null
     and private.sai_learning_can_manage_course(private.sai_learning_question_course(p_lesson))
   order by q.position, q.id;
 $$;
@@ -1384,7 +1469,9 @@ revoke all on function public.sai_learning_assessment_start(uuid),
   public.sai_learning_assessment_results(uuid),
   public.sai_learning_assessment_roster(uuid),
   public.sai_learning_assessment_assign(uuid, uuid[]),
-  public.sai_learning_assessment_duplicate(uuid, text) from public, anon, authenticated;
+  public.sai_learning_assessment_duplicate(uuid, text),
+  public.sai_learning_assessment_question_bank(uuid, text),
+  public.sai_learning_assessment_add_from_bank(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.sai_learning_assessment_start(uuid),
   public.sai_learning_assessment_save(uuid, uuid, jsonb),
   public.sai_learning_assessment_submit(uuid),
@@ -1393,7 +1480,9 @@ grant execute on function public.sai_learning_assessment_start(uuid),
   public.sai_learning_assessment_results(uuid),
   public.sai_learning_assessment_roster(uuid),
   public.sai_learning_assessment_assign(uuid, uuid[]),
-  public.sai_learning_assessment_duplicate(uuid, text) to authenticated;
+  public.sai_learning_assessment_duplicate(uuid, text),
+  public.sai_learning_assessment_question_bank(uuid, text),
+  public.sai_learning_assessment_add_from_bank(uuid, uuid) to authenticated;
 
 revoke all on function public.sai_learning_exercise_questions_admin(uuid),
   public.sai_learning_submit_exercise(uuid, jsonb) from public, anon, authenticated;
