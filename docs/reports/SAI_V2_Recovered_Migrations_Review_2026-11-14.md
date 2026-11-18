@@ -1,5 +1,10 @@
 # Recovered Production migrations compared with V2
 
+<!-- PHASE7M-CURRENT -->
+**Main production reconciliation checkpoint, 18 November 2026:** [Phase 7-M](PHASE_7M_RECONCILIATION.md) now supplies the current Main inventory, classifications, tested compatibility packages and approval boundaries. Historical Preview/recovery results below retain their original scope; they are not production installation proof. Production remains NO-GO and Phase 4B paused.
+
+<!-- END-PHASE7M-CURRENT -->
+
 Read-only comparison of the three recovered SQL files with the 33-file V2
 chain through protected admission status events. No recovery, source overwrite,
 ledger repair, hosted query, or deployment was performed in this closeout.

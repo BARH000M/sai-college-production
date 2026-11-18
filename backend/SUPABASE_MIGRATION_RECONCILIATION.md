@@ -1,5 +1,10 @@
 # Safe migration reconciliation — IMPORTANT
 
+<!-- PHASE7M-CURRENT -->
+**18 November 2026 update — Phase 7-M:** The refreshed Main inventory is **57 local files / 57 GitHub Main files / 16 production history records**. All migration files match origin/main bytes at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. The earlier evidence below is historical wherever it differs. No production write, history repair or deployment occurred; Phase 4B remains paused. The current [report](../docs/reports/PHASE_7M_RECONCILIATION.md) and [matrix](../docs/reports/PHASE_7M_MIGRATION_MATRIX.md) supersede older Main counts and any advice below to use another Git branch. Work remains exclusively on `main`.
+
+<!-- END-PHASE7M-CURRENT -->
+
 Target production project: `aeryusbrulqdxjdynwfh` only. Never touch deprecated projects.
 
 Observed GitHub repository contains numbered files `001` to `028` with gaps. The remote migration history exposes 001–006, 008–014, and timestamped `20261110172940`, `20261110173339`, `20261110173506`. The live schema includes modules and business tables even though the numbered migration history does not account for all of them.

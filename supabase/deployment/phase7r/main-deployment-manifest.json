@@ -81,6 +81,130 @@
     {
       "path": "supabase/functions/_shared/client-ip.ts",
       "sha256": "015f547c2382273c5639fe4f8970926fecdef7611beaadc2e92091f47ec0b5e7"
+    },
+    {
+      "path": "supabase/deployment/phase7m/00_package_tracking.sql",
+      "sha256": "ea70101828352ca9e5fa3455dda2ac44db84edde1373a582b4dfc21494d7e416"
+    },
+    {
+      "path": "supabase/deployment/phase7m/01_finance_main.sql",
+      "sha256": "c5e533499ef7e6ad6daf06e0f7c0b8fd8c8849bd4a2f7c53e274f9c02879fc41"
+    },
+    {
+      "path": "supabase/deployment/phase7m/02_settings_main.sql",
+      "sha256": "b316b7785d5fcd5a060526ba6fe57503b63c2f3b40289766c34fcbb0475051f1"
+    },
+    {
+      "path": "supabase/deployment/phase7m/03_admissions_remaining.sql",
+      "sha256": "f181e214a260ccd9fc2463b365a30346aed38d887f1bce46e9b23b1730870eb2"
+    },
+    {
+      "path": "supabase/deployment/phase7m/04_admission_events.sql",
+      "sha256": "faa7fa736387c194e3e027239981c40126dbf113b0919dbba0da6ad1179ae3d6"
+    },
+    {
+      "path": "supabase/deployment/phase7m/migration-lock.json",
+      "sha256": "11782590f35c3d403d672ea70b581cd40a2375e4df00aa1f36399da5e36741f1"
+    },
+    {
+      "path": "supabase/deployment/phase7m/evidence.json",
+      "sha256": "f6d250dcaf7098f0fb37c235b38d46339a07dfcd6293a2665afae29102ac88c6"
+    },
+    {
+      "path": "supabase/tests/phase7m/main_baseline.sql",
+      "sha256": "afedaf02a0dff016de2c1e0c4d6838d599bb1d3e112ab8d07ae6b6ad7af8b084"
+    },
+    {
+      "path": "supabase/tools/validate_migrations.py",
+      "sha256": "9d1e252e7ef2788d76160ac0f63aff0de59c9a89097ba7236440b746cdd98d08"
+    },
+    {
+      "path": "supabase/deployment/phase7r/Invoke-MainDeployment.ps1",
+      "sha256": "b8ad34202228b3869ce56869c0819de44ec4bacb91d22143f4b84c7908b53046"
+    },
+    {
+      "path": "supabase/inspection/phase7m_equivalence.sql",
+      "sha256": "0ea6051bb8eb2c52fa0103b3119d28d3987dd57f2a324924404ffb8e396494b1"
+    },
+    {
+      "path": "supabase/tests/phase3b-main/run_local.py",
+      "sha256": "88ce9bfbafd31ca342c241a85ad602271b3b38e195e8e41fe85e325d475f3669"
+    },
+    {
+      "path": "supabase/tests/phase3b-main/fixtures.sql",
+      "sha256": "013460b18ad3e64772eb43a0bf4daad2c55ce7097d9cc878a0e99d173388919a"
+    },
+    {
+      "path": "supabase/tests/phase3b-main/behavior.sql",
+      "sha256": "797cd6682652ab2c978fedd2e137091fc6ab4101c48ad6c2b541ba7dc9cdef15"
+    },
+    {
+      "path": "supabase/tests/phase7m_behavior.sql",
+      "sha256": "3d1692288626b25b0e483c350e9544d0f3a8294a82e039f2eebf14bbe66fd67f"
+    },
+    {
+      "path": "supabase/tests/phase7m_executor_tracking.ps1",
+      "sha256": "552d6bbadba9d3a21478c5003390b94dd43ac5edafb0fe36a5c54d252a80b573"
+    },
+    {
+      "path": "supabase/tests/run_native_contracts.py",
+      "sha256": "868b1e41f00779103be930f540e0f2289ad5ae8e5a3ce2dd74cc181d2200ccbc"
+    },
+    {
+      "path": "supabase/tests/test_migration_validation.py",
+      "sha256": "efdcf6981b2ebc8434c4e727d996c9e15c0834c805b16df26691f77e401a41c4"
+    },
+    {
+      "path": "supabase/tests/finance_completion_behavior.sql",
+      "sha256": "fd680c381698a0193c620bf1e41619269a2a962799fd75b3042b864f566369bb"
+    },
+    {
+      "path": "supabase/tests/admissions_behavior.sql",
+      "sha256": "850c719901baf8c87ac0493aaa04a095a3b2545f8edb8493043a6753a825c6d7"
+    },
+    {
+      "path": "supabase/tests/admissions_tracking_behavior.sql",
+      "sha256": "4b99e29b16e21c3ff35460484a6dfd33c26ac13d04b815b2232846a94c1f7d5d"
+    },
+    {
+      "path": "supabase/tests/admission_event_integrity.sql",
+      "sha256": "c3dc7c44aa6b5cdd1b96f04b1442031e6c0c1d4479ae9dcadd4f4386b0b5ce77"
+    },
+    {
+      "path": "supabase/tests/student_parent_access.sql",
+      "sha256": "bd2c7b4892dd95597b22d44914a0e6987abcd83f48158840d7d34f64411a18c7"
+    },
+    {
+      "path": "supabase/tests/attendance_behavior.sql",
+      "sha256": "ee8e386253aed319467ec6e853d4a6bc1f62455dfd092ce0661f63751b66d4cd"
+    },
+    {
+      "path": "supabase/tests/profile_contact_behavior.sql",
+      "sha256": "e198ee861568b3374b809fb105ba36dad7bc12a233964bce4eaf14cee9d75713"
+    },
+    {
+      "path": "supabase/tests/examinations_behavior.sql",
+      "sha256": "2c3a5b77a3715d7795e2e4617d97882f66703491479c043089c00ae0eb4e3d66"
+    },
+    {
+      "path": "supabase/tests/recovery/mutation_hold_fixture.sql",
+      "sha256": "ae3382ac1b14a2fe492ea3ad3dcbab9803ce8e672f093aaaf87234736f6d304a"
+    },
+    {
+      "path": "supabase/tests/recovery/mutation_hold_behavior.sql",
+      "sha256": "6d88c48176afcde4d08be43a4934a2fb2fc895e8fa3a24829dc737cddf73bb04"
+    },
+    {
+      "path": "supabase/tests/recovery/mutation_hold_cleanup.sql",
+      "sha256": "ad99f7ee3eedbd03acb18a28674bcde7ab388a79176c64fa920d2e51d2e72176"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "70abd1c872b57c15a4ecb9193228ca29a7ab27958c2734d1e30c6a78dd29a697"
+    },
+    {
+      "path": ".github/workflows/database-ci.yml",
+      "sha256": "32adb005994c6c27616d5fb76cc0eb055786c4a030adb26028e41a12cab35ba0"
     }
   ],
   "steps": [
@@ -94,41 +218,71 @@
       "id": "phase3b-role-contract",
       "kind": "sql",
       "path": "supabase/deployment/phase3b-main/01_role_contract.sql",
-      "depends_on": ["install-mutation-hold"]
+      "depends_on": [
+        "install-mutation-hold"
+      ]
     },
     {
       "id": "phase3b-teacher-assignment",
       "kind": "sql",
       "path": "supabase/deployment/phase3b-main/02_teacher_assignment.sql",
-      "depends_on": ["phase3b-role-contract"]
+      "depends_on": [
+        "phase3b-role-contract"
+      ]
     },
     {
       "id": "phase3b-verified-onboarding",
       "kind": "sql",
       "path": "supabase/deployment/phase3b-main/03_verified_onboarding.sql",
-      "depends_on": ["phase3b-role-contract"]
+      "depends_on": [
+        "phase3b-role-contract"
+      ]
     },
     {
       "id": "phase3c-own-contact-validation",
       "kind": "sql",
       "path": "supabase/deployment/phase3c-main/001_own_contact_validation.sql",
-      "depends_on": ["phase3b-verified-onboarding"]
+      "depends_on": [
+        "phase3b-verified-onboarding"
+      ]
     },
     {
       "id": "phase4a-examinations",
       "kind": "sql",
       "path": "supabase/deployment/phase4a-examinations/001_examinations.sql",
-      "depends_on": ["phase3c-own-contact-validation"]
+      "depends_on": [
+        "phase3c-own-contact-validation"
+      ]
+    },
+    {
+      "id": "phase7m-finance",
+      "kind": "sql",
+      "path": "supabase/deployment/phase7m/01_finance_main.sql",
+      "depends_on": [
+        "phase4a-examinations"
+      ]
+    },
+    {
+      "id": "phase7m-settings",
+      "kind": "sql",
+      "path": "supabase/deployment/phase7m/02_settings_main.sql",
+      "depends_on": [
+        "phase7m-finance"
+      ]
     },
     {
       "id": "refresh-mutation-guards",
       "kind": "refresh-mutation-guards",
-      "depends_on": ["phase4a-examinations"]
+      "depends_on": [
+        "phase7m-settings"
+      ]
     },
     {
       "id": "activate-mutation-hold",
       "kind": "activate-mutation-hold",
-      "depends_on": ["refresh-mutation-guards"]
+      "depends_on": [
+        "refresh-mutation-guards"
+      ]
     },
     {
       "id": "deploy-edge-guards",
@@ -142,7 +296,9 @@
         "admission-notify",
         "announcement-email"
       ],
-      "depends_on": ["activate-mutation-hold"]
+      "depends_on": [
+        "activate-mutation-hold"
+      ]
     }
   ],
   "edge_function_baseline": [
@@ -152,7 +308,9 @@
       "version": 9,
       "verify_jwt": false,
       "entrypoint": "supabase/functions/manage-roles/index.ts",
-      "dependencies": ["supabase/functions/_shared/role-management-handler.ts"]
+      "dependencies": [
+        "supabase/functions/_shared/role-management-handler.ts"
+      ]
     },
     {
       "slug": "school-admin",
@@ -171,7 +329,9 @@
       "version": 8,
       "verify_jwt": true,
       "entrypoint": "supabase/functions/provision-learning-account/index.ts",
-      "dependencies": ["supabase/functions/_shared/mutation-gate.ts"]
+      "dependencies": [
+        "supabase/functions/_shared/mutation-gate.ts"
+      ]
     },
     {
       "slug": "link-student-account",
@@ -190,7 +350,9 @@
       "version": 7,
       "verify_jwt": true,
       "entrypoint": "supabase/functions/admission-reminders/index.ts",
-      "dependencies": ["supabase/functions/_shared/mutation-gate.ts"]
+      "dependencies": [
+        "supabase/functions/_shared/mutation-gate.ts"
+      ]
     },
     {
       "slug": "admission-notify",
@@ -209,7 +371,9 @@
       "version": 3,
       "verify_jwt": true,
       "entrypoint": "supabase/functions/announcement-email/index.ts",
-      "dependencies": ["supabase/functions/_shared/mutation-gate.ts"]
+      "dependencies": [
+        "supabase/functions/_shared/mutation-gate.ts"
+      ]
     }
   ],
   "excluded_functions": [
@@ -228,5 +392,58 @@
     "external_hold_attestation": "External JSON must attest edge/direct-write containment and paused managed jobs.",
     "secrets": "Only protected environment variables; never command-line arguments, logs, or repository files.",
     "post_failure": "Stop immediately; never auto-release the hold or run a reverse migration."
-  }
+  },
+  "reconciliation": {
+    "checkpoint": "Phase 7-M",
+    "release_ready": false,
+    "decision": "NO-GO",
+    "evidence_path": "supabase/deployment/phase7m/evidence.json",
+    "lock_path": "supabase/deployment/phase7m/migration-lock.json",
+    "phase4b": "ACTIVE FOR LOCAL DEVELOPMENT; excluded from production, including scored-exercise rollout",
+    "historical_replay": false,
+    "history_repairs_eligible": [
+      "030",
+      "20261116013951"
+    ],
+    "history_repairs_authorized": false
+  },
+  "package_tracking": {
+    "bootstrap_path": "supabase/deployment/phase7m/00_package_tracking.sql",
+    "table": "private.sai_deployment_packages",
+    "policy": "Package SQL, postcondition and receipt commit atomically; reject retries; never infer historical migration completion."
+  },
+  "deferred_steps": [
+    {
+      "id": "phase7m-admissions-remaining",
+      "path": "supabase/deployment/phase7m/03_admissions_remaining.sql",
+      "depends_on": [
+        "phase3b-verified-onboarding"
+      ],
+      "reason": "Requires separately approved admission-tracking Edge and public-flow cutover; not executed by Phase 7-R"
+    },
+    {
+      "id": "phase7m-admission-events",
+      "path": "supabase/deployment/phase7m/04_admission_events.sql",
+      "depends_on": [
+        "phase7m-admissions-remaining"
+      ],
+      "reason": "Deploy together with tracking; not executed by Phase 7-R"
+    }
+  ],
+  "quarantined_migrations": [
+    "supabase/migrations/20261117202728_production_mutation_hold.sql",
+    "supabase/migrations/20261117202733_production_security_permissions.sql",
+    "supabase/migrations/20261117202739_production_atomic_role_management.sql",
+    "supabase/migrations/20261117202743_production_branch_membership_protection.sql",
+    "supabase/migrations/20261117202749_production_teacher_assignment.sql",
+    "supabase/migrations/20261117202754_production_verified_onboarding.sql",
+    "supabase/migrations/20261117202759_production_admissions_enrollment_tracking.sql",
+    "supabase/migrations/20261117202805_production_admission_event_integrity.sql",
+    "supabase/migrations/20261117202811_production_finance_scoped_directories.sql",
+    "supabase/migrations/20261117202817_production_system_settings_additive.sql",
+    "supabase/migrations/20261117202821_production_learning_completion_scoring.sql",
+    "supabase/migrations/20261117202825_production_examinations_results.sql",
+    "supabase/migrations/20261117202830_production_refresh_mutation_guards.sql",
+    "supabase/migrations/20261117202835_production_release_mutation_hold.sql"
+  ]
 }

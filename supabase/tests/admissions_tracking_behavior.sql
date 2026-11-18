@@ -47,8 +47,10 @@ begin
     (admin_id, 'TRACK_TEST_admin', 'TRACK_TEST_admin@example.test'),
     (receptionist_id, 'TRACK_TEST_reception', 'TRACK_TEST_reception@example.test'),
     (parent_id, 'TRACK_TEST_parent', 'TRACK_TEST_parent@example.test');
-  insert into public.branches (id, name, code, is_active)
-  values (branch_id, 'TRACK_TEST_' || run_id, 'TRACK_TEST_' || run_id, true);
+  -- Public submission chooses the oldest active branch. Keep this fixture
+  -- deterministic when the Main replay already contains synthetic branches.
+  insert into public.branches (id, name, code, is_active, created_at)
+  values (branch_id, 'TRACK_TEST_' || run_id, 'TRACK_TEST_' || run_id, true, '1900-01-01');
   insert into public.academic_sessions (id, name, starts_on, ends_on, is_active)
   values (session_id, 'TRACK_TEST_' || run_id, date '2031-01-01', date '2031-12-31', true);
   insert into public.branch_memberships (user_id, branch_id)

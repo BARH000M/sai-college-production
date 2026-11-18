@@ -1,0 +1,7 @@
+# Deployment SHA-256 pins bind exact bytes on Windows and Linux.
+supabase/deployment/** -text
+supabase/functions/** -text
+supabase/tests/** -text
+supabase/tests/phase7m/main_baseline.sql whitespace=cr-at-eol
+supabase/tools/validate_migrations.py -text
+.github/workflows/database-ci.yml -text

@@ -1,5 +1,10 @@
 # Phase 2C-1 final migration review
 
+<!-- PHASE7M-CURRENT -->
+**Main production reconciliation checkpoint, 18 November 2026:** [Phase 7-M](PHASE_7M_RECONCILIATION.md) now supplies the current Main inventory, classifications, tested compatibility packages and approval boundaries. Historical Preview/recovery results below retain their original scope; they are not production installation proof. Production remains NO-GO and Phase 4B paused.
+
+<!-- END-PHASE7M-CURRENT -->
+
 Date: 2026-11-16. Workspace: `D:\SAI-College-Production-v2-completion`. Branch confirmed: `feature/v2-completion`.
 
 ## Decision

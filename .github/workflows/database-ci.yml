@@ -1,0 +1,42 @@
+name: Migration integrity and database security
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/**', '.github/workflows/database-ci.yml']
+  pull_request:
+    paths: ['supabase/**', '.github/workflows/database-ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate inventory and applied migration immutability
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]]; then
+            python supabase/tools/validate_migrations.py --base-ref "$BASE_SHA"
+          else
+            python supabase/tools/validate_migrations.py
+          fi
+      - run: python supabase/tests/test_migration_validation.py
+      - name: Install native PostgreSQL 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17
+          test -x /usr/lib/postgresql/17/bin/initdb
+          echo 'SAI_PG_BIN=/usr/lib/postgresql/17/bin' >> "$GITHUB_ENV"
+      - run: python supabase/tests/run_native_contracts.py
+      - run: python supabase/tests/phase3b-main/run_local.py --reconciliation
+      # No production credentials, linked project, Docker, deploy or history repair.

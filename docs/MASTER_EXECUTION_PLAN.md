@@ -1,5 +1,21 @@
 # Yemen SAI V2 — Building and production roadmap
 
+**Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
+
+
+<!-- PHASE7M-CURRENT -->
+**18 November 2026 update — Phase 7-M:** The refreshed Main inventory is **57 local files / 57 GitHub Main files / 16 production history records**. All migration files match origin/main bytes at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. The earlier evidence below is historical wherever it differs. No production write, history repair or deployment occurred; Phase 4B remains paused.
+
+**Current checkpoint within Phase 7: Phase 7-M.** Local reconciliation preparation and native SQL/security testing passed; the production baseline is unchanged and remains NO-GO. Retain all **16 development phases** and **24 system-settings requirements** below. Phase 7-M is a checkpoint, not an additional development phase or a waiver of provider/release requirements.
+
+- Use the [complete matrix](reports/PHASE_7M_MIGRATION_MATRIX.md), [current reconciliation report](reports/PHASE_7M_RECONCILIATION.md) and [updated Phase 7-R manifest](../supabase/deployment/phase7r/main-deployment-manifest.json).
+- Never replay 007 or the historical backlog. Quarantine the fourteen overlapping production candidates, including six empty placeholders. Apply only reviewed Main-compatible package routes after approval.
+- Native Main replay passed 3B roles/onboarding, 3C profiles, 4A examinations, finance/settings corrections, deferred admissions regressions, all-nine-role tests, last-admin concurrency and maintenance containment. Actual executor receipt/rollback/tamper tests passed. Drift negative tests passed 6/6; CI is prepared without production deployment. Hosted acceptance remains unverified.
+- Only grant-only 030 and 20261116013951 have individually verified repair proposals; no repair is authorized. Packages outside migrations receive atomic hash-bound receipts, never synthetic historical completion records.
+- Next: review exact hashes and recovery/containment evidence, obtain explicit deployment approval, perform the coordinated cutover and live acceptance, then update production status. Resume Phase 4B only after the required production baseline is reconciled and verified. Existing Flutter/signing and full platform recovery blockers remain open.
+
+<!-- END-PHASE7M-CURRENT -->
+
 **Roadmap revision:** 18 November 2026 — Phase 7-R local recovery and deployment safeguards verified; production remains NO-GO
 
 **Current execution checkpoint:** Local Main `f2ca63f08ed59455cd8cebb64f99aa0272c93af2` matched live `origin/main` in a read-only check; GitHub reported no hooks or deployments. No commit or push was made in this task because Hostinger control-panel deployment settings remain unverified. The hash-verified backup was recovered into a disposable native PostgreSQL cluster for application-scope testing: 85 tables, 860 rows, 355 constraints, 105 functions, 44 triggers and 113 policies passed integrity checks. The original full `pg_restore` had 56 errors; Supabase-managed Auth, Storage, Realtime, Edge, Cron, Vault and hosted extensions were not recovered. Local maintenance authorization, concurrency and rollback tests passed, with 14 public wrappers still awaiting the Phase 3B grant restrictions. The guarded executor dry-run passed; wrong-project and missing-attestation gates failed safely. Web type-check, lint, build and 105 tests passed; the 3 integration tests and 7 Deno tests passed. Flutter dependency resolution passed, but analysis (30 issues), tests (5 test files failed to compile) and debug APK build failed due Dart/file-picker/homework API errors. Java 21.0.13 is available; release signing is not verified. No production write or deployment occurred. Preserve Phase 4B work and do not replay the historical migration backlog.

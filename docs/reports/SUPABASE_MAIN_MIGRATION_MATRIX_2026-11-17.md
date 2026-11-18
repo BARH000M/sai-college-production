@@ -1,5 +1,10 @@
 # Main versus 40 local migrations — 2026-11-17
 
+<!-- PHASE7M-CURRENT -->
+**18 November 2026 update — Phase 7-M:** The refreshed Main inventory is **57 local files / 57 GitHub Main files / 16 production history records**. All migration files match origin/main bytes at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. The earlier evidence below is historical wherever it differs. No production write, history repair or deployment occurred; Phase 4B remains paused. See the authoritative [Phase 7-M report](PHASE_7M_RECONCILIATION.md) and [complete matrix](PHASE_7M_MIGRATION_MATRIX.md).
+
+<!-- END-PHASE7M-CURRENT -->
+
 Target: `aeryusbrulqdxjdynwfh`. History and live catalogs were inspected separately. “Present” identifies inspected effects, including later equivalent/replacement implementations; it does not assert byte-identical historical execution or runtime certification. No migration is approved for deployment by this table.
 
 | Local SQL file | In Main history | Live result / deployment disposition |

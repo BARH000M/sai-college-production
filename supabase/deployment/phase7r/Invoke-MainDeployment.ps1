@@ -241,9 +241,14 @@ function Assert-FunctionBaseline {
 function Assert-Manifest {
   Assert-True ($ProjectRef -eq $manifest.project.ref) "Production execution is restricted to the exact Main project."
   Assert-True ($manifest.project.git_branch -eq "main") "Manifest does not target the main branch."
+  Assert-True ($manifest.reconciliation.checkpoint -eq "Phase 7-M") "Missing migration reconciliation checkpoint."
+  if ($Execute) {
+    Assert-True ([bool]$manifest.reconciliation.release_ready) "Phase 7-M baseline is NO-GO; production execution is disabled."
+  }
 
   $seenPaths = @{}
   foreach ($source in $manifest.required_source_files) {
+    Assert-True ($source.path -notmatch 'phase4b') "Unfinished Phase 4B inputs are excluded."
     Assert-True (-not $seenPaths.ContainsKey($source.path)) "Manifest repeats a source path."
     $seenPaths[$source.path] = $true
     $fullPath = Get-ManifestPath -RelativePath $source.path
@@ -257,6 +262,9 @@ function Assert-Manifest {
       Assert-True ($seenPaths.ContainsKey([string]$dependency)) "Edge dependency is not hash-pinned: $dependency"
     }
   }
+  Assert-True ($seenPaths.ContainsKey([string]$manifest.package_tracking.bootstrap_path)) "Package tracking SQL is not pinned."
+  Assert-True ($seenPaths.ContainsKey([string]$manifest.reconciliation.lock_path)) "Migration inventory lock is not pinned."
+  Assert-True ($seenPaths.ContainsKey([string]$manifest.reconciliation.evidence_path)) "Reconciliation evidence is not pinned."
 
   $functionStep = @($manifest.steps | Where-Object { $_.kind -eq "edge-functions" })
   Assert-True ($functionStep.Count -eq 1) "Manifest must contain one ordered Edge Function deployment step."
@@ -266,6 +274,7 @@ function Assert-Manifest {
 
   $completed = @{}
   foreach ($step in $manifest.steps) {
+    Assert-True (-not $completed.ContainsKey([string]$step.id)) "Deployment step ID is duplicated."
     foreach ($dependency in @($step.depends_on)) {
       Assert-True ($completed.ContainsKey([string]$dependency)) "Deployment dependency order is invalid at $($step.id)."
     }
@@ -290,13 +299,6 @@ function Invoke-SqlStep {
   param([Parameter(Mandatory)][object]$Step)
   $fullPath = Get-ManifestPath -RelativePath $Step.path
   Write-Record -Step $Step.id -Status "STARTED" -Message "Applying the single reviewed SQL proposal."
-  $result = Invoke-Psql -Arguments @(
-    "--no-psqlrc", "--host", $env:PGHOST, "--port", $env:PGPORT,
-    "--username", $env:PGUSER, "--dbname", $env:PGDATABASE,
-    "--set", "ON_ERROR_STOP=1", "--quiet", "--file", $fullPath
-  )
-  Write-Record -Step $Step.id -Status "APPLIED" -Message "SQL process exited successfully."
-
   $verifySql = switch ($Step.id) {
     "install-mutation-hold" {
       "SELECT CASE WHEN to_regprocedure('public.sai_set_mutation_hold(boolean,text)') IS NOT NULL AND (SELECT enabled = false FROM private.sai_mutation_hold_state WHERE singleton) THEN 'OK' ELSE 'FAIL' END;"
@@ -316,19 +318,80 @@ function Invoke-SqlStep {
     "phase4a-examinations" {
       "SELECT CASE WHEN to_regclass('public.exams') IS NOT NULL AND to_regclass('public.exam_results') IS NOT NULL AND EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid = 'public.exams'::regclass AND relrowsecurity) AND EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE oid = 'public.exam_results'::regclass AND relrowsecurity) THEN 'OK' ELSE 'FAIL' END;"
     }
+    "phase7m-finance" {
+      "SELECT CASE WHEN to_regprocedure('public.sai_finance_students()') IS NOT NULL AND NOT has_function_privilege('anon','public.sai_finance_students()','EXECUTE') AND to_regnamespace('sai_finance') IS NULL THEN 'OK' ELSE 'FAIL' END;"
+    }
+    "phase7m-settings" {
+      "SELECT CASE WHEN to_regclass('private.sai_system_settings_audit') IS NOT NULL AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='sai_system_settings' AND column_name='value_type') THEN 'OK' ELSE 'FAIL' END;"
+    }
     default { throw "No post-deployment verifier is defined for $($Step.id)." }
   }
+  # Every package, postcondition and receipt commit together. Strip only the
+  # single reviewed top-level transaction pair; reject unexpected structure.
+  $sourceBytes = [IO.File]::ReadAllBytes($fullPath)
+  $sourceHash = ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($sourceBytes))).Replace('-', '').ToLowerInvariant()
+  $expectedSource = @($manifest.required_source_files | Where-Object path -eq $Step.path)
+  Assert-True ($expectedSource.Count -eq 1 -and $sourceHash -eq $expectedSource[0].sha256) "Package changed after manifest preflight."
+  $source = [Text.Encoding]::UTF8.GetString($sourceBytes)
+  $beginPattern = '(?im)^begin;\s*\r?$'
+  $commitPattern = '(?im)^commit;\s*\r?$'
+  Assert-True ([regex]::Matches($source, $beginPattern).Count -eq 1) "Package must have exactly one top-level BEGIN."
+  Assert-True ([regex]::Matches($source, $commitPattern).Count -eq 1) "Package must have exactly one top-level COMMIT."
+  $body = [regex]::Replace([regex]::Replace($source, $beginPattern, ''), $commitPattern, '')
+  $trackingPath = [string]$manifest.package_tracking.bootstrap_path
+  $trackingBytes = [IO.File]::ReadAllBytes((Get-ManifestPath -RelativePath $trackingPath))
+  $trackingHash = ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($trackingBytes))).Replace('-', '').ToLowerInvariant()
+  $expectedTracking = @($manifest.required_source_files | Where-Object path -eq $trackingPath)
+  Assert-True ($expectedTracking.Count -eq 1 -and $trackingHash -eq $expectedTracking[0].sha256) "Package tracker changed after manifest preflight."
+  $tracking = [Text.Encoding]::UTF8.GetString($trackingBytes)
+  $packageId = ([string]$Step.id).Replace("'", "''")
+  $packagePath = ([string]$Step.path).Replace("'", "''")
+  $postcondition = $verifySql.Trim().TrimEnd(';')
+  $wrapper = @"
+begin;
+select pg_advisory_xact_lock(831704, 7);
+$tracking
+do `$receipt`$ begin
+  if exists(select 1 from private.sai_deployment_packages where package_id='$packageId') then
+    raise exception 'Package already recorded; inspect receipt and schema before retry';
+  end if;
+end `$receipt`$;
+$body
+do `$post`$ begin
+  if ($postcondition) is distinct from 'OK' then
+    raise exception 'Package postcondition failed';
+  end if;
+end `$post`$;
+insert into private.sai_deployment_packages(package_id,source_path,source_sha256,manifest_sha256,git_commit)
+values('$packageId','$packagePath','$sourceHash','$script:manifestHash','$script:gitCommit');
+commit;
+"@
+  $wrapperPath = Join-Path $logRoot ("package-" + [guid]::NewGuid().ToString("N") + ".sql")
+  try {
+    [IO.File]::WriteAllText($wrapperPath, $wrapper, [Text.UTF8Encoding]::new($false))
+    $result = Invoke-Psql -Arguments @(
+      "--no-psqlrc", "--host", $env:PGHOST, "--port", $env:PGPORT,
+      "--username", $env:PGUSER, "--dbname", $env:PGDATABASE,
+      "--set", "ON_ERROR_STOP=1", "--quiet", "--file", $wrapperPath
+    )
+  }
+  finally {
+    if (Test-Path -LiteralPath $wrapperPath) { Remove-Item -LiteralPath $wrapperPath }
+  }
+  Write-Record -Step $Step.id -Status "APPLIED" -Message "SQL, postcondition and immutable package receipt committed together."
   $verification = Invoke-PsqlQuery -Sql $verifySql
   Assert-True ($verification.Output.Trim() -eq "OK") "Post-SQL verification failed for $($Step.id)."
   Write-Record -Step $Step.id -Status "VERIFIED" -Message "Required database objects and policy state were verified."
 }
 
-function Invoke-RefreshAndActivateHold {
+function Invoke-RefreshMutationGuards {
   $refresh = Invoke-PsqlQuery -Sql "SELECT private.sai_install_mutation_hold_guards();"
   $guardCount = 0
   Assert-True ([int]::TryParse($refresh.Output.Trim(), [ref]$guardCount) -and $guardCount -gt 0) "Hold guards were not refreshed over the deployed schema."
   Write-Record -Step "refresh-mutation-guards" -Status "VERIFIED" -Message "Hold guards were installed on current relations."
+}
 
+function Invoke-ActivateMutationHold {
   Write-Record -Step "activate-mutation-hold" -Status "STARTED" -Message "Requesting hold activation through the authenticated Super Admin RPC."
   $headers = @{
     apikey = $env:SUPABASE_ANON_KEY
@@ -445,17 +508,15 @@ try {
     exit 0
   }
 
-  $sqlSteps = @($manifest.steps | Where-Object { $_.kind -eq "sql" })
-  foreach ($step in $sqlSteps) {
-    Invoke-SqlStep -Step $step
+  foreach ($step in $manifest.steps) {
+    switch ($step.kind) {
+      "sql" { Invoke-SqlStep -Step $step }
+      "refresh-mutation-guards" { Invoke-RefreshMutationGuards }
+      "activate-mutation-hold" { Invoke-ActivateMutationHold }
+      "edge-functions" { Deploy-EdgeFunctions -Step $step }
+      default { throw "Unsupported execution step kind: $($step.kind)" }
+    }
   }
-
-  $refreshStep = @($manifest.steps | Where-Object { $_.kind -eq "refresh-mutation-guards" })[0]
-  $activateStep = @($manifest.steps | Where-Object { $_.kind -eq "activate-mutation-hold" })[0]
-  $edgeStep = @($manifest.steps | Where-Object { $_.kind -eq "edge-functions" })[0]
-  Assert-True ($refreshStep -and $activateStep -and $edgeStep) "Manifest is missing a required safety step."
-  Invoke-RefreshAndActivateHold
-  Deploy-EdgeFunctions -Step $edgeStep
 
   Write-Record -Step "completion" -Status "CUTOVER_READY_HOLD_ACTIVE" -Message "All approved SQL and Edge steps verified. Hold intentionally remains active pending acceptance and separately approved release."
   Write-Output "CUTOVER STEPS PASS - database maintenance hold remains active; no automatic release was attempted."

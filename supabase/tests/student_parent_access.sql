@@ -57,10 +57,10 @@ begin
   values (teacher_a, branch_id, true), (multi_role_user, branch_id, true);
   insert into public.students (id, branch_id, admission_no, full_name, class_id, user_id)
   values
-    (student_record_a, branch_id, 'RLS_TEST_A_' || run_id, 'RLS_TEST_student_a', class_a, student_a),
-    (student_record_b, branch_id, 'RLS_TEST_B_' || run_id, 'RLS_TEST_student_b', class_b, student_b),
-    (student_record_c, other_branch_id, 'RLS_TEST_C_' || run_id, 'RLS_TEST_student_c', class_c, student_c),
-    (student_record_multi, branch_id, 'RLS_TEST_M_' || run_id, 'RLS_TEST_multi', class_a, multi_role_user),
+    (student_record_a, branch_id, 'RLS_TEST_A_' || run_id, 'RLS_TEST_student_a', class_a, null),
+    (student_record_b, branch_id, 'RLS_TEST_B_' || run_id, 'RLS_TEST_student_b', class_b, null),
+    (student_record_c, other_branch_id, 'RLS_TEST_C_' || run_id, 'RLS_TEST_student_c', class_c, null),
+    (student_record_multi, branch_id, 'RLS_TEST_M_' || run_id, 'RLS_TEST_multi', class_a, null),
     (student_record_unrelated, branch_id, 'RLS_TEST_U_' || run_id, 'RLS_TEST_unrelated', class_a, null);
   insert into public.profiles (id, full_name, email)
   values
@@ -71,6 +71,7 @@ begin
   perform public.admissions_link_student_account(student_record_a, student_a);
   perform public.admissions_link_student_account(student_record_b, student_b);
   perform public.admissions_link_student_account(student_record_c, student_c);
+  perform public.admissions_link_student_account(student_record_multi, multi_role_user);
   perform public.admissions_verify_parent_student(student_record_a, parent_a);
   perform public.admissions_verify_parent_student(student_record_b, parent_b);
   execute 'reset role';

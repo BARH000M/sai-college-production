@@ -15,9 +15,11 @@ import time
 import uuid
 
 ROOT=Path(__file__).resolve().parents[3]
-BIN=Path(r'C:\Program Files\PostgreSQL\17\bin')
+BIN=Path(os.environ.get('SAI_PG_BIN',r'C:\Program Files\PostgreSQL\17\bin'))
 parser=argparse.ArgumentParser()
 parser.add_argument('--catalog-dir',type=Path,help='Optional captured metadata directory; default is the checked-in synthetic DDL fixture')
+parser.add_argument('--reconciliation',action='store_true',help='Test Phase 7-M Main-compatible finance/settings corrections and package integration')
+parser.add_argument('--export-fixture',type=Path,help='Export synthetic metadata-only fixture without starting PostgreSQL')
 args=parser.parse_args()
 if args.catalog_dir:
     catalog=json.loads((args.catalog_dir/'catalog.json').read_text())[0]['catalog']
@@ -36,7 +38,10 @@ for key in list(env):
     if key.startswith('PG') or key.startswith('SUPABASE_'): env.pop(key)
 env['PGOPTIONS']='-c statement_timeout=20000 -c lock_timeout=10000'
 flags=getattr(subprocess,'CREATE_NO_WINDOW',0)
+def executable(name): return BIN/(name+('.exe' if os.name=='nt' else ''))
 def command(argv,**kwargs):
+    if os.name != 'nt':
+        argv=[str(x)[:-4] if str(x).endswith('.exe') else x for x in argv]
     return subprocess.run([str(x) for x in argv],env=env,creationflags=flags,
                           capture_output=True,text=True,encoding='utf-8',errors='replace',**kwargs)
 def require(result,label):
@@ -44,7 +49,7 @@ def require(result,label):
     if result.returncode: raise RuntimeError(f'{label}: {result.stderr[-3500:]}')
     print(label+': PASS',flush=True)
 def connection():
-    return [BIN/'psql.exe','-X','-h','127.0.0.1','-p',str(port),'-U','postgres','-d','phase3b_main',
+    return [executable('psql'),'-X','-h','127.0.0.1','-p',str(port),'-U','postgres','-d','phase3b_main',
             '-v','ON_ERROR_STOP=1','-v','VERBOSITY=verbose']
 def guard():
     # Check server identity in EVERY write session; fail closed before its SQL.
@@ -126,6 +131,9 @@ def baseline():
         name=qualified(t['schema'],t['name'])
         if t['rls']: out+=f'alter table {name} enable row level security;\n'
         out+=acl_sql(name,'table',t['acl'])
+    for t in catalog['tables']:
+        if t['kind']=='S':
+            out+=acl_sql(qualified(t['schema'],t['name']),'sequence',t['acl'])
     for c in catalog['columns']:
         for item in c['acl'] or []:
             role,rights=item.split('=',1);rights=rights.split('/')[0]
@@ -144,26 +152,51 @@ def baseline():
     out+='set check_function_bodies=true;\n'
     return out
 
+if args.export_fixture:
+    if not args.catalog_dir: raise RuntimeError('--catalog-dir required for export')
+    args.export_fixture.parent.mkdir(parents=True,exist_ok=True)
+    args.export_fixture.write_text('-- Synthetic DDL/ACL fixture; no production records or credentials.\n'+baseline(),encoding='utf-8')
+    print('Exported synthetic Main fixture; no server started')
+    raise SystemExit(0)
 started=False
 try:
     require(command([BIN/'initdb.exe','-D',data,'-U','postgres','--auth=trust','--encoding=UTF8','--locale=C']), 'New synthetic cluster')
     # File handles avoid an inherited Windows pipe keeping communicate() open
     # for the entire server lifetime after pg_ctl itself exits.
     with (state/'start.log').open('w',encoding='utf-8') as log:
-        start_result=subprocess.run([str(x) for x in [BIN/'pg_ctl.exe','-D',data,'-l',state/'server.log','-o',f'-h 127.0.0.1 -p {port}','-w','-t','20','start']],
+        start_result=subprocess.run([str(x) for x in [executable('pg_ctl'),'-D',data,'-l',state/'server.log','-o',f'-h 127.0.0.1 -p {port}','-w','-t','20','start']],
           env=env,creationflags=flags,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,timeout=30)
     started=(data/'postmaster.pid').exists()
     if start_result.returncode: raise RuntimeError((state/'start.log').read_text())
     print('Start own loopback cluster: PASS',flush=True)
     started=True
     require(command([BIN/'createdb.exe','-h','127.0.0.1','-p',str(port),'-U','postgres','phase3b_main']), 'Create isolated database')
-    base=baseline() if args.catalog_dir else (Path(__file__).parent/'main_baseline.sql').read_text(encoding='utf-8')
+    base=baseline() if args.catalog_dir else (ROOT/'supabase/tests/phase7m/main_baseline.sql').read_text(encoding='utf-8')
     (state/'synthetic_baseline.sql').write_text(base,encoding='utf-8')
     sql(base,'Captured Main DDL/ACL/policy baseline')
     sql((Path(__file__).parent/'fixtures.sql').read_text(encoding='utf-8'),'Synthetic accounts/settings/audit fixtures')
     for file in sorted((ROOT/'supabase/deployment/phase3b-main').glob('0*.sql')):
         sql(file.read_text(encoding='utf-8'),'Proposal '+file.name)
     sql((Path(__file__).parent/'behavior.sql').read_text(encoding='utf-8'),'Role/onboarding/RLS/atomicity/preservation assertions')
+    if args.reconciliation:
+        sql("create table private.phase7m_preservation as select (select jsonb_agg(to_jsonb(s) order by category,setting_key) from public.sai_system_settings s) settings, (select jsonb_agg(to_jsonb(a) order by id) from public.sai_system_settings_audit a) audits;",'Snapshot settings and legacy audits')
+        for file in [
+            ROOT/'supabase/deployment/phase3c-main/001_own_contact_validation.sql',
+            ROOT/'supabase/deployment/phase4a-examinations/001_examinations.sql',
+            ROOT/'supabase/deployment/phase7m/01_finance_main.sql',
+            ROOT/'supabase/deployment/phase7m/02_settings_main.sql',
+        ]:
+            if file.name=='001_own_contact_validation.sql':
+                require(command(['pwsh','-NoProfile','-File',ROOT/'supabase/tests/phase7m_executor_tracking.ps1','-PgBin',BIN,'-Port',str(port),'-DataDirectory',data,'-WorkDirectory',state]),'Actual executor atomic package tracking')
+            else:
+                sql(file.read_text(encoding='utf-8'),'Integrated proposal '+file.name)
+        sql((ROOT/'supabase/tests/phase7m_behavior.sql').read_text(encoding='utf-8'),'Finance/settings preservation and security')
+        finance=(ROOT/'supabase/tests/finance_completion_behavior.sql').read_text(encoding='utf-8')
+        sql("set sai.finance_isolated_test='yes';\n"+finance,'Public finance completion and authorization')
+        for file in ['03_admissions_remaining.sql','04_admission_events.sql']:
+            sql((ROOT/'supabase/deployment/phase7m'/file).read_text(encoding='utf-8'),'Deferred proposal '+file)
+        for file in ['admissions_behavior.sql','admissions_tracking_behavior.sql','admission_event_integrity.sql','student_parent_access.sql','attendance_behavior.sql']:
+            sql("set sai.wave1_isolated_test='yes'; set sai.attendance_isolated_test='yes';\n"+(ROOT/'supabase/tests'/file).read_text(encoding='utf-8'),'Main regression '+file)
     isolation=sql("begin isolation level repeatable read; set local role service_role; select public.sai_manage_role_assignment('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','grant','student','{}',true,false,null,null); commit;",'Unsupported isolation rejection',False)
     assert isolation.returncode!=0 and '25001' in isolation.stderr,'Stale transaction snapshots were accepted'
     print('Unsupported isolation fails closed: PASS',flush=True)
@@ -198,6 +231,10 @@ try:
     assert time.monotonic()-start>.5,'No observed serialization wait'
     print('Two concurrent last-admin revocations: PASS (one commit; one 23514)',flush=True)
     sql("do $$begin if (select count(*) from public.user_roles where role='super_admin')<>1 then raise exception 'Concurrent lockout';end if;end$$;",'Concurrent survivor assertion')
+    if args.reconciliation:
+        sql('create role supabase_auth_admin nologin bypassrls; grant usage on schema auth to supabase_auth_admin; create table auth.identities(id uuid primary key);','Maintenance platform-contract fixture')
+        for file in ['supabase/tests/recovery/mutation_hold_fixture.sql','supabase/deployment/maintenance/001_global_mutation_hold.sql','supabase/tests/recovery/mutation_hold_behavior.sql','supabase/deployment/maintenance/rollback_global_mutation_hold.sql','supabase/tests/recovery/mutation_hold_cleanup.sql']:
+            sql((ROOT/file).read_text(encoding='utf-8'),'Maintenance integration '+Path(file).name)
     print('ALL LOCAL DATABASE CHECKS PASS',flush=True)
 finally:
     if started and (data/'postmaster.pid').exists():

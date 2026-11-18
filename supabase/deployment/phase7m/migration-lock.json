@@ -1,0 +1,464 @@
+{
+  "schema_version": 1,
+  "project_ref": "aeryusbrulqdxjdynwfh",
+  "baseline_commit": "d9e15f3b5680b32323bde29d3f41bd3bf22b4716",
+  "hash_algorithm": "sha256 normalized LF bytes",
+  "migrations": [
+    {
+      "version": "001",
+      "filename": "001_initial_schema.sql",
+      "sha256_lf": "f88da7f1b53da4ce0ededdfa91ff002b5501fb644bc07e068db2e50daa5f7bcb",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "002",
+      "filename": "002_security_policies.sql",
+      "sha256_lf": "b3a99c954d76ae102422bea4754f1b0fa180dabe3eeee123c83fa6a2939b776c",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "003",
+      "filename": "003_staff_management_policies.sql",
+      "sha256_lf": "7663af295a84ad266dc592f9c5fe869e77eeef96519be36ce111a10bede74744",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "004",
+      "filename": "004_admissions.sql",
+      "sha256_lf": "59dfe557de7786d9ab4237fe4ff34fbc03d9674f513d747e7acd5df641723fe9",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "005",
+      "filename": "005_admissions_session_directory.sql",
+      "sha256_lf": "b4583ca59440a52c39edd2401d25430d69adb054efbee3d672974c4f43f5053f",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "006",
+      "filename": "006_attendance.sql",
+      "sha256_lf": "cbfad5a4a73d03eddd0f80520905498bede46252aee5ce4d25ae28df20dd643e",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "007",
+      "filename": "007_finance.sql",
+      "sha256_lf": "628a7297753f8c062de0bd7f308dfbb16b7c012c33622c7f95f46b87bfc34b9b",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "008",
+      "filename": "008_learning_portal.sql",
+      "sha256_lf": "df592410ccc02c3ef93d41463d19f58b864f9261af5720bb0a404dd78d19d59b",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "009",
+      "filename": "009_lesson_content.sql",
+      "sha256_lf": "5533e3e7794f6e59c40b875189383a835f9b9669a903d79282c08c4d23ce8d0e",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "010",
+      "filename": "010_lesson_media_and_homework.sql",
+      "sha256_lf": "8d845ef0749120355b40878e47b48a290199a36308d9227a922d7d1ab89ffebb",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "011",
+      "filename": "011_homework_management.sql",
+      "sha256_lf": "20de985ce4e275533d2cec52aeaee7389c65d1e0db5274705ca8d0aa045ca92f",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "012",
+      "filename": "012_learning_inbox_and_teacher_provision.sql",
+      "sha256_lf": "a400523786dae8a460fea8883b6ecab31baeec7c462ab60492bfaf1df02cf1b9",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "013",
+      "filename": "013_teacher_account_management.sql",
+      "sha256_lf": "c446c7062ab68a2e79985fcdd3334c9acd8ee5e2a1a3349aa71026cae1460e9b",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "014",
+      "filename": "014_public_read_and_status_permissions.sql",
+      "sha256_lf": "d6ef686de6899cf8af52cb67cff7a1b791265d3756681e77d1ae2540829f16eb",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "015",
+      "filename": "015_cleanup_and_schema_history.sql",
+      "sha256_lf": "ee99e89eb6f77e70ea7786aeabf5c181eeeabf1aba5efd5911ac672ef1e4764a",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "016",
+      "filename": "016_vocabulary_and_notifications.sql",
+      "sha256_lf": "0aacf9171b0796802375325669ed95af756842639a0fdca9bc413b9114b74b08",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "017",
+      "filename": "017_demo_attendance_week.sql",
+      "sha256_lf": "3d800bcb3851e8cfa5baf86040b1f52b524863c8bf960c43293d4954dc26d67d",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "018",
+      "filename": "018_library_and_communications.sql",
+      "sha256_lf": "a7beabef56ff01bb74ff5ccc7b55e42f90e53a8f89a87beab344495f24e11b2e",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "019",
+      "filename": "019_public_finance.sql",
+      "sha256_lf": "ad818fdffb82a5494ffed6d53e05e5e307701bc2ca0fbdc059ebfade1290e2c3",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "020",
+      "filename": "020_cms_schema_and_private_helpers.sql",
+      "sha256_lf": "2860fbdc1324f5bbb772e471594b5355c234de6b335a3c2bee4033ca38a03134",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "021",
+      "filename": "021_restore_write_grants.sql",
+      "sha256_lf": "232391498a497b599e4a1e0e79ddb4b3381f495e32c58da16251531339665257",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "022",
+      "filename": "022_consolidate_security_helpers.sql",
+      "sha256_lf": "7dfa0898408ca103f14e69edfaf9b38257008c245f05fd37d86b170c491e3a88",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "023",
+      "filename": "023_revoke_wrapper_execute.sql",
+      "sha256_lf": "217d64fbd469589255e1c17e2e2573992b85832cb07153b55173c83c1d65893b",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "024",
+      "filename": "024_retire_sai_set_role.sql",
+      "sha256_lf": "5dc89811ec9f0fc806f06bb8f9dc5c71eedaad3b0e16f52e4f7433738ba3f02a",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "025",
+      "filename": "025_normalize_private_helpers.sql",
+      "sha256_lf": "0c703367fd2cb5087ac7a28c41201eff5af16df52da8e17c7715be931a39ec2a",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "026",
+      "filename": "026_consolidate_finance_helpers.sql",
+      "sha256_lf": "9ef588b9a3fd7e2f01653d02bb8c01c9f72e875fd4a49a3e3c5ecd6ce4e4206b",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "027",
+      "filename": "027_security_invariant_guard.sql",
+      "sha256_lf": "f559eed32618fe67895107735064a73ef9ed8d6b3c08d2e6095c48cacd9c81e6",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "028",
+      "filename": "028_revoke_finance_oracle_execute.sql",
+      "sha256_lf": "db2f01f1a87452312e662fd7fe4fad27a4ddefa437e24d6975a61e0db9d18fc8",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "029",
+      "filename": "029_revoke_public_helper_execute.sql",
+      "sha256_lf": "76265385dded5c9da8666e6e8932e78ba1dcb84fe44a8e5168e0911490a7cd46",
+      "history": false,
+      "empty": false,
+      "classification": "NOT APPLIED"
+    },
+    {
+      "version": "030",
+      "filename": "030_restore_admission_column_grants.sql",
+      "sha256_lf": "ecfd10247c385f4410ca70dbeba23fa36889460b3e74c47cd1c18c3a59182405",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "031",
+      "filename": "031_admissions_status_and_enrollment.sql",
+      "sha256_lf": "fea90929eb97c08ac26fa251fc97e02eecf71bc31aef5312517bbce608299974",
+      "history": false,
+      "empty": false,
+      "classification": "NOT APPLIED"
+    },
+    {
+      "version": "20261110172940",
+      "filename": "20261110172940_sai_system_settings_shared_20261110.sql",
+      "sha256_lf": "a07a5500870ca044dd6dda230462178ba46907e53ab2222b04065a171bb6d8f7",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "20261110173339",
+      "filename": "20261110173339_sai_unified_modules_web_mobile_secure.sql",
+      "sha256_lf": "2be6ea1b7429abf3af653f6f029a6b7203d21aa35717af1e244168eea50d3f37",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "20261110173506",
+      "filename": "20261110173506_sai_unified_module_realtime.sql",
+      "sha256_lf": "d40ef4d3f9a6adb9d0580a50697ee86e407fdb9da56d249adc1b3f0975e4cf17",
+      "history": true,
+      "empty": false,
+      "classification": "MATCHED"
+    },
+    {
+      "version": "20261115001316",
+      "filename": "20261115001316_secure_admission_tracking_and_verified_links.sql",
+      "sha256_lf": "b45f2ad73d8c83b9b37dfce27c2ce90f1a7d8db9e6bc920429936bec134e106f",
+      "history": false,
+      "empty": false,
+      "classification": "PARTIALLY APPLIED"
+    },
+    {
+      "version": "20261115014149",
+      "filename": "20261115014149_protected_admission_status_events.sql",
+      "sha256_lf": "e4cd50bead1e30a434fcd807ccf2960fb5920a34a424e2e530edec5ef4c4ffc0",
+      "history": false,
+      "empty": false,
+      "classification": "NOT APPLIED"
+    },
+    {
+      "version": "20261115051532",
+      "filename": "20261115051532_finance_scoped_directories.sql",
+      "sha256_lf": "81ef2af3d3606f2d27808572413b61282cb3b91c2a75d836d1d5fa079a199247",
+      "history": false,
+      "empty": false,
+      "classification": "CONFLICTING"
+    },
+    {
+      "version": "20261116000437",
+      "filename": "20261116000437_learning_lesson_completion_basis.sql",
+      "sha256_lf": "7b9eeb4765d005bba1b6cdbf5c7b70535d1440b6f3c2ded085ef587f7e15d488",
+      "history": false,
+      "empty": false,
+      "classification": "PARTIALLY APPLIED"
+    },
+    {
+      "version": "20261116013950",
+      "filename": "20261116013950_learning_scored_exercises.sql",
+      "sha256_lf": "2eb8cb5c25dfb95c4d636a5e8b76653a64931c7493d242f172effd7dc1e83e90",
+      "history": false,
+      "empty": false,
+      "classification": "NOT APPLIED"
+    },
+    {
+      "version": "20261116013951",
+      "filename": "20261116013951_phase2b_service_permissions.sql",
+      "sha256_lf": "f5d38fc2f3413f24cf29393411f947701a16354b2810fb401801a39be731ce28",
+      "history": false,
+      "empty": false,
+      "classification": "APPLIED BUT NOT RECORDED"
+    },
+    {
+      "version": "20261116013952",
+      "filename": "20261116013952_phase2b_system_settings.sql",
+      "sha256_lf": "88c5595cca3ef84a5919002183d33dcee8d1c60f87de8cd162d10f639c014bb7",
+      "history": false,
+      "empty": false,
+      "classification": "CONFLICTING"
+    },
+    {
+      "version": "20261116142308",
+      "filename": "20261116142308_atomic_role_management.sql",
+      "sha256_lf": "41f66351904fe1dbfc1b83ef561a96b60d93cff182a5560a9a0cd2ff666b8fe4",
+      "history": false,
+      "empty": false,
+      "classification": "NOT APPLIED"
+    },
+    {
+      "version": "20261116151509",
+      "filename": "20261116151509_branch_membership_write_lockdown.sql",
+      "sha256_lf": "4241b03060366b2743ca50e567f98a6a8f191689982eae9897709c5eccd656a8",
+      "history": false,
+      "empty": false,
+      "classification": "NOT APPLIED"
+    },
+    {
+      "version": "20261117202728",
+      "filename": "20261117202728_production_mutation_hold.sql",
+      "sha256_lf": "0e0fcf7cf416da0bc6316f9fea2f41760ce7dacaad4677677adcf2f9a2f8ed1d",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "20261117202733",
+      "filename": "20261117202733_production_security_permissions.sql",
+      "sha256_lf": "ffc230b61186a455c272fbafe5ba5841fd68428dc3df9630ec70ea30100b7675",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "20261117202739",
+      "filename": "20261117202739_production_atomic_role_management.sql",
+      "sha256_lf": "fbdd597ebc2ba1435c71293b034b720dd5c6a88954189e77f6bad955a5ce134e",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "20261117202743",
+      "filename": "20261117202743_production_branch_membership_protection.sql",
+      "sha256_lf": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "history": false,
+      "empty": true,
+      "classification": "CONFLICTING"
+    },
+    {
+      "version": "20261117202749",
+      "filename": "20261117202749_production_teacher_assignment.sql",
+      "sha256_lf": "1f3e35c4897814258a99053ba8b16543aae339d8ebbff0ef77c6879b9814fe4e",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "20261117202754",
+      "filename": "20261117202754_production_verified_onboarding.sql",
+      "sha256_lf": "edf88c5e0012762fc781079e996386455b5fd3e97d1fc0d6fb8f1872151fd05c",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "20261117202759",
+      "filename": "20261117202759_production_admissions_enrollment_tracking.sql",
+      "sha256_lf": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "history": false,
+      "empty": true,
+      "classification": "CONFLICTING"
+    },
+    {
+      "version": "20261117202805",
+      "filename": "20261117202805_production_admission_event_integrity.sql",
+      "sha256_lf": "e4cd50bead1e30a434fcd807ccf2960fb5920a34a424e2e530edec5ef4c4ffc0",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "20261117202811",
+      "filename": "20261117202811_production_finance_scoped_directories.sql",
+      "sha256_lf": "81ef2af3d3606f2d27808572413b61282cb3b91c2a75d836d1d5fa079a199247",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "20261117202817",
+      "filename": "20261117202817_production_system_settings_additive.sql",
+      "sha256_lf": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "history": false,
+      "empty": true,
+      "classification": "CONFLICTING"
+    },
+    {
+      "version": "20261117202821",
+      "filename": "20261117202821_production_learning_completion_scoring.sql",
+      "sha256_lf": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "history": false,
+      "empty": true,
+      "classification": "CONFLICTING"
+    },
+    {
+      "version": "20261117202825",
+      "filename": "20261117202825_production_examinations_results.sql",
+      "sha256_lf": "ad498cf023518d071204614e38d15497bbff5cfda6ee94d24ee17cd271e3823d",
+      "history": false,
+      "empty": false,
+      "classification": "SUPERSEDED"
+    },
+    {
+      "version": "20261117202830",
+      "filename": "20261117202830_production_refresh_mutation_guards.sql",
+      "sha256_lf": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "history": false,
+      "empty": true,
+      "classification": "CONFLICTING"
+    },
+    {
+      "version": "20261117202835",
+      "filename": "20261117202835_production_release_mutation_hold.sql",
+      "sha256_lf": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "history": false,
+      "empty": true,
+      "classification": "CONFLICTING"
+    }
+  ]
+}

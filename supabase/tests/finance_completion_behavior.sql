@@ -142,7 +142,8 @@ begin
     or has_function_privilege('anon', 'public.sai_finance_sessions()', 'EXECUTE')
     then raise exception 'Anonymous finance directory access'; end if;
   if has_table_privilege('authenticated', 'public.fee_payments', 'INSERT,UPDATE,DELETE')
-    or pg_has_role('authenticated', 'sai_finance_owner', 'MEMBER')
+    or exists (select 1 from pg_roles where rolname='sai_finance_owner'
+      and pg_has_role('authenticated', oid, 'MEMBER'))
     then raise exception 'Client can bypass the finance workflow'; end if;
 end;
 $$;

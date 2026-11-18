@@ -1,0 +1,178 @@
+{
+  "recorded_at_utc": "2026-11-18T14:03:45.641920+00:00",
+  "project_ref": "aeryusbrulqdxjdynwfh",
+  "production_decision": "NO-GO",
+  "production_writes_performed": false,
+  "history_repairs_performed": false,
+  "phase4b": "PAUSED",
+  "source_commit_before_local_work": "d9e15f3b5680b32323bde29d3f41bd3bf22b4716",
+  "native_postgresql_version": "17.11",
+  "counts": {
+    "local_migrations": 57,
+    "github_migrations": 57,
+    "production_history": 16
+  },
+  "checks": [
+    {
+      "command": "python supabase/tools/validate_migrations.py --base-ref origin/main",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "python supabase/tests/test_migration_validation.py",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0
+    },
+    {
+      "command": "python supabase/tests/phase3b-main/run_local.py --reconciliation",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact_directory": ".tmp-phase3b-main/45526ba9-954a-4e6f-8662-b3755cb6366e",
+      "log_sha256": "0c5964d22f8435f9e29336fd561b9391d116dfc23776e35c0c0455d024385f26",
+      "cluster_stopped": true,
+      "coverage": [
+        "captured Main DDL/sequence ACL baseline",
+        "three Phase 3B packages",
+        "nine-role role/onboarding/RLS/atomicity/preservation assertions",
+        "actual executor SQL/postcondition/receipt atomicity",
+        "duplicate retry rejection",
+        "source changed after preflight rejected",
+        "failed package DDL/receipt rollback",
+        "Phase 3C profile validation",
+        "Phase 4A examinations",
+        "Main-specific public finance",
+        "additive settings and legacy audits preserved",
+        "deferred enrollment/tracking and protected events",
+        "admissions_behavior",
+        "admissions_tracking_behavior",
+        "admission_event_integrity",
+        "student_parent_access",
+        "attendance_behavior",
+        "unsupported isolation denial",
+        "two concurrent last-admin revocations: one commit and one 23514",
+        "maintenance DML/DDL/TRUNCATE/Auth/service/privileged denial",
+        "maintenance rollback"
+      ]
+    },
+    {
+      "command": "python supabase/tests/run_native_contracts.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "suites": [
+        "profile_contact_behavior.sql",
+        "examinations_behavior.sql"
+      ],
+      "artifact_directories": [
+        ".tmp-phase7m-contracts/ba7ca0aeb6524d72962f699f3fa7b3cc",
+        ".tmp-phase7m-contracts/6831996bbf6747b4b2451359cbecfc78"
+      ],
+      "clusters_stopped": true
+    },
+    {
+      "command": "pwsh -NoProfile -File supabase/deployment/phase7r/Invoke-MainDeployment.ps1",
+      "exit_code": 0,
+      "result": "DRY RUN PASS",
+      "writes": false,
+      "external_log_basename": "phase7r-main-20261118T140131Z-0a965d2da4984b1bac9880201c05321f.jsonl"
+    },
+    {
+      "command": "python supabase/tools/validate_migrations.py --release",
+      "exit_code": 1,
+      "result": "EXPECTED NO-GO",
+      "unresolved_conflicting_files": 8
+    },
+    {
+      "check": "Roadmap preservation",
+      "phases": 16,
+      "settings_requirements": 24,
+      "all_nine_updated_legacy_documents_original_content_preserved": true
+    },
+    {
+      "check": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "manifest_sha256": "009535a128fef2ea4207e2c144a856bbcddd7f385e611fd74abf264dba37361d",
+  "executor_sha256": "b8ad34202228b3869ce56869c0819de44ec4bacb91d22143f4b84c7908b53046",
+  "source_sha256": {
+    "supabase/deployment/maintenance/001_global_mutation_hold.sql": "4a682ce38e6c900f2b338f7d5d41896b6efb8ea435753beb4cf7bf8fff5767cf",
+    "supabase/deployment/maintenance/rollback_global_mutation_hold.sql": "49daa73d598cb15d643c90263dc39e641c8ec449d2510c076393f2a3bb7d0580",
+    "supabase/deployment/phase3b-main/01_role_contract.sql": "8b2a2db0c4db8b33c0190a3e538414ba1a5781a8d5697e5785683236ce817417",
+    "supabase/deployment/phase3b-main/02_teacher_assignment.sql": "1f3e35c4897814258a99053ba8b16543aae339d8ebbff0ef77c6879b9814fe4e",
+    "supabase/deployment/phase3b-main/03_verified_onboarding.sql": "edf88c5e0012762fc781079e996386455b5fd3e97d1fc0d6fb8f1872151fd05c",
+    "supabase/deployment/phase3c-main/001_own_contact_validation.sql": "17f33774dda9200ed371ccf59eae3ebba8584074bf9eb4600746897ff8d84afe",
+    "supabase/deployment/phase4a-examinations/001_examinations.sql": "36f90b4ba4e01481731912787144e098ef0efc8a026695ad511a9e7fa6b135f2",
+    "supabase/functions/manage-roles/index.ts": "28db90d00ad7dab2bdabfa888546f358fec39fe300db87bd0a2739c679fd8217",
+    "supabase/functions/school-admin/index.ts": "45667f463eaa6992f9dc7dc2c1d25f86eb63c58bf3f45cf1aa21b9cccafaf848",
+    "supabase/functions/provision-learning-account/index.ts": "dc33a9aef2742747c4bcfd337d0386d3224b526b90d0585e2379a8983cb54490",
+    "supabase/functions/link-student-account/index.ts": "b22ecd7198708a87b31addad320b77f824294ac7f6432a9a1eee0e7d3bde665c",
+    "supabase/functions/admission-reminders/index.ts": "301e50fc2d4f1d66223be8e04b88aa7b7fc8b30eada94d6153ca9a9c95a0aa72",
+    "supabase/functions/admission-notify/index.ts": "d6e8b83aa8686c0233f26779e0107c1f1e3c13d616cdd08fa4a0ebdd4ec0a285",
+    "supabase/functions/announcement-email/index.ts": "1f1077f56a197dbba4e8105c1923f4c728cdd3d49e3e0e27937cd0dd39367f46",
+    "supabase/functions/_shared/role-management-handler.ts": "38f1efc49e21f1ad5aae858d7f25c5613919886aea9a11b23c3ce531267753f7",
+    "supabase/functions/_shared/mutation-gate.ts": "80dd24600a5748116f00aafe36799d332b80d3c888bd78f5b34a6eab4167acef",
+    "supabase/functions/_shared/client-ip.ts": "015f547c2382273c5639fe4f8970926fecdef7611beaadc2e92091f47ec0b5e7",
+    "supabase/deployment/phase7m/00_package_tracking.sql": "ea70101828352ca9e5fa3455dda2ac44db84edde1373a582b4dfc21494d7e416",
+    "supabase/deployment/phase7m/01_finance_main.sql": "c5e533499ef7e6ad6daf06e0f7c0b8fd8c8849bd4a2f7c53e274f9c02879fc41",
+    "supabase/deployment/phase7m/02_settings_main.sql": "b316b7785d5fcd5a060526ba6fe57503b63c2f3b40289766c34fcbb0475051f1",
+    "supabase/deployment/phase7m/03_admissions_remaining.sql": "f181e214a260ccd9fc2463b365a30346aed38d887f1bce46e9b23b1730870eb2",
+    "supabase/deployment/phase7m/04_admission_events.sql": "faa7fa736387c194e3e027239981c40126dbf113b0919dbba0da6ad1179ae3d6",
+    "supabase/deployment/phase7m/migration-lock.json": "11782590f35c3d403d672ea70b581cd40a2375e4df00aa1f36399da5e36741f1",
+    "supabase/deployment/phase7m/evidence.json": "f6d250dcaf7098f0fb37c235b38d46339a07dfcd6293a2665afae29102ac88c6",
+    "supabase/tests/phase7m/main_baseline.sql": "109e09dcfe6b642de1a275aceee03d51686c78207efb81e2094eb3deae93b18d",
+    "supabase/tools/validate_migrations.py": "9d1e252e7ef2788d76160ac0f63aff0de59c9a89097ba7236440b746cdd98d08",
+    "supabase/deployment/phase7r/Invoke-MainDeployment.ps1": "b8ad34202228b3869ce56869c0819de44ec4bacb91d22143f4b84c7908b53046",
+    "supabase/inspection/phase7m_equivalence.sql": "0ea6051bb8eb2c52fa0103b3119d28d3987dd57f2a324924404ffb8e396494b1",
+    "supabase/tests/phase3b-main/run_local.py": "88ce9bfbafd31ca342c241a85ad602271b3b38e195e8e41fe85e325d475f3669",
+    "supabase/tests/phase3b-main/fixtures.sql": "013460b18ad3e64772eb43a0bf4daad2c55ce7097d9cc878a0e99d173388919a",
+    "supabase/tests/phase3b-main/behavior.sql": "797cd6682652ab2c978fedd2e137091fc6ab4101c48ad6c2b541ba7dc9cdef15",
+    "supabase/tests/phase7m_behavior.sql": "3d1692288626b25b0e483c350e9544d0f3a8294a82e039f2eebf14bbe66fd67f",
+    "supabase/tests/phase7m_executor_tracking.ps1": "552d6bbadba9d3a21478c5003390b94dd43ac5edafb0fe36a5c54d252a80b573",
+    "supabase/tests/run_native_contracts.py": "868b1e41f00779103be930f540e0f2289ad5ae8e5a3ce2dd74cc181d2200ccbc",
+    "supabase/tests/test_migration_validation.py": "efdcf6981b2ebc8434c4e727d996c9e15c0834c805b16df26691f77e401a41c4",
+    "supabase/tests/finance_completion_behavior.sql": "fd680c381698a0193c620bf1e41619269a2a962799fd75b3042b864f566369bb",
+    "supabase/tests/admissions_behavior.sql": "850c719901baf8c87ac0493aaa04a095a3b2545f8edb8493043a6753a825c6d7",
+    "supabase/tests/admissions_tracking_behavior.sql": "4b99e29b16e21c3ff35460484a6dfd33c26ac13d04b815b2232846a94c1f7d5d",
+    "supabase/tests/admission_event_integrity.sql": "c3dc7c44aa6b5cdd1b96f04b1442031e6c0c1d4479ae9dcadd4f4386b0b5ce77",
+    "supabase/tests/student_parent_access.sql": "bd2c7b4892dd95597b22d44914a0e6987abcd83f48158840d7d34f64411a18c7",
+    "supabase/tests/attendance_behavior.sql": "ee8e386253aed319467ec6e853d4a6bc1f62455dfd092ce0661f63751b66d4cd",
+    "supabase/tests/profile_contact_behavior.sql": "e198ee861568b3374b809fb105ba36dad7bc12a233964bce4eaf14cee9d75713",
+    "supabase/tests/examinations_behavior.sql": "2c3a5b77a3715d7795e2e4617d97882f66703491479c043089c00ae0eb4e3d66",
+    "supabase/tests/recovery/mutation_hold_fixture.sql": "ae3382ac1b14a2fe492ea3ad3dcbab9803ce8e672f093aaaf87234736f6d304a",
+    "supabase/tests/recovery/mutation_hold_behavior.sql": "6d88c48176afcde4d08be43a4934a2fb2fc895e8fa3a24829dc737cddf73bb04",
+    "supabase/tests/recovery/mutation_hold_cleanup.sql": "ad99f7ee3eedbd03acb18a28674bcde7ab388a79176c64fa920d2e51d2e72176",
+    ".gitattributes": "433fc1f4cd0b439996bfc08615f68095cbdf98837bba38ec169ad3296e41cfb5",
+    ".github/workflows/database-ci.yml": "c75ae87a597d35fdf25058df024038a8e95571e65cb564a11211151af216412e"
+  },
+  "history_repair_proposals": {
+    "030": {
+      "equivalent": true,
+      "executed": false,
+      "proof": "exact admissions INSERT/UPDATE boundary"
+    },
+    "20261116013951": {
+      "equivalent": true,
+      "contracts": 73,
+      "executed": false
+    }
+  },
+  "reused_recovery": {
+    "rerun": false,
+    "source": "docs/reports/PRODUCTION_DEPLOYMENT_STATUS.md prior Phase 7-R refresh",
+    "application_tables": 85,
+    "rows": 860,
+    "constraints": 355,
+    "functions": 105,
+    "triggers": 44,
+    "policies": 113,
+    "platform_restore_certified": false
+  },
+  "limits": [
+    "Synthetic Auth/Storage contracts; no hosted JWT, email, provider, mobile or browser acceptance",
+    "New corrections not applied to a fresh full production-row restore",
+    "Storage bytes and current managed recovery point not refreshed",
+    "CI authored and locally exercised, not run on GitHub; no commit/push",
+    "Production SQL, history repair and hosted deployment require separate explicit approval"
+  ]
+}

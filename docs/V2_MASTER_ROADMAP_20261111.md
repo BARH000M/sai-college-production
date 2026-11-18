@@ -1,5 +1,13 @@
 # Yemen SAI V2 — implementation and verification roadmap (evidence-driven)
 
+**Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
+
+
+<!-- PHASE7M-CURRENT -->
+**18 November 2026 — Phase 7-M checkpoint:** See the authoritative [master execution plan](MASTER_EXECUTION_PLAN.md) and [reconciliation report](reports/PHASE_7M_RECONCILIATION.md). Inventory: 57 local / 57 GitHub / 16 production records. Main-compatible SQL and security tests passed locally; production deployment remains NO-GO. Preserve all sixteen development phases and twenty-four settings requirements; do not resume Phase 4B before verified production baseline reconciliation.
+
+<!-- END-PHASE7M-CURRENT -->
+
 Source of requirements: `docs/requirements/MASTER_BUILD_PROMPT_SUBMITTED_20261111.md`. This roadmap makes no claim to have completed all deliverables.
 
 ## Locked choices

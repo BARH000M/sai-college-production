@@ -1,5 +1,19 @@
 # Feature completion matrix
 
+**Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
+
+
+<!-- PHASE7M-CURRENT -->
+**Current Phase 7-M refresh — 18 November 2026:** This checkpoint supplements every existing phase row below; no prior implementation or live-acceptance blocker is waived.
+
+| Checkpoint | Database / security | Web / mobile | Actual local checks | Git / deploy / live |
+|---|---|---|---|---|
+| 7-M within Phase 7 | 57 local / 57 GitHub files / 16 production history; 007 superseded; finance/settings forward corrections and deferred admissions packages prepared; atomic package receipts integrated | No feature-completion upgrade; Phase 4B remains paused; prior Flutter/signing blockers retained | Main replay, nine-role/onboarding, finance, settings preservation, admissions, parent/student, attendance, maintenance, concurrency and actual executor atomicity PASS; profiles/exams PASS; drift negative tests 6/6 PASS | Local changes only; no commit/push, SQL, repair or hosted deployment. CI prepared, not remotely run. Production NO-GO; authenticated acceptance NOT VERIFIED |
+
+Authoritative [report](PHASE_7M_RECONCILIATION.md), [57-version matrix](PHASE_7M_MIGRATION_MATRIX.md), and [test evidence](../../supabase/deployment/phase7m/test-results.json). All 16 development phases and 24 settings requirements remain preserved. Earlier Git hashes/results below are historical snapshots.
+
+<!-- END-PHASE7M-CURRENT -->
+
 Status is separated by layer; local implementation or a passing isolated test
 does not imply production deployment or live acceptance. Main was inspected
 read-only; no production writes were performed. The deployment/recovery

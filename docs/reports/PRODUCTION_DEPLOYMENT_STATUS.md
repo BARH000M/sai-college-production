@@ -1,5 +1,21 @@
 # Production deployment status and candidate manifest — Phase 7-R
 
+**Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
+
+
+<!-- PHASE7M-CURRENT -->
+**18 November 2026 update — Phase 7-M:** The refreshed Main inventory is **57 local files / 57 GitHub Main files / 16 production history records**. All migration files match origin/main bytes at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. The earlier evidence below is historical wherever it differs. No production write, history repair or deployment occurred; Phase 4B remains paused.
+
+**Current disposition: NO-GO.** [Phase 7-M](PHASE_7M_RECONCILIATION.md) supersedes earlier inventory/source assumptions below. Production has 47 public tables with RLS, no private 007 finance schema/owner, no proposed mutation hold or atomic-role RPC, and no examinations schema. Finance aggregate checks found one assignment and zero invalid scope/amount/duplicate-key results. The production baseline has not been changed.
+
+The [updated manifest](../../supabase/deployment/phase7r/main-deployment-manifest.json) integrates existing maintenance/3B/3C/4A packages with tested Main-specific finance/settings corrections. Tracking/enrollment and protected events are pinned as deferred coordinated-cutover packages; unfinished Phase 4B/learning scoring and overlapping timestamped candidates are excluded from execution. The executor commits each package, postcondition and receipt atomically, rejects source changes/retries and follows manifest order. Its `release_ready=false` gate blocks execution.
+
+The native combined replay, profiles/examinations, nine-role/finance/admissions/attendance security suites, concurrency, maintenance and actual executor atomicity tests passed. Drift gates passed; six tamper tests passed. Default executor dry run passed read-only. See [actual results and current source/manifest/executor hashes](../../supabase/deployment/phase7m/test-results.json); all earlier approval hashes below are obsolete. Two grant-only history repairs are proposed, not executed or authorized. New database CI has no production credentials or deployment job and has not run on GitHub.
+
+Prior application-scope archive recovery evidence is reused, not rerun; full platform recovery, current recovery point, independently enforced write containment, owner approval, coordinated hosted compatibility and authenticated web/mobile acceptance remain required. Prior Flutter/signing blockers are unchanged. No commit/push or live write occurred.
+
+<!-- END-PHASE7M-CURRENT -->
+
 ## Execution refresh — 18 November 2026 (Asia/Aden)
 
 **Disposition: NO-GO.** Local recovery and safety tooling were exercised, but no production SQL, maintenance activation, Edge deployment, website deployment, migration repair, APK/AAB publication or authenticated live acceptance occurred. The owner must approve the exact final manifest before any production write; this report is not that approval.

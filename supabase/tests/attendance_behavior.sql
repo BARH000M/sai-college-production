@@ -23,7 +23,7 @@ declare
   today date := (now() at time zone 'Asia/Aden')::date;
 begin
   insert into auth.users (id) values (super_id), (admin_id), (teacher_id), (other_teacher_id), (reception_id), (student_user), (parent_id), (unverified_parent_id);
-  update auth.users set email_confirmed_at = now() where id in (parent_id, student_user);
+  update auth.users set email_confirmed_at = now() where id in (super_id, admin_id, teacher_id, other_teacher_id, reception_id, parent_id, student_user);
   insert into public.user_roles (user_id, role) values (super_id, 'super_admin'), (admin_id, 'admin'),
     (teacher_id, 'teacher'), (other_teacher_id, 'teacher'), (reception_id, 'receptionist'),
     (parent_id, 'parent'), (unverified_parent_id, 'parent');
