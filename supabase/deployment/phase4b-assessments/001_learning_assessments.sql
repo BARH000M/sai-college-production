@@ -413,7 +413,7 @@ as $$
   select exists (
     select 1 from public.learning_assessments a
     where a.id = wanted_assessment
-      and a.status = 'published'
+      and a.status in ('published','closed','archived')
         and (
           private.sai_security_can_read_student(
             (select s.id from public.students s
@@ -442,12 +442,12 @@ create policy learning_assessments_select on public.learning_assessments
   for select to authenticated
   using (
     private.sai_learning_can_manage_course(course_id)
-    or (status = 'published' and private.sai_security_can_read_student(
+    or (status in ('published','closed','archived') and private.sai_security_can_read_student(
       (select s.id from public.students s
         where s.class_id = learning_assessments.class_id and s.user_id = (select auth.uid())
           and private.sai_learning_assessment_eligible(learning_assessments.id, s.id) limit 1)
     ))
-    or (status = 'published' and private.sai_security_can_read_student(
+    or (status in ('published','closed','archived') and private.sai_security_can_read_student(
       (select s.id from public.students s
         join public.parent_student_links l on l.student_id = s.id
         where s.class_id = learning_assessments.class_id
@@ -759,11 +759,11 @@ begin
   if tg_op = 'UPDATE' and old.status in ('closed','archived')
     and (new.course_id, new.lesson_id, new.title, new.instructions, new.starts_at,
       new.due_at, new.time_limit_minutes, new.attempt_limit, new.passing_score,
-      new.randomize_questions, new.results_released)
+      new.randomize_questions)
     is distinct from
       (old.course_id, old.lesson_id, old.title, old.instructions, old.starts_at,
       old.due_at, old.time_limit_minutes, old.attempt_limit, old.passing_score,
-      old.randomize_questions, old.results_released) then
+      old.randomize_questions) then
     raise exception 'Closed or archived assessments cannot be edited'
       using errcode = '23514';
   end if;
@@ -784,9 +784,9 @@ begin
     raise exception 'Published assessment with attempts cannot be edited' using errcode = '23514';
   end if;
   if tg_op = 'UPDATE' and old.status = 'published'
-    and new.status <> 'published'
+    and new.status = 'draft'
     and exists (select 1 from public.learning_assessment_attempts a where a.assessment_id = old.id) then
-    raise exception 'Published assessment with attempts cannot be unpublished' using errcode = '23514';
+    raise exception 'Published assessment with attempts cannot return to draft' using errcode = '23514';
   end if;
   if new.status = 'published' and tg_op = 'UPDATE' and old.status <> 'published'
     and not exists (select 1 from public.learning_exercise_questions q
@@ -1000,7 +1000,8 @@ begin
   if new.status is distinct from old.status then
     update public.learning_exercise_questions
       set is_published = (new.status <> 'draft')
-      where assessment_id = new.id;
+      where assessment_id = new.id
+        and is_published is distinct from (new.status <> 'draft');
   end if;
   return new;
 end;

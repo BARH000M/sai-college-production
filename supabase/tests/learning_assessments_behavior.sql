@@ -637,14 +637,42 @@ set role authenticated;
 select public.as_user('00000000-0000-0000-0000-000000000101');
 do $$
 begin
+  update public.learning_assessments set status='closed'
+    where id='00000000-0000-0000-0000-000000000701';
+  begin
+    update public.learning_assessments set status='draft'
+      where id='00000000-0000-0000-0000-000000000701';
+    raise exception 'Closed assessment with history returned to draft';
+  exception when check_violation then null;
+  end;
   update public.learning_assessments set results_released=true
     where id in ('00000000-0000-0000-0000-000000000701',
       '00000000-0000-0000-0000-000000000712');
 end $$;
 
+select public.as_user('00000000-0000-0000-0000-000000000102');
+do $$
+begin
+  if not exists (select 1 from public.learning_assessments
+      where id='00000000-0000-0000-0000-000000000701' and status='closed')
+    or not exists (select 1 from public.learning_assessment_attempts
+      where assessment_id='00000000-0000-0000-0000-000000000701'
+        and status='graded' and score=9) then
+    raise exception 'Student cannot see a closed assessment and its released history';
+  end if;
+  begin
+    perform public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000701');
+    raise exception 'Student restarted a closed assessment';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
 select public.as_user('00000000-0000-0000-0000-000000000103');
 do $$
 begin
+  if not exists (select 1 from public.learning_assessments
+      where id='00000000-0000-0000-0000-000000000701' and status='closed') then
+    raise exception 'Verified parent cannot see closed assessment history';
+  end if;
   if exists (select 1 from public.learning_exercise_questions
       where assessment_id='00000000-0000-0000-0000-000000000701') then
     raise exception 'Parent can read the assessment question bank';
