@@ -112,3 +112,85 @@ test("written grading validates the RPC response path and surfaces permission fa
   const deniedApi = await load(denied, "grade-denied");
   await assert.rejects(deniedApi.gradeAssessmentAnswer("answer-1", 1, ""), /not authorized/);
 });
+
+test("assessment scheduling and grading settings are validated before database writes", async () => {
+  const client = fakeClient();
+  const api = await load(client, "schedule-settings");
+  await assert.rejects(api.createAssessment({
+    courseId: "course-1",
+    lessonId: "lesson-1",
+    title: "Scheduled quiz",
+    instructions: "",
+    startsAt: "2030-01-02T10:00:00Z",
+    dueAt: "2030-01-02T09:00:00Z",
+    timeLimitMinutes: 30,
+    attemptLimit: 2,
+    passingScore: 70,
+    randomizeQuestions: true,
+  }), /موعد الإغلاق بعد موعد البدء/);
+  assert.equal(client.calls.length, 0);
+
+  await api.createAssessment({
+    courseId: "course-1",
+    lessonId: "lesson-1",
+    title: "Scheduled quiz",
+    instructions: "",
+    startsAt: "2030-01-02T08:00:00Z",
+    dueAt: "2030-01-02T10:00:00Z",
+    timeLimitMinutes: 30,
+    attemptLimit: 2,
+    passingScore: 75.5,
+    randomizeQuestions: true,
+  });
+  const payload = client.calls.find((call) => call[0] === "insert")[1];
+  assert.equal(payload.starts_at, "2030-01-02T08:00:00.000Z");
+  assert.equal(payload.time_limit_minutes, 30);
+  assert.equal(payload.passing_score, 75.5);
+  assert.equal(payload.randomize_questions, true);
+});
+
+test("assessment duplication and individual assignment use authorized server RPCs", async () => {
+  const duplicateClient = fakeClient({
+    rpcResult: { data: "copy-id", error: null },
+  });
+  const duplicateApi = await load(duplicateClient, "duplicate-assessment");
+  assert.equal(await duplicateApi.duplicateAssessment("assessment-1"), "copy-id");
+  assert.deepEqual(duplicateClient.calls[0], ["rpc", "sai_learning_assessment_duplicate", {
+    p_assessment: "assessment-1",
+    p_title: null,
+  }]);
+
+  const assignmentClient = fakeClient({ rpcResult: { data: 2, error: null } });
+  const assignmentApi = await load(assignmentClient, "assign-assessment");
+  assert.equal(await assignmentApi.assignAssessmentStudents("assessment-1", ["student-1", "student-2"]), 2);
+  assert.deepEqual(assignmentClient.calls[0], ["rpc", "sai_learning_assessment_assign", {
+    p_assessment: "assessment-1",
+    p_student_ids: ["student-1", "student-2"],
+  }]);
+  await assert.rejects(assignmentApi.assignAssessmentStudents("assessment-1", ["student-1", "student-1"]), /تكرار/);
+  assert.equal(assignmentClient.calls.length, 1);
+});
+
+test("timed-out attempts are parsed as submitted without questions or answer keys", async () => {
+  const client = fakeClient({
+    rpcResult: {
+      data: {
+        attempt_id: "attempt-1",
+        attempt_number: 1,
+        status: "submitted",
+        timed_out: true,
+        due_at: null,
+        expires_at: "2030-01-02T10:30:00Z",
+        passing_score: 70,
+        questions: [],
+        saved_answers: {},
+      },
+      error: null,
+    },
+  });
+  const api = await load(client, "timed-out-attempt");
+  const attempt = await api.startAssessment("assessment-1");
+  assert.equal(attempt.status, "submitted");
+  assert.equal(attempt.timed_out, true);
+  assert.deepEqual(attempt.questions, []);
+});

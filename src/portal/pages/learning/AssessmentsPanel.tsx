@@ -2,10 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   assessmentKindLabels,
   assessmentKinds,
+  assignAssessmentStudents,
   createAssessment,
   createAssessmentQuestion,
+  duplicateAssessment,
   deleteAssessmentQuestion,
   gradeAssessmentAnswer,
+  loadAssessmentRoster,
   loadAssessmentQuestionsAdmin,
   loadAssessmentResults,
   loadAssessments,
@@ -19,6 +22,7 @@ import {
   type AssessmentQuestionAdmin,
   type AssessmentQuestionKind,
   type AssessmentResultRow,
+  type AssessmentStudent,
   type LearningAssessment,
 } from "@/portal/lib/assessments";
 
@@ -59,6 +63,13 @@ function cleanDate(value: string): string | null {
   return date.toISOString();
 }
 
+function cleanStartDate(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error("موعد البدء غير صالح.");
+  return date.toISOString();
+}
+
 export function AssessmentsPanel({
   lessonId,
   courseId,
@@ -85,11 +96,19 @@ export function AssessmentsPanel({
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [startsAt, setStartsAt] = useState("");
   const [dueAt, setDueAt] = useState("");
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState<number | null>(null);
   const [attemptLimit, setAttemptLimit] = useState(1);
+  const [passingScore, setPassingScore] = useState(70);
+  const [randomizeQuestions, setRandomizeQuestions] = useState(false);
   const [editing, setEditing] = useState("");
   const [questionForm, setQuestionForm] = useState<QuestionForm>(emptyQuestion);
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null);
+  const [assignmentFor, setAssignmentFor] = useState("");
+  const [roster, setRoster] = useState<AssessmentStudent[] | null>(null);
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+  const [assignmentBusy, setAssignmentBusy] = useState(false);
 
   const reload = useCallback(() => {
     setAssessments(null);
@@ -136,8 +155,12 @@ export function AssessmentsPanel({
     setEditing(item.id);
     setTitle(item.title);
     setInstructions(item.instructions ?? "");
+    setStartsAt(localDate(item.starts_at));
     setDueAt(localDate(item.due_at));
+    setTimeLimitMinutes(item.time_limit_minutes);
     setAttemptLimit(item.attempt_limit);
+    setPassingScore(item.passing_score);
+    setRandomizeQuestions(item.randomize_questions);
     setError("");
   }
 
@@ -150,8 +173,12 @@ export function AssessmentsPanel({
         id: item.id,
         title,
         instructions,
+        startsAt: cleanStartDate(startsAt),
         dueAt: cleanDate(dueAt),
+        timeLimitMinutes,
         attemptLimit,
+        passingScore,
+        randomizeQuestions,
       });
       setNotice("حُفظت إعدادات التقييم.");
       setEditing("");
@@ -173,14 +200,22 @@ export function AssessmentsPanel({
         lessonId,
         title,
         instructions,
+        startsAt: cleanStartDate(startsAt),
         dueAt: cleanDate(dueAt),
+        timeLimitMinutes,
         attemptLimit,
+        passingScore,
+        randomizeQuestions,
       });
       setCreateOpen(false);
       setTitle("");
       setInstructions("");
+      setStartsAt("");
       setDueAt("");
+      setTimeLimitMinutes(null);
       setAttemptLimit(1);
+      setPassingScore(70);
+      setRandomizeQuestions(false);
       setNotice("أُنشئت مسودة التقييم. أضف الأسئلة ثم انشرها للطلاب.");
       reload();
       setOpenId(id);
@@ -280,8 +315,10 @@ export function AssessmentsPanel({
       const started = await startAssessment(item.id);
       setAttempt(started);
       setAnswers(started.saved_answers);
-      setSubmitted(false);
-      setAttemptNotice(`المحاولة رقم ${started.attempt_number}. يُحفظ التقدم على الخادم.`);
+      setSubmitted(started.status !== "in_progress");
+      setAttemptNotice(started.timed_out
+        ? "انتهى الوقت وأُرسلت الإجابات المحفوظة تلقائياً."
+        : `المحاولة رقم ${started.attempt_number}. يُحفظ التقدم على الخادم.`);
     } catch (failure) {
       setError(message(failure));
     } finally {
@@ -352,14 +389,63 @@ export function AssessmentsPanel({
     }
   }
 
-  async function toggleStatus(item: LearningAssessment) {
+  async function changeStatus(item: LearningAssessment, status: LearningAssessment["status"]) {
     setSaving(true);
     setError("");
     try {
-      await setAssessmentStatus(item.id, item.status === "published" ? "draft" : "published");
-      setNotice(item.status === "published" ? "أُوقف نشر التقييم." : "نُشر التقييم للطلاب.");
+      await setAssessmentStatus(item.id, status);
+      setNotice(status === "published" ? "نُشر التقييم للطلاب."
+        : status === "closed" ? "أُغلق التقييم ومنع بدء محاولات جديدة."
+          : status === "archived" ? "أُرشف التقييم." : "أُعيد التقييم إلى المسودات.");
       reload();
       if (openId === item.id) setQuestions(await loadAssessmentQuestionsAdmin(item.id));
+    } catch (failure) {
+      setError(message(failure));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openAssignments(item: LearningAssessment) {
+    setAssignmentFor(item.id);
+    setRoster(null);
+    setError("");
+    try {
+      const students = await loadAssessmentRoster(item.id);
+      setRoster(students);
+      setSelectedStudents(new Set(students.filter((student) => student.assigned)
+        .map((student) => student.student_id)));
+    } catch (failure) {
+      setError(message(failure));
+    }
+  }
+
+  async function saveAssignments(item: LearningAssessment, allStudents = false) {
+    if (assignmentBusy) return;
+    setAssignmentBusy(true);
+    setError("");
+    try {
+      await assignAssessmentStudents(item.id, allStudents ? [] : [...selectedStudents]);
+      setNotice(allStudents ? "أُسند التقييم إلى الصف بالكامل." : "حُفظ تعيين الطلاب.");
+      setAssignmentFor("");
+      setRoster(null);
+    } catch (failure) {
+      setError(message(failure));
+    } finally {
+      setAssignmentBusy(false);
+    }
+  }
+
+  async function duplicate(item: LearningAssessment) {
+    setSaving(true);
+    setError("");
+    try {
+      const id = await duplicateAssessment(item.id);
+      setNotice("أُنشئت نسخة مسودة بأسئلة التقييم، دون نسخ المحاولات أو الطلاب المعيّنين.");
+      reload();
+      setOpenId(id);
+      setQuestions([]);
+      setResults([]);
     } catch (failure) {
       setError(message(failure));
     } finally {
@@ -389,7 +475,18 @@ export function AssessmentsPanel({
         <p className="muted">محاولات محفوظة، تصحيح آلي للموضوعي، ومراجعة كتابية من المعلم.</p>
       </div>
       {canManage && <button className="button primary" type="button" disabled={saving || createOpen}
-        onClick={() => { setCreateOpen(true); setTitle(""); setInstructions(""); setError(""); }}>
+        onClick={() => {
+          setCreateOpen(true);
+          setTitle("");
+          setInstructions("");
+          setStartsAt("");
+          setDueAt("");
+          setTimeLimitMinutes(null);
+          setAttemptLimit(1);
+          setPassingScore(70);
+          setRandomizeQuestions(false);
+          setError("");
+        }}>
         إنشاء تقييم
       </button>}
     </div>
@@ -405,9 +502,16 @@ export function AssessmentsPanel({
       <h4>تقييم جديد — مسودة</h4>
       <label>العنوان<input required minLength={2} maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <label>التعليمات<textarea rows={3} maxLength={4000} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label>
-      <label>موعد التسليم<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label>
+      <label>موعد البدء<input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></label>
+      <label>موعد الإغلاق<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label>
+      <label>مدة المحاولة بالدقائق (اختياري)<input type="number" min={1} max={300} value={timeLimitMinutes ?? ""}
+        onChange={(event) => setTimeLimitMinutes(event.target.value ? Number(event.target.value) : null)} /></label>
       <label>الحد الأقصى للمحاولات<input type="number" min={1} max={10} value={attemptLimit}
         onChange={(event) => setAttemptLimit(Number(event.target.value))} /></label>
+      <label>درجة الاجتياز (%)<input type="number" min={0} max={100} step={0.01} value={passingScore}
+        onChange={(event) => setPassingScore(Number(event.target.value))} /></label>
+      <label className="inline-control"><input type="checkbox" checked={randomizeQuestions}
+        onChange={(event) => setRandomizeQuestions(event.target.checked)} /> ترتيب عشوائي ثابت لكل محاولة</label>
       <div className="actions">
         <button className="button primary" disabled={saving}>{saving ? "جارٍ الإنشاء..." : "إنشاء المسودة"}</button>
         <button type="button" className="button secondary" disabled={saving} onClick={() => setCreateOpen(false)}>إلغاء</button>
@@ -419,10 +523,14 @@ export function AssessmentsPanel({
         <div>
           <h4>{item.title}</h4>
           <small className="learn-meta">
-            {item.status === "published" ? "منشور" : "مسودة"}
+            {({ draft: "مسودة", published: "منشور", closed: "مغلق", archived: "مؤرشف" } as const)[item.status]}
+            {item.starts_at ? ` · يبدأ ${new Date(item.starts_at).toLocaleString("ar-EG")}` : ""}
+            {item.due_at ? ` · الإغلاق ${new Date(item.due_at).toLocaleString("ar-EG")}` : " · بلا موعد إغلاق"}
             {" · "}
             {item.attempt_limit} محاولة كحد أقصى
-            {item.due_at ? ` · التسليم ${new Date(item.due_at).toLocaleString("ar-EG")}` : " · بلا موعد نهائي"}
+            {item.time_limit_minutes ? ` · ${item.time_limit_minutes} دقيقة للمحاولة` : ""}
+            {` · الاجتياز ${item.passing_score}%`}
+            {item.randomize_questions ? " · ترتيب عشوائي" : ""}
           </small>
         </div>
         <button type="button" className="button secondary" onClick={() => void openAssessment(item)}>
@@ -433,9 +541,16 @@ export function AssessmentsPanel({
         onSubmit={(event) => { event.preventDefault(); void saveMetadata(item); }}>
         <label>العنوان<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
         <label>التعليمات<textarea rows={3} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label>
-        <label>موعد التسليم<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label>
+        <label>موعد البدء<input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></label>
+        <label>موعد الإغلاق<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label>
+        <label>مدة المحاولة بالدقائق (اختياري)<input type="number" min={1} max={300} value={timeLimitMinutes ?? ""}
+          onChange={(event) => setTimeLimitMinutes(event.target.value ? Number(event.target.value) : null)} /></label>
         <label>الحد الأقصى للمحاولات<input type="number" min={1} max={10} value={attemptLimit}
           onChange={(event) => setAttemptLimit(Number(event.target.value))} /></label>
+        <label>درجة الاجتياز (%)<input type="number" min={0} max={100} step={0.01} value={passingScore}
+          onChange={(event) => setPassingScore(Number(event.target.value))} /></label>
+        <label className="inline-control"><input type="checkbox" checked={randomizeQuestions}
+          onChange={(event) => setRandomizeQuestions(event.target.checked)} /> ترتيب عشوائي ثابت لكل محاولة</label>
         <div className="actions">
           <button className="button primary" disabled={saving}>حفظ التعديل</button>
           <button type="button" className="button secondary" onClick={() => setEditing("")}>إلغاء</button>
@@ -444,15 +559,48 @@ export function AssessmentsPanel({
       {openId === item.id && <>
         {item.instructions && <p>{item.instructions}</p>}
         {canManage && <div className="actions">
-          <button type="button" className="text-button" onClick={() => beginEdit(item)}>تعديل إعدادات التقييم</button>
-          <button type="button" className="text-button" disabled={saving} onClick={() => void toggleStatus(item)}>
-            {item.status === "published" ? "إيقاف النشر" : "نشر للطلاب"}
-          </button>
-          <button type="button" className="text-button" disabled={saving || item.status !== "published"}
+          {item.status !== "archived" && <button type="button" className="text-button" onClick={() => beginEdit(item)}>تعديل إعدادات التقييم</button>}
+          {item.status === "draft" && <button type="button" className="text-button" disabled={saving}
+            onClick={() => void changeStatus(item, "published")}>نشر للطلاب</button>}
+          {item.status === "published" && <button type="button" className="text-button" disabled={saving}
+            onClick={() => void changeStatus(item, "closed")}>إغلاق التقييم</button>}
+          {item.status === "closed" && <button type="button" className="text-button" disabled={saving}
+            onClick={() => void changeStatus(item, "archived")}>أرشفة التقييم</button>}
+          {item.status !== "archived" && <button type="button" className="text-button" disabled={saving}
+            onClick={() => void duplicate(item)}>نسخ التقييم</button>}
+          {item.status !== "closed" && item.status !== "archived" && <button type="button" className="text-button"
+            disabled={saving || assignmentBusy} onClick={() => void openAssignments(item)}>تعيين الطلاب</button>}
+          <button type="button" className="text-button" disabled={saving || item.status === "draft" || item.status === "archived"}
             onClick={() => void toggleResults(item)}>
             {item.results_released ? "إخفاء النتائج" : "إتاحة النتائج"}
           </button>
         </div>}
+
+        {canManage && assignmentFor === item.id && <section className="management-form" aria-label="تعيين طلاب التقييم">
+          <h5>تعيين الطلاب</h5>
+          {!roster && <p role="status">جارٍ تحميل طلاب الصف...</p>}
+          {roster?.length === 0 && <p className="muted">لا يوجد طلاب نشطون في الصف.</p>}
+          {roster?.map((student) => <label className="inline-control" key={student.student_id}>
+            <input type="checkbox" checked={selectedStudents.has(student.student_id)}
+              onChange={(event) => setSelectedStudents((current) => {
+                const next = new Set(current);
+                if (event.target.checked) next.add(student.student_id);
+                else next.delete(student.student_id);
+                return next;
+              })} />
+            {student.full_name} · {student.admission_no}
+          </label>)}
+          <div className="actions">
+            <button type="button" className="button primary" disabled={assignmentBusy || !roster?.length || !selectedStudents.size}
+              onClick={() => void saveAssignments(item)}>
+              {assignmentBusy ? "جارٍ الحفظ..." : "حفظ التعيين الفردي"}
+            </button>
+            <button type="button" className="button secondary" disabled={assignmentBusy}
+              onClick={() => void saveAssignments(item, true)}>إسناد إلى الصف بالكامل</button>
+            <button type="button" className="button secondary" disabled={assignmentBusy}
+              onClick={() => { setAssignmentFor(""); setRoster(null); }}>إلغاء</button>
+          </div>
+        </section>}
 
         {canManage && <>
           <h5>بنك أسئلة التقييم</h5>
@@ -466,14 +614,14 @@ export function AssessmentsPanel({
             {question.kind === "fill_blank" && <p className="data-note">الإجابات المقبولة: {(question.answer_key as string[] | null)?.join("، ")}</p>}
             {(question.kind === "multiple_choice" || question.kind === "true_false")
               && <p className="data-note">الإجابة: {question.choices[question.correct_choice ?? 0]}</p>}
-            <div className="actions">
+            {item.status !== "closed" && item.status !== "archived" && <div className="actions">
               <button type="button" className="text-button" onClick={() => beginQuestionEdit(question)}>تعديل</button>
               <button type="button" className="text-button" disabled={saving}
                 onClick={() => void removeQuestion(item, question.id)}>حذف</button>
-            </div>
+            </div>}
           </div>)}
 
-          <form className="management-form" onSubmit={(event) => { event.preventDefault(); void saveQuestion(item); }}>
+          {item.status !== "closed" && item.status !== "archived" && <form className="management-form" onSubmit={(event) => { event.preventDefault(); void saveQuestion(item); }}>
             <h5>{editingQuestion ? "تعديل السؤال" : "إضافة سؤال"}</h5>
             <label>نوع السؤال<select value={questionForm.kind} onChange={(event) => {
               const next = event.target.value as AssessmentQuestionKind;
@@ -507,12 +655,13 @@ export function AssessmentsPanel({
                 setEditingQuestion(null); setQuestionForm(emptyQuestion);
               }}>إلغاء التعديل</button>}
             </div>
-          </form>
+          </form>}
 
           <h5>المحاولات والنتائج</h5>
           {!results.length && <p className="muted">لا توجد محاولات حتى الآن.</p>}
           {results.map((row) => row.answer_id && <div className="learn-exercise" key={row.answer_id}>
             <strong>{row.prompt}</strong>
+            {typeof row.passed === "boolean" && <small className="learn-meta">{row.passed ? "مجتاز" : "لم يجتز"}</small>}
             <p>{typeof row.answer === "string" ? row.answer : JSON.stringify(row.answer)}</p>
             {row.kind === "written" && !row.feedback && row.status !== "graded" && <div className="management-form">
               <label>الدرجة من {questions.find((question) => question.id === row.question_id)?.points ?? 0}
@@ -529,11 +678,20 @@ export function AssessmentsPanel({
         </>}
 
         {canTake && item.status === "published" && !attempt && <button type="button"
-          className="button primary" disabled={saving} onClick={() => void start(item)}>
-          بدء التقييم أو استكمال المحاولة المحفوظة
+          className="button primary"
+          disabled={saving
+            || Boolean(item.starts_at && Date.now() < new Date(item.starts_at).getTime())
+            || Boolean(item.due_at && Date.now() > new Date(item.due_at).getTime())}
+          onClick={() => void start(item)}>
+          {item.starts_at && Date.now() < new Date(item.starts_at).getTime()
+            ? `يفتح في ${new Date(item.starts_at).toLocaleString("ar-EG")}`
+            : "بدء التقييم أو استكمال المحاولة المحفوظة"}
         </button>}
         {canTake && attempt && !submitted && <>
           <p role="status">{attemptNotice}</p>
+          {attempt.expires_at && <p className="data-note">
+            يجب التسليم قبل {new Date(attempt.expires_at).toLocaleString("ar-EG")}.
+          </p>}
           {attempt.questions.map((question, index) => {
             const value = answers[question.id];
             return <fieldset className="learn-exercise" key={question.id} disabled={saving}>
@@ -570,6 +728,7 @@ export function AssessmentsPanel({
           {!results.length && <p className="data-note">تظهر نتيجة الطالب هنا بعد إتاحتها من المعلم.</p>}
           {results.map((row) => <p className="data-note" key={row.answer_id ?? row.attempt_id}>
             {row.status === "graded" ? `النتيجة ${row.score ?? 0} من ${row.max_score}` : "ما زالت النتيجة قيد التصحيح."}
+            {typeof row.passed === "boolean" ? ` · ${row.passed ? "مجتاز" : "لم يجتز"}` : ""}
             {row.feedback ? ` · ${row.feedback}` : ""}
           </p>)}
         </>}

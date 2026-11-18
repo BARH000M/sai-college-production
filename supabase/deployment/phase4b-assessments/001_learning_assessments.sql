@@ -35,9 +35,13 @@ create table public.learning_assessments (
   academic_session_id uuid not null references public.academic_sessions(id),
   title text not null check (length(btrim(title)) between 2 and 200),
   instructions text check (instructions is null or length(instructions) <= 4000),
+  starts_at timestamptz,
   due_at timestamptz,
+  time_limit_minutes integer check (time_limit_minutes is null or time_limit_minutes between 1 and 300),
   attempt_limit integer not null default 1 check (attempt_limit between 1 and 10),
-  status text not null default 'draft' check (status in ('draft','published')),
+  passing_score numeric(5,2) not null default 70 check (passing_score between 0 and 100),
+  randomize_questions boolean not null default false,
+  status text not null default 'draft' check (status in ('draft','published','closed','archived')),
   published_at timestamptz,
   results_released boolean not null default false,
   created_by uuid not null default auth.uid() references auth.users(id),
@@ -76,10 +80,20 @@ create table public.learning_assessment_attempts (
   status text not null default 'in_progress' check (status in ('in_progress','submitted','graded')),
   score numeric(9,2),
   max_score numeric(9,2) not null check (max_score > 0),
+  question_order uuid[] not null default '{}'::uuid[],
   started_at timestamptz not null default now(),
+  expires_at timestamptz,
   submitted_at timestamptz,
   graded_at timestamptz,
   unique (assessment_id, student_id, attempt_number)
+);
+
+create table public.learning_assessment_assignments (
+  assessment_id uuid not null references public.learning_assessments(id) on delete cascade,
+  student_id uuid not null references public.students(id) on delete cascade,
+  assigned_by uuid not null default auth.uid() references auth.users(id),
+  assigned_at timestamptz not null default now(),
+  primary key (assessment_id, student_id)
 );
 
 create table public.learning_assessment_answers (
@@ -313,6 +327,8 @@ create index learning_assessments_course_idx
   on public.learning_assessments(course_id, status, due_at);
 create index learning_assessments_lesson_idx
   on public.learning_assessments(lesson_id, status, created_at desc);
+create index learning_assessment_assignments_student_idx
+  on public.learning_assessment_assignments(student_id, assessment_id);
 create index learning_assessment_attempts_student_idx
   on public.learning_assessment_attempts(student_id, assessment_id, started_at desc);
 create index learning_assessment_answers_attempt_idx
@@ -321,14 +337,18 @@ create index learning_assessment_answers_attempt_idx
 alter table public.learning_assessments enable row level security;
 alter table public.learning_assessment_attempts enable row level security;
 alter table public.learning_assessment_answers enable row level security;
+alter table public.learning_assessment_assignments enable row level security;
 
 revoke all on public.learning_assessments, public.learning_assessment_attempts,
-  public.learning_assessment_answers, public.learning_exercise_questions
+  public.learning_assessment_answers, public.learning_assessment_assignments,
+  public.learning_exercise_questions
   from public, anon, authenticated;
 grant select on public.learning_assessments to authenticated;
-grant insert (id, course_id, lesson_id, title, instructions, due_at, attempt_limit)
+grant insert (id, course_id, lesson_id, title, instructions, starts_at, due_at,
+  time_limit_minutes, attempt_limit, passing_score, randomize_questions)
   on public.learning_assessments to authenticated;
-grant update (title, instructions, due_at, attempt_limit, status, results_released)
+grant update (title, instructions, starts_at, due_at, time_limit_minutes,
+  attempt_limit, passing_score, randomize_questions, status, results_released)
   on public.learning_assessments to authenticated;
 grant select (id, lesson_id, vocabulary_id, kind, prompt, choices, position,
   is_published, created_at, assessment_id, points)
@@ -354,6 +374,30 @@ as $$
   );
 $$;
 
+create or replace function private.sai_learning_assessment_eligible(
+  wanted_assessment uuid, wanted_student uuid
+)
+returns boolean language sql stable security definer
+set search_path = pg_catalog, public, private
+as $$
+  select exists (
+    select 1 from public.learning_assessments a
+    join public.students s on s.id = wanted_student
+      and s.class_id = a.class_id and s.status = 'active'
+    where a.id = wanted_assessment
+      and (
+        not exists (
+          select 1 from public.learning_assessment_assignments x
+          where x.assessment_id = a.id
+        )
+        or exists (
+          select 1 from public.learning_assessment_assignments x
+          where x.assessment_id = a.id and x.student_id = s.id
+        )
+      )
+  );
+$$;
+
 create or replace function private.sai_learning_assessment_read(wanted_assessment uuid)
 returns boolean language sql stable security definer
 set search_path = pg_catalog, public, private
@@ -365,22 +409,26 @@ as $$
         and (
           private.sai_security_can_read_student(
             (select s.id from public.students s
-              where s.class_id = a.class_id and s.user_id = (select auth.uid()) limit 1)
+              where s.class_id = a.class_id and s.user_id = (select auth.uid())
+                and private.sai_learning_assessment_eligible(a.id, s.id) limit 1)
           )
           or private.sai_security_can_read_student(
             (select s.id from public.students s
               join public.parent_student_links l on l.student_id = s.id
               where s.class_id = a.class_id and l.parent_user_id = (select auth.uid())
-                and l.verified_at is not null limit 1)
+                and l.verified_at is not null
+                and private.sai_learning_assessment_eligible(a.id, s.id) limit 1)
           )
         )
   );
 $$;
 
 revoke all on function private.sai_learning_assessment_manage(uuid),
-  private.sai_learning_assessment_read(uuid) from public, anon;
+  private.sai_learning_assessment_read(uuid),
+  private.sai_learning_assessment_eligible(uuid, uuid) from public, anon;
 grant execute on function private.sai_learning_assessment_manage(uuid),
-  private.sai_learning_assessment_read(uuid) to authenticated;
+  private.sai_learning_assessment_read(uuid),
+  private.sai_learning_assessment_eligible(uuid, uuid) to authenticated;
 
 create policy learning_assessments_select on public.learning_assessments
   for select to authenticated
@@ -388,13 +436,15 @@ create policy learning_assessments_select on public.learning_assessments
     private.sai_learning_can_manage_course(course_id)
     or (status = 'published' and private.sai_security_can_read_student(
       (select s.id from public.students s
-        where s.class_id = learning_assessments.class_id and s.user_id = (select auth.uid()) limit 1)
+        where s.class_id = learning_assessments.class_id and s.user_id = (select auth.uid())
+          and private.sai_learning_assessment_eligible(learning_assessments.id, s.id) limit 1)
     ))
     or (status = 'published' and private.sai_security_can_read_student(
       (select s.id from public.students s
         join public.parent_student_links l on l.student_id = s.id
         where s.class_id = learning_assessments.class_id
-          and l.parent_user_id = (select auth.uid()) and l.verified_at is not null limit 1)
+          and l.parent_user_id = (select auth.uid()) and l.verified_at is not null
+          and private.sai_learning_assessment_eligible(learning_assessments.id, s.id) limit 1)
     ))
   );
 
@@ -402,6 +452,151 @@ create policy learning_assessments_write on public.learning_assessments
   for all to authenticated
   using (private.sai_learning_can_manage_course(course_id))
   with check (private.sai_learning_can_manage_course(course_id));
+
+create function public.sai_learning_assessment_roster(p_assessment uuid)
+returns table (
+  student_id uuid, full_name text, admission_no text,
+  assigned boolean, class_wide boolean
+)
+language plpgsql stable security definer
+set search_path = pg_catalog, public, private, auth
+as $$
+declare
+  v_class uuid;
+begin
+  if (select auth.uid()) is null
+    or not private.sai_learning_assessment_manage(p_assessment) then
+    raise exception 'Assessment roster is not available to this account'
+      using errcode = '42501';
+  end if;
+  select a.class_id into v_class
+    from public.learning_assessments a where a.id = p_assessment;
+  return query
+    select s.id, s.full_name, s.admission_no,
+      (not exists (
+        select 1 from public.learning_assessment_assignments x
+        where x.assessment_id = p_assessment
+      ) or exists (
+        select 1 from public.learning_assessment_assignments x
+        where x.assessment_id = p_assessment and x.student_id = s.id
+      )),
+      not exists (
+        select 1 from public.learning_assessment_assignments x
+        where x.assessment_id = p_assessment
+      )
+    from public.students s
+    where s.class_id = v_class and s.status = 'active'
+    order by s.full_name, s.id;
+end;
+$$;
+
+create function public.sai_learning_assessment_assign(
+  p_assessment uuid, p_student_ids uuid[]
+)
+returns integer language plpgsql security definer
+set search_path = pg_catalog, public, private, auth
+as $$
+declare
+  v_assessment public.learning_assessments%rowtype;
+  v_count integer;
+begin
+  if (select auth.uid()) is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+  select a.* into v_assessment
+    from public.learning_assessments a
+    where a.id = p_assessment for update;
+  if v_assessment.id is null
+    or not private.sai_learning_assessment_manage(p_assessment) then
+    raise exception 'Assessment assignment is not authorized'
+      using errcode = '42501';
+  end if;
+  if v_assessment.status not in ('draft','published')
+    or exists (
+      select 1 from public.learning_assessment_attempts a
+      where a.assessment_id = p_assessment
+    ) then
+    raise exception 'Assignments are locked after attempts begin or the assessment closes'
+      using errcode = '23514';
+  end if;
+  if p_student_ids is null or cardinality(p_student_ids) > 1000
+    or cardinality(p_student_ids) <>
+      (select count(distinct wanted.id)
+        from unnest(p_student_ids) as wanted(id)) then
+    raise exception 'Student assignment list is invalid' using errcode = '23514';
+  end if;
+  if exists (
+    select 1 from unnest(p_student_ids) wanted(id)
+    where not exists (
+      select 1 from public.students s
+      where s.id = wanted.id and s.class_id = v_assessment.class_id
+        and s.status = 'active'
+    )
+  ) then
+    raise exception 'Every assigned student must be active in the assessment class'
+      using errcode = '23514';
+  end if;
+  delete from public.learning_assessment_assignments x
+    where x.assessment_id = p_assessment;
+  insert into public.learning_assessment_assignments
+    (assessment_id, student_id, assigned_by)
+  select p_assessment, wanted.id, (select auth.uid())
+    from unnest(p_student_ids) wanted(id);
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+create function public.sai_learning_assessment_duplicate(
+  p_assessment uuid, p_title text default null
+)
+returns uuid language plpgsql security definer
+set search_path = pg_catalog, public, private, auth
+as $$
+declare
+  v_source public.learning_assessments%rowtype;
+  v_id uuid;
+  v_title text;
+begin
+  if (select auth.uid()) is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+  select a.* into v_source
+    from public.learning_assessments a
+    where a.id = p_assessment for share;
+  if v_source.id is null
+    or not private.sai_learning_assessment_manage(p_assessment) then
+    raise exception 'Assessment duplication is not authorized'
+      using errcode = '42501';
+  end if;
+  v_title := coalesce(nullif(btrim(p_title), ''), v_source.title || ' (نسخة)');
+  if length(v_title) < 2 or length(v_title) > 200 then
+    raise exception 'Assessment title must contain 2 to 200 characters'
+      using errcode = '23514';
+  end if;
+  insert into public.learning_assessments (
+    course_id, lesson_id, title, instructions, starts_at, due_at,
+    time_limit_minutes, attempt_limit, passing_score, randomize_questions,
+    status, results_released
+  )
+  values (
+    v_source.course_id, v_source.lesson_id, v_title, v_source.instructions,
+    null, null, v_source.time_limit_minutes, v_source.attempt_limit,
+    v_source.passing_score, v_source.randomize_questions, 'draft', false
+  )
+  returning id into v_id;
+  insert into public.learning_exercise_questions (
+    lesson_id, vocabulary_id, kind, prompt, choices, correct_choice,
+    position, is_published, assessment_id, points, answer_key
+  )
+  select q.lesson_id, q.vocabulary_id, q.kind, q.prompt, q.choices,
+    q.correct_choice, q.position, false, v_id, q.points, q.answer_key
+  from public.learning_exercise_questions q
+  where q.assessment_id = p_assessment
+  order by q.position, q.id;
+  return v_id;
+end;
+$$;
 
 drop policy if exists learning_exercise_questions_select on public.learning_exercise_questions;
 create policy learning_exercise_questions_select on public.learning_exercise_questions
@@ -435,6 +630,7 @@ create policy learning_assessment_attempts_results on public.learning_assessment
     or (private.sai_learning_assessment_read(assessment_id)
       and exists (select 1 from public.learning_assessments x
         where x.id = assessment_id and x.results_released)
+      and private.sai_learning_assessment_eligible(assessment_id, student_id)
       and private.sai_security_can_read_student(student_id))
   );
 
@@ -448,6 +644,7 @@ create policy learning_assessment_answers_results on public.learning_assessment_
           private.sai_learning_assessment_manage(a.assessment_id)
           or (private.sai_learning_assessment_read(a.assessment_id)
             and private.sai_security_can_read_student(a.student_id)
+            and private.sai_learning_assessment_eligible(a.assessment_id, a.student_id)
             and exists (select 1 from public.learning_assessments x
               where x.id = a.assessment_id and x.results_released))
         )
@@ -467,9 +664,33 @@ begin
   if v_course.id is null or v_lesson_course is distinct from new.course_id then
     raise exception 'Assessment lesson must belong to its selected course' using errcode = '23514';
   end if;
+  if new.starts_at is not null and new.due_at is not null
+    and new.starts_at >= new.due_at then
+    raise exception 'Assessment end must be after its start' using errcode = '23514';
+  end if;
   new.class_id := v_course.class_id;
   new.academic_session_id := v_course.session_id;
   new.updated_at := now();
+  if tg_op = 'UPDATE' and new.status is distinct from old.status then
+    if not (
+      (old.status = 'draft' and new.status in ('published','archived'))
+      or (old.status = 'published' and new.status in ('draft','closed'))
+      or (old.status = 'closed' and new.status = 'archived')
+    ) then
+      raise exception 'Invalid assessment state transition' using errcode = '23514';
+    end if;
+  end if;
+  if tg_op = 'UPDATE' and old.status in ('closed','archived')
+    and (new.course_id, new.lesson_id, new.title, new.instructions, new.starts_at,
+      new.due_at, new.time_limit_minutes, new.attempt_limit, new.passing_score,
+      new.randomize_questions, new.results_released)
+    is distinct from
+      (old.course_id, old.lesson_id, old.title, old.instructions, old.starts_at,
+      old.due_at, old.time_limit_minutes, old.attempt_limit, old.passing_score,
+      old.randomize_questions, old.results_released) then
+    raise exception 'Closed or archived assessments cannot be edited'
+      using errcode = '23514';
+  end if;
   if tg_op = 'UPDATE' and new.status = 'published' and old.status <> 'published' then
     new.published_at := now();
   elsif new.status = 'draft' then
@@ -477,9 +698,13 @@ begin
   end if;
   if tg_op = 'UPDATE' and old.status = 'published'
     and exists (select 1 from public.learning_assessment_attempts a where a.assessment_id = old.id)
-    and (new.course_id, new.lesson_id, new.title, new.instructions, new.due_at, new.attempt_limit)
+    and (new.course_id, new.lesson_id, new.title, new.instructions, new.starts_at,
+      new.due_at, new.time_limit_minutes, new.attempt_limit, new.passing_score,
+      new.randomize_questions)
       is distinct from
-      (old.course_id, old.lesson_id, old.title, old.instructions, old.due_at, old.attempt_limit) then
+      (old.course_id, old.lesson_id, old.title, old.instructions, old.starts_at,
+      old.due_at, old.time_limit_minutes, old.attempt_limit, old.passing_score,
+      old.randomize_questions) then
     raise exception 'Published assessment with attempts cannot be edited' using errcode = '23514';
   end if;
   if tg_op = 'UPDATE' and old.status = 'published'
@@ -510,7 +735,7 @@ returns trigger language plpgsql security definer
 set search_path = pg_catalog, public
 as $$
 begin
-  if old.status = 'published'
+  if old.status in ('published','closed','archived')
     or exists (select 1 from public.learning_assessment_attempts a
       where a.assessment_id = old.id) then
     raise exception 'Published assessments and assessment history cannot be deleted'
@@ -549,6 +774,12 @@ begin
   if exists (select 1 from public.learning_assessment_attempts a
     where a.assessment_id = any (array[v_old_assessment, v_new_assessment])) then
     raise exception 'Assessment questions cannot be edited after attempts begin' using errcode = '23514';
+  end if;
+  if exists (select 1 from public.learning_assessments a
+  where a.id = any (array[v_old_assessment, v_new_assessment])
+    and a.status in ('closed','archived')) then
+  raise exception 'Closed or archived assessment questions cannot be edited'
+    using errcode = '23514';
   end if;
   if tg_op = 'DELETE' then
     return old;
@@ -642,7 +873,7 @@ as $$
 begin
   if new.status is distinct from old.status then
     update public.learning_exercise_questions
-      set is_published = (new.status = 'published')
+      set is_published = (new.status <> 'draft')
       where assessment_id = new.id;
   end if;
   return new;
@@ -681,7 +912,10 @@ declare
   v_assessment public.learning_assessments%rowtype;
   v_student uuid;
   v_attempt public.learning_assessment_attempts%rowtype;
+  v_expired_attempt public.learning_assessment_attempts%rowtype;
   v_next integer;
+  v_question_order uuid[];
+  v_max_score numeric(9,2);
 begin
   if current_setting('transaction_isolation') <> 'read committed' then
     raise exception 'Starting an assessment requires read committed isolation' using errcode = '25001';
@@ -703,39 +937,84 @@ begin
   if v_assessment.id is null then
     raise exception 'Assessment is not available to this student' using errcode = '42501';
   end if;
+  if not private.sai_learning_assessment_eligible(p_assessment, v_student) then
+    raise exception 'Assessment is not assigned to this student' using errcode = '42501';
+  end if;
+  if v_assessment.starts_at is not null and clock_timestamp() < v_assessment.starts_at then
+    raise exception 'Assessment has not started yet' using errcode = 'P0001';
+  end if;
   if v_assessment.due_at is not null and clock_timestamp() > v_assessment.due_at then
     raise exception 'Assessment deadline has passed' using errcode = 'P0001';
   end if;
   select a.* into v_attempt from public.learning_assessment_attempts a
     where a.assessment_id = p_assessment and a.student_id = v_student
       and a.status = 'in_progress'
-    order by a.attempt_number desc limit 1;
+    order by a.attempt_number desc limit 1 for update;
+  if v_attempt.id is not null and v_attempt.expires_at is not null
+    and clock_timestamp() >= v_attempt.expires_at then
+    v_expired_attempt := v_attempt;
+    perform public.sai_learning_assessment_submit(v_attempt.id);
+    select * into v_expired_attempt from public.learning_assessment_attempts
+      where id = v_attempt.id;
+    v_attempt.id := null;
+  end if;
   if v_attempt.id is null then
     select coalesce(max(a.attempt_number), 0) + 1 into v_next
       from public.learning_assessment_attempts a
       where a.assessment_id = p_assessment and a.student_id = v_student;
     if v_next > v_assessment.attempt_limit then
+      if v_expired_attempt.id is not null then
+        return jsonb_build_object(
+          'attempt_id', v_expired_attempt.id,
+          'attempt_number', v_expired_attempt.attempt_number,
+          'status', v_expired_attempt.status,
+          'timed_out', true,
+          'due_at', v_assessment.due_at,
+          'expires_at', v_expired_attempt.expires_at,
+          'passing_score', v_assessment.passing_score,
+          'questions', '[]'::jsonb,
+          'saved_answers', '{}'::jsonb
+        );
+      end if;
       raise exception 'No attempts remain for this assessment' using errcode = 'P0001';
     end if;
-    insert into public.learning_assessment_attempts
-      (assessment_id, student_id, attempt_number, max_score)
-    select p_assessment, v_student, v_next, sum(q.points)
+    select array_agg(q.id order by
+        case when v_assessment.randomize_questions then random() end,
+        q.position, q.id),
+      coalesce(sum(q.points), 0)
+      into v_question_order, v_max_score
       from public.learning_exercise_questions q
-      where q.assessment_id = p_assessment and q.is_published
+      where q.assessment_id = p_assessment and q.is_published;
+    insert into public.learning_assessment_attempts
+      (assessment_id, student_id, attempt_number, max_score, question_order, expires_at)
+    values (p_assessment, v_student, v_next, v_max_score, v_question_order,
+      case when v_assessment.time_limit_minutes is null then v_assessment.due_at
+        else least(coalesce(v_assessment.due_at, 'infinity'::timestamptz),
+          clock_timestamp() + make_interval(mins => v_assessment.time_limit_minutes))
+      end)
     returning * into v_attempt;
   end if;
   return jsonb_build_object(
     'attempt_id', v_attempt.id,
     'attempt_number', v_attempt.attempt_number,
     'due_at', v_assessment.due_at,
-    'questions', coalesce((
+    'expires_at', v_attempt.expires_at,
+    'passing_score', v_assessment.passing_score,
+    'questions', coalesce(case when cardinality(v_attempt.question_order) > 0 then (
+      select jsonb_agg(jsonb_build_object(
+        'id', q.id, 'kind', q.kind, 'prompt', q.prompt,
+        'choices', q.choices, 'points', q.points, 'position', q.position
+      ) order by ordered.ordinality)
+      from unnest(v_attempt.question_order) with ordinality ordered(question_id, ordinality)
+      join public.learning_exercise_questions q on q.id = ordered.question_id
+    ) else (
       select jsonb_agg(jsonb_build_object(
         'id', q.id, 'kind', q.kind, 'prompt', q.prompt,
         'choices', q.choices, 'points', q.points, 'position', q.position
       ) order by q.position, q.id)
       from public.learning_exercise_questions q
       where q.assessment_id = p_assessment and q.is_published
-    ), '[]'::jsonb),
+    ) end, '[]'::jsonb),
     'saved_answers', coalesce((
       select jsonb_object_agg(x.question_id::text, x.answer)
       from public.learning_assessment_answers x where x.attempt_id = v_attempt.id
@@ -760,9 +1039,18 @@ begin
     raise exception 'Attempt is not editable by this account' using errcode = '42501';
   end if;
   if exists (select 1 from public.learning_assessments x
+    where x.id = v_attempt.assessment_id and x.status <> 'published') then
+    raise exception 'Assessment is closed' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.learning_assessments x
     where x.id = v_attempt.assessment_id and x.due_at is not null
       and clock_timestamp() > x.due_at) then
     raise exception 'Assessment deadline has passed' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.learning_assessment_attempts a
+    where a.id = v_attempt.id and a.expires_at is not null
+      and clock_timestamp() >= a.expires_at) then
+    raise exception 'Assessment time limit has passed' using errcode = 'P0001';
   end if;
   select q.* into v_question from public.learning_exercise_questions q
     where q.id = p_question and q.assessment_id = v_attempt.assessment_id
@@ -807,6 +1095,10 @@ begin
       and a.status = 'in_progress' for update of a;
   if v_attempt.id is null then
     raise exception 'Attempt cannot be submitted by this account' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.learning_assessments x
+    where x.id = v_attempt.assessment_id and x.status <> 'published') then
+    raise exception 'Assessment is closed' using errcode = 'P0001';
   end if;
   if exists (select 1 from public.learning_assessments x
     where x.id = v_attempt.assessment_id and x.due_at is not null
@@ -936,21 +1228,25 @@ returns table (
   attempt_id uuid, student_id uuid, attempt_number integer, status text,
   score numeric, max_score numeric, submitted_at timestamptz,
   answer_id uuid, question_id uuid, answer jsonb, is_correct boolean,
-  points_awarded numeric, feedback text, prompt text, kind text
+  points_awarded numeric, feedback text, prompt text, kind text, passed boolean
 )
 language sql stable security definer
 set search_path = pg_catalog, public, private
 as $$
   select a.id, a.student_id, a.attempt_number, a.status, a.score, a.max_score,
     a.submitted_at, x.id, x.question_id, x.answer, x.is_correct,
-    x.points_awarded, x.feedback, q.prompt, q.kind
+    x.points_awarded, x.feedback, q.prompt, q.kind,
+    case when a.score is null then null
+      else a.score * 100 / nullif(a.max_score, 0) >= s.passing_score end
   from public.learning_assessment_attempts a
   join public.learning_assessments s on s.id = a.assessment_id
   left join public.learning_assessment_answers x on x.attempt_id = a.id
   left join public.learning_exercise_questions q on q.id = x.question_id
   where a.assessment_id = p_assessment
     and (private.sai_learning_assessment_manage(s.id)
-      or (s.results_released and private.sai_security_can_read_student(a.student_id)))
+      or (s.results_released
+        and private.sai_learning_assessment_eligible(s.id, a.student_id)
+        and private.sai_security_can_read_student(a.student_id)))
   order by a.attempt_number desc, a.started_at desc, q.position, q.id;
 $$;
 
@@ -1085,13 +1381,19 @@ revoke all on function public.sai_learning_assessment_start(uuid),
   public.sai_learning_assessment_submit(uuid),
   public.sai_learning_assessment_grade(uuid, numeric, text),
   public.sai_learning_assessment_questions_admin(uuid),
-  public.sai_learning_assessment_results(uuid) from public, anon, authenticated;
+  public.sai_learning_assessment_results(uuid),
+  public.sai_learning_assessment_roster(uuid),
+  public.sai_learning_assessment_assign(uuid, uuid[]),
+  public.sai_learning_assessment_duplicate(uuid, text) from public, anon, authenticated;
 grant execute on function public.sai_learning_assessment_start(uuid),
   public.sai_learning_assessment_save(uuid, uuid, jsonb),
   public.sai_learning_assessment_submit(uuid),
   public.sai_learning_assessment_grade(uuid, numeric, text),
   public.sai_learning_assessment_questions_admin(uuid),
-  public.sai_learning_assessment_results(uuid) to authenticated;
+  public.sai_learning_assessment_results(uuid),
+  public.sai_learning_assessment_roster(uuid),
+  public.sai_learning_assessment_assign(uuid, uuid[]),
+  public.sai_learning_assessment_duplicate(uuid, text) to authenticated;
 
 revoke all on function public.sai_learning_exercise_questions_admin(uuid),
   public.sai_learning_submit_exercise(uuid, jsonb) from public, anon, authenticated;

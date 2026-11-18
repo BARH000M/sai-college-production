@@ -28,7 +28,8 @@ create table public.learning_lessons (
 );
 create table public.students (
   id uuid primary key, user_id uuid, class_id uuid not null references public.classes,
-  status text not null default 'active'
+  status text not null default 'active', full_name text not null default 'Student',
+  admission_no text not null default 'STUDENT'
 );
 create table public.learning_homework (
   id uuid primary key default gen_random_uuid(),
@@ -73,12 +74,14 @@ insert into auth.users values
  ('00000000-0000-0000-0000-000000000101'),
  ('00000000-0000-0000-0000-000000000102'),
  ('00000000-0000-0000-0000-000000000103'),
- ('00000000-0000-0000-0000-000000000104');
+ ('00000000-0000-0000-0000-000000000104'),
+ ('00000000-0000-0000-0000-000000000105');
 insert into public.user_roles values
  ('00000000-0000-0000-0000-000000000101','teacher'),
  ('00000000-0000-0000-0000-000000000102','student'),
  ('00000000-0000-0000-0000-000000000103','parent'),
- ('00000000-0000-0000-0000-000000000104','student');
+ ('00000000-0000-0000-0000-000000000104','student'),
+ ('00000000-0000-0000-0000-000000000105','student');
 insert into public.classes values
  ('00000000-0000-0000-0000-000000000201','00000000-0000-0000-0000-000000000101'),
  ('00000000-0000-0000-0000-000000000202','00000000-0000-0000-0000-000000000104');
@@ -92,7 +95,8 @@ insert into public.learning_lessons values
  ('00000000-0000-0000-0000-000000000502','00000000-0000-0000-0000-000000000402',true);
 insert into public.students values
  ('00000000-0000-0000-0000-000000000601','00000000-0000-0000-0000-000000000102','00000000-0000-0000-0000-000000000201','active'),
- ('00000000-0000-0000-0000-000000000602','00000000-0000-0000-0000-000000000104','00000000-0000-0000-0000-000000000202','active');
+ ('00000000-0000-0000-0000-000000000602','00000000-0000-0000-0000-000000000104','00000000-0000-0000-0000-000000000202','active'),
+ ('00000000-0000-0000-0000-000000000603','00000000-0000-0000-0000-000000000105','00000000-0000-0000-0000-000000000201','active');
 insert into public.parent_student_links values
  ('00000000-0000-0000-0000-000000000103','00000000-0000-0000-0000-000000000601',now());
 create table storage.buckets (
@@ -231,6 +235,146 @@ values
   'vocabulary','Practice question','["A","B"]',0,7);
 update public.learning_assessments set status='published'
   where id='00000000-0000-0000-0000-000000000701';
+insert into public.learning_assessments
+ (id,course_id,lesson_id,title,starts_at,due_at,time_limit_minutes,attempt_limit,passing_score,randomize_questions)
+values
+ ('00000000-0000-0000-0000-000000000711',
+  '00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000501',
+  'Scheduled random assessment',now()+interval '1 hour',now()+interval '2 hours',30,2,65,true),
+ ('00000000-0000-0000-0000-000000000712',
+  '00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000501',
+  'Individual assignment',null,now()+interval '2 hours',null,1,70,false),
+ ('00000000-0000-0000-0000-000000000713',
+  '00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000501',
+  'Timed assessment',null,now()+interval '2 hours',1,1,70,false);
+insert into public.learning_exercise_questions
+ (id,lesson_id,kind,prompt,choices,correct_choice,position,assessment_id,points)
+values
+ ('00000000-0000-0000-0000-000000000811','00000000-0000-0000-0000-000000000501',
+  'multiple_choice','Scheduled question one','["A","B"]',0,1,'00000000-0000-0000-0000-000000000711',1),
+ ('00000000-0000-0000-0000-000000000812','00000000-0000-0000-0000-000000000501',
+  'multiple_choice','Scheduled question two','["A","B"]',0,2,'00000000-0000-0000-0000-000000000711',2),
+ ('00000000-0000-0000-0000-000000000813','00000000-0000-0000-0000-000000000501',
+  'multiple_choice','Assigned question','["A","B"]',0,1,'00000000-0000-0000-0000-000000000712',1),
+ ('00000000-0000-0000-0000-000000000814','00000000-0000-0000-0000-000000000501',
+  'multiple_choice','Timed question','["A","B"]',0,1,'00000000-0000-0000-0000-000000000713',1);
+update public.learning_assessments set status='published'
+  where id in ('00000000-0000-0000-0000-000000000711',
+    '00000000-0000-0000-0000-000000000712',
+    '00000000-0000-0000-0000-000000000713');
+do $$
+declare v_copy uuid; v_roster record;
+begin
+  v_copy := public.sai_learning_assessment_duplicate(
+    '00000000-0000-0000-0000-000000000701', 'نسخة قابلة للتحرير');
+  if not exists (select 1 from public.learning_assessments
+      where id=v_copy and status='draft' and starts_at is null and due_at is null
+        and attempt_limit=1 and passing_score=70 and randomize_questions=false)
+    or (select count(*) from public.learning_exercise_questions where assessment_id=v_copy) <> 5
+    or exists (select 1 from public.learning_assessment_attempts where assessment_id=v_copy) then
+    raise exception 'Assessment duplication did not preserve settings/questions without history';
+  end if;
+  perform public.sai_learning_assessment_assign(
+    '00000000-0000-0000-0000-000000000712',
+    array['00000000-0000-0000-0000-000000000603'::uuid]);
+  select * into v_roster from public.sai_learning_assessment_roster(
+    '00000000-0000-0000-0000-000000000712')
+    where student_id='00000000-0000-0000-0000-000000000601';
+  if v_roster.assigned or v_roster.class_wide then
+    raise exception 'Individual student assignment did not restrict the class roster';
+  end if;
+  begin
+    perform public.sai_learning_assessment_assign(
+      '00000000-0000-0000-0000-000000000712',
+      array['00000000-0000-0000-0000-000000000602'::uuid]);
+    raise exception 'Assessment assigned a student from another class';
+  exception when check_violation then null;
+  end;
+end $$;
+select public.as_user('00000000-0000-0000-0000-000000000102');
+do $$
+declare v_first jsonb; v_resume jsonb;
+begin
+  begin
+    perform public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000711');
+    raise exception 'Assessment opened before its scheduled start';
+  exception when raise_exception then
+    if sqlerrm <> 'Assessment has not started yet' then raise; end if;
+  end;
+end $$;
+select public.as_user('00000000-0000-0000-0000-000000000102');
+do $$
+begin
+  begin
+    perform public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000712');
+    raise exception 'Unassigned student started an individual assessment';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+select public.as_user('00000000-0000-0000-0000-000000000101');
+update public.learning_assessments set starts_at=now()-interval '1 minute'
+  where id='00000000-0000-0000-0000-000000000711';
+select public.as_user('00000000-0000-0000-0000-000000000105');
+do $$
+declare v_first jsonb; v_resume jsonb; v_order jsonb;
+begin
+  v_first := public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000711');
+  v_resume := public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000711');
+  if jsonb_array_length(v_first->'questions') <> 2
+    or v_first->'questions' <> v_resume->'questions'
+    or v_first->>'expires_at' is null then
+    raise exception 'Randomized order or time-limit expiry was not stable across resume';
+  end if;
+  v_first := public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000712');
+  if jsonb_array_length(v_first->'questions') <> 1 then
+    raise exception 'Assigned student could not start the assessment';
+  end if;
+  v_first := public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000713');
+  if v_first->>'status' <> 'in_progress' then
+    raise exception 'Timed assessment did not start in progress';
+  end if;
+end $$;
+select public.as_user('00000000-0000-0000-0000-000000000101');
+do $$
+begin
+  begin
+    perform public.sai_learning_assessment_assign(
+      '00000000-0000-0000-0000-000000000712',
+      array['00000000-0000-0000-0000-000000000603'::uuid]);
+    raise exception 'Assignment changed after an attempt began';
+  exception when check_violation then null;
+  end;
+end $$;
+reset role;
+update public.learning_assessment_attempts
+  set expires_at=clock_timestamp()-interval '1 second'
+  where assessment_id='00000000-0000-0000-0000-000000000713';
+set role authenticated;
+select public.as_user('00000000-0000-0000-0000-000000000105');
+do $$
+declare v_start jsonb;
+begin
+  v_start := public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000713');
+  if v_start->>'status' not in ('submitted', 'graded')
+    or v_start->>'timed_out' <> 'true' then
+    raise exception 'Expired timed attempt was not submitted automatically';
+  end if;
+end $$;
+reset role;
+do $$
+begin
+  if not exists (select 1 from public.learning_assessment_attempts
+      where assessment_id='00000000-0000-0000-0000-000000000713'
+        and status in ('submitted', 'graded')) then
+    raise exception 'Timed attempt history was not persisted: %',
+      (select jsonb_agg(jsonb_build_object('id',id,'student_id',student_id,
+        'attempt_number',attempt_number,'status',status,'expires_at',expires_at))
+        from public.learning_assessment_attempts
+        where assessment_id='00000000-0000-0000-0000-000000000713');
+  end if;
+end $$;
+set role authenticated;
+select public.as_user('00000000-0000-0000-0000-000000000101');
 insert into public.learning_assessments (id,course_id,lesson_id,title,due_at)
 values ('00000000-0000-0000-0000-000000000708',
   '00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000501',
@@ -386,7 +530,8 @@ select public.as_user('00000000-0000-0000-0000-000000000101');
 do $$
 begin
   update public.learning_assessments set results_released=true
-    where id='00000000-0000-0000-0000-000000000701';
+    where id in ('00000000-0000-0000-0000-000000000701',
+      '00000000-0000-0000-0000-000000000712');
 end $$;
 
 select public.as_user('00000000-0000-0000-0000-000000000103');
@@ -397,8 +542,11 @@ begin
     raise exception 'Parent can read the assessment question bank';
   end if;
   if not exists (select 1 from public.sai_learning_assessment_results('00000000-0000-0000-0000-000000000701')
-      where score=9 and feedback='إجابة جيدة') then
+      where score=9 and feedback='إجابة جيدة' and passed) then
     raise exception 'Verified parent cannot read released linked result';
+  end if;
+  if exists (select 1 from public.sai_learning_assessment_results('00000000-0000-0000-0000-000000000712')) then
+    raise exception 'Parent read an individually assigned assessment for an unassigned child';
   end if;
 end $$;
 
