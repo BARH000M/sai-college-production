@@ -23,6 +23,7 @@ deployed to Supabase Main.
 
 Current sprint commits on local `main` (not pushed): `54deda5`, `42c85a6`,
 `b6cccbf`, `77088f7`, `bbf71e3`, `d759e3b`, `4dd16e2`, and `6d695b2`.
+This status refresh is committed as `1443683`.
 The next unimplemented mandatory requirement is Workstream B's full reusable
 exercise engine across student-facing React and Flutter clients, including
 image/audio questions and specialized Chinese character, pinyin, tone,
