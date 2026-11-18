@@ -61,6 +61,31 @@ test("assessment question validation prevents malformed pair maps from reaching 
   assert.equal(client.calls.filter((call) => call[0] === "insert").length, 0);
 });
 
+test("multiple-select authoring normalizes valid answer indexes and rejects duplicates", async () => {
+  const client = fakeClient();
+  const api = await load(client, "multiple-select");
+  await api.createAssessmentQuestion({
+    ...question,
+    kind: "multiple_select",
+    choices: ["A", "B", "C"],
+    correctChoice: null,
+    answerKey: [2, 0],
+  });
+  const inserted = client.calls.find((call) => call[0] === "insert")[1];
+  assert.deepEqual(inserted.answer_key, [0, 2]);
+
+  const denied = fakeClient();
+  const deniedApi = await load(denied, "multiple-select-invalid");
+  await assert.rejects(deniedApi.createAssessmentQuestion({
+    ...question,
+    kind: "multiple_select",
+    choices: ["A", "B", "C"],
+    correctChoice: null,
+    answerKey: [1, 1],
+  }), /حدّد إجابة واحدة أو أكثر/);
+  assert.equal(denied.calls.filter((call) => call[0] === "insert").length, 0);
+});
+
 test("authoring persists a validated matching answer key with lesson and assessment association", async () => {
   const client = fakeClient();
   const api = await load(client, "matching");

@@ -269,8 +269,13 @@ insert into public.learning_exercise_questions
   (lesson_id,kind,prompt,choices,correct_choice,assessment_id,points,bank_category)
 values ('00000000-0000-0000-0000-000000000501','multiple_choice','Bank question',
   '["A","B"]',1,null,2,'مفردات');
+insert into public.learning_exercise_questions
+  (lesson_id,kind,prompt,choices,correct_choice,assessment_id,points,answer_key,bank_category)
+values ('00000000-0000-0000-0000-000000000501','multiple_select','Select two',
+  '["A","B","C"]',null,null,2,'[0,2]','قواعد');
 do $$
 declare v_copy uuid; v_roster record; v_bank_id uuid; v_added_id uuid;
+  v_multi_id uuid;
 begin
   v_copy := public.sai_learning_assessment_duplicate(
     '00000000-0000-0000-0000-000000000701', 'نسخة قابلة للتحرير');
@@ -300,6 +305,15 @@ begin
       where id=v_added_id and bank_category='مفردات' and correct_choice=1) then
     raise exception 'Question bank import did not preserve the protected answer key';
   end if;
+  select id into v_bank_id from public.sai_learning_assessment_question_bank(
+    '00000000-0000-0000-0000-000000000401','قواعد');
+  v_multi_id := public.sai_learning_assessment_add_from_bank(
+    '00000000-0000-0000-0000-000000000714',v_bank_id);
+  if not exists (select 1 from public.sai_learning_assessment_questions_admin(
+      '00000000-0000-0000-0000-000000000714')
+      where id=v_multi_id and kind='multiple_select' and answer_key='[0,2]'::jsonb) then
+    raise exception 'Multiple-select bank import did not preserve its answer set';
+  end if;
   begin
     perform public.sai_learning_assessment_assign(
       '00000000-0000-0000-0000-000000000712',
@@ -327,6 +341,45 @@ begin
     raise exception 'Unassigned student started an individual assessment';
   exception when insufficient_privilege then null;
   end;
+end $$;
+select public.as_user('00000000-0000-0000-0000-000000000101');
+update public.learning_assessments set status='published'
+  where id='00000000-0000-0000-0000-000000000714';
+select public.as_user('00000000-0000-0000-0000-000000000105');
+do $$
+declare
+  v_start jsonb;
+  v_attempt uuid;
+  v_question jsonb;
+  v_multiple uuid;
+  v_result jsonb;
+begin
+  v_start := public.sai_learning_assessment_start(
+    '00000000-0000-0000-0000-000000000714');
+  v_attempt := (v_start->>'attempt_id')::uuid;
+  select (question->>'id')::uuid into v_multiple
+    from jsonb_array_elements(v_start->'questions') question
+    where question->>'kind'='multiple_select';
+  begin
+    perform public.sai_learning_assessment_save(v_attempt,v_multiple,'[0,0]');
+    raise exception 'Duplicate multiple-select answers were accepted';
+  exception when check_violation then null;
+  end;
+  for v_question in select value from jsonb_array_elements(v_start->'questions')
+  loop
+    if v_question->>'kind'='multiple_select' then
+      perform public.sai_learning_assessment_save(
+        v_attempt,(v_question->>'id')::uuid,'[0,2]');
+    else
+      perform public.sai_learning_assessment_save(
+        v_attempt,(v_question->>'id')::uuid,'1');
+    end if;
+  end loop;
+  v_result := public.sai_learning_assessment_submit(v_attempt);
+  if v_result->>'status' <> 'graded'
+    or (select score from public.learning_assessment_attempts where id=v_attempt) <> 4 then
+    raise exception 'Multiple-answer questions were not automatically graded: %',v_result;
+  end if;
 end $$;
 select public.as_user('00000000-0000-0000-0000-000000000101');
 update public.learning_assessments set starts_at=now()-interval '1 minute'

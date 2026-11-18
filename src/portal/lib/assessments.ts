@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 
 export const assessmentKinds = [
   "multiple_choice",
+  "multiple_select",
   "true_false",
   "matching",
   "fill_blank",
@@ -11,6 +12,7 @@ export const assessmentKinds = [
 export type AssessmentQuestionKind = typeof assessmentKinds[number];
 export const assessmentKindLabels: Record<AssessmentQuestionKind, string> = {
   multiple_choice: "اختيار من متعدد",
+  multiple_select: "اختر جميع الإجابات الصحيحة",
   true_false: "صح أو خطأ",
   matching: "مطابقة",
   fill_blank: "أكمل الفراغ",
@@ -47,7 +49,7 @@ export type AssessmentQuestion = {
 
 export type AssessmentQuestionAdmin = AssessmentQuestion & {
   correct_choice: number | null;
-  answer_key: Record<string, string> | string[] | null;
+  answer_key: Record<string, string> | string[] | number[] | null;
   bank_category: string | null;
 };
 
@@ -290,7 +292,7 @@ export async function loadAssessmentQuestionsAdmin(
     return {
       ...question,
       correct_choice: correctChoice as number | null,
-      answer_key: row.answer_key as Record<string, string> | string[] | null,
+      answer_key: row.answer_key as Record<string, string> | string[] | number[] | null,
       bank_category: typeof row.bank_category === "string" ? row.bank_category : null,
     };
   });
@@ -314,7 +316,7 @@ export async function loadAssessmentQuestionBank(
     return {
       ...question,
       correct_choice: typeof row.correct_choice === "number" ? row.correct_choice : null,
-      answer_key: row.answer_key as Record<string, string> | string[] | null,
+      answer_key: row.answer_key as Record<string, string> | string[] | number[] | null,
       bank_category: row.category,
     };
   });
@@ -341,13 +343,14 @@ export type AssessmentQuestionInput = {
   bankCategory?: string | null;
   choices: string[];
   correctChoice: number | null;
-  answerKey: Record<string, string> | string[] | null;
+  answerKey: Record<string, string> | string[] | number[] | null;
 };
 
 function questionPayload(input: AssessmentQuestionInput) {
   const prompt = input.prompt.trim();
   const bankCategory = input.bankCategory?.trim() || null;
   const choices = input.choices.map((choice) => choice.trim());
+  let answerKey = input.answerKey;
   if (prompt.length < 2 || prompt.length > 200) throw new Error("نص السؤال يجب أن يكون بين حرفين و٢٠٠ حرف.");
   if (bankCategory !== null && bankCategory.length > 80) throw new Error("التصنيف يجب ألا يتجاوز ٨٠ حرفاً.");
   if (!Number.isFinite(input.points) || input.points <= 0 || input.points > 1000) throw new Error("درجة السؤال يجب أن تكون أكبر من صفر وحتى ١٠٠٠.");
@@ -359,6 +362,16 @@ function questionPayload(input: AssessmentQuestionInput) {
     if (!Number.isInteger(input.correctChoice) || input.correctChoice! < 0 || input.correctChoice! >= choices.length) {
       throw new Error("حدّد الإجابة الصحيحة.");
     }
+  } else if (input.kind === "multiple_select") {
+    const indexes = Array.isArray(input.answerKey) ? input.answerKey : [];
+    if (choices.length < 2 || choices.length > 6 || !Array.isArray(input.answerKey)
+      || !indexes.length || !indexes.every((index): index is number =>
+        typeof index === "number" && Number.isInteger(index) && index >= 0
+        && index < choices.length)
+      || new Set(indexes).size !== indexes.length) {
+      throw new Error("حدّد إجابة واحدة أو أكثر من الخيارات.");
+    }
+    answerKey = [...indexes].sort((left, right) => left - right);
   } else if (input.kind === "matching") {
     if (choices.length < 4 || choices.length > 12 || choices.length % 2 !== 0
       || choices.some((item) => !item || item.length > 300)
@@ -390,7 +403,7 @@ function questionPayload(input: AssessmentQuestionInput) {
     correct_choice: input.kind === "multiple_choice" || input.kind === "true_false"
       ? input.correctChoice
       : null,
-    answer_key: input.answerKey,
+    answer_key: answerKey,
     points: input.points,
     bank_category: bankCategory,
     is_published: false,

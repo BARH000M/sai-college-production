@@ -61,7 +61,8 @@ alter table public.learning_exercise_questions
   drop constraint if exists learning_exercise_questions_check;
 alter table public.learning_exercise_questions
   add constraint learning_exercise_questions_kind_check
-    check (kind in ('vocabulary','listening','multiple_choice','true_false','matching','fill_blank','written')),
+    check (kind in ('vocabulary','listening','multiple_choice','multiple_select',
+      'true_false','matching','fill_blank','written')),
   add constraint learning_exercise_questions_assessment_shape_check
     check (
       (assessment_id is null
@@ -73,10 +74,10 @@ alter table public.learning_exercise_questions
       or
       (assessment_id is null
         and bank_category is not null
-        and kind in ('multiple_choice','true_false','matching','fill_blank','written'))
+        and kind in ('multiple_choice','multiple_select','true_false','matching','fill_blank','written'))
       or
       (assessment_id is not null
-        and kind in ('multiple_choice','true_false','matching','fill_blank','written'))
+        and kind in ('multiple_choice','multiple_select','true_false','matching','fill_blank','written'))
     );
 
 create table public.learning_assessment_attempts (
@@ -889,6 +890,28 @@ begin
       if new.kind = 'true_false' and jsonb_array_length(new.choices) <> 2 then
         raise exception 'True/false questions need exactly two options' using errcode = '23514';
       end if;
+    elsif new.kind = 'multiple_select' then
+      if jsonb_array_length(new.choices) < 2 or jsonb_array_length(new.choices) > 6
+        or jsonb_typeof(new.answer_key) <> 'array'
+        or jsonb_array_length(new.answer_key) < 1
+        or jsonb_array_length(new.answer_key) > jsonb_array_length(new.choices)
+        or new.correct_choice is not null
+        or exists (
+          select 1 from jsonb_array_elements(new.answer_key) selected(value)
+          where jsonb_typeof(selected.value) <> 'number'
+            or (case when selected.value #>> '{}' ~ '^\d+$'
+                then (selected.value #>> '{}')::integer else -1 end)
+              not between 0 and jsonb_array_length(new.choices) - 1
+        )
+        or (select count(*) from jsonb_array_elements(new.answer_key))
+          <> (select count(distinct value::integer)
+              from jsonb_array_elements_text(new.answer_key) values(value)) then
+        raise exception 'Multiple-select question needs distinct valid answer indexes'
+          using errcode = '23514';
+      end if;
+      select jsonb_agg(index order by index) into new.answer_key
+        from jsonb_array_elements_text(new.answer_key) selected(value)
+        cross join lateral (select selected.value::integer as index) normalized;
     elsif new.kind = 'matching' then
       if jsonb_typeof(new.answer_key) is distinct from 'object' then
         raise exception 'Matching question needs a matching key' using errcode = '23514';
@@ -1147,6 +1170,22 @@ begin
       or (p_answer #>> '{}') !~ '^\d+$'
       or (p_answer #>> '{}')::integer >= jsonb_array_length(v_question.choices)) then
     raise exception 'Select a valid option' using errcode = '23514';
+  elsif v_question.kind = 'multiple_select' and (
+    jsonb_typeof(p_answer) <> 'array'
+    or jsonb_array_length(p_answer) < 1
+    or exists (
+      select 1 from jsonb_array_elements(p_answer) selected(value)
+      where jsonb_typeof(selected.value) <> 'number'
+        or (case when selected.value #>> '{}' ~ '^\d+$'
+            then (selected.value #>> '{}')::integer else -1 end)
+          not between 0 and jsonb_array_length(v_question.choices) - 1
+    )
+    or (select count(*) from jsonb_array_elements(p_answer))
+      <> (select count(distinct value::integer)
+          from jsonb_array_elements_text(p_answer) values(value))
+  ) then
+    raise exception 'Multiple-select answer must contain unique valid option indexes'
+      using errcode = '23514';
   elsif v_question.kind = 'matching' and jsonb_typeof(p_answer) <> 'object' then
     raise exception 'Matching answer must contain pairs' using errcode = '23514';
   elsif v_question.kind in ('fill_blank','written')
@@ -1208,7 +1247,7 @@ begin
       on conflict (attempt_id, question_id) do update
         set is_correct = excluded.is_correct, points_awarded = excluded.points_awarded,
             is_graded = true, feedback = null, graded_by = null, graded_at = null;
-    elsif v_question.kind = 'matching' then
+    elsif v_question.kind in ('matching','multiple_select') then
       v_correct := v_answer is not null and v_answer = v_question.answer_key;
       v_points := case when v_correct then v_question.points else 0 end;
       insert into public.learning_assessment_answers

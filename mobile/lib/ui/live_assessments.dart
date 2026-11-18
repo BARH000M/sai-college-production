@@ -6,6 +6,7 @@ import 'components.dart';
 
 const _questionKinds = <String, String>{
   'multiple_choice': 'اختيار من متعدد',
+  'multiple_select': 'اختر جميع الإجابات الصحيحة',
   'true_false': 'صح أو خطأ',
   'matching': 'مطابقة',
   'fill_blank': 'أكمل الفراغ',
@@ -348,7 +349,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                         labelText: 'تصنيف بنك الأسئلة (اختياري)',
                       ),
                     ),
-                    if (kind == 'multiple_choice' || kind == 'true_false')
+                    if (kind == 'multiple_choice' ||
+                        kind == 'multiple_select' ||
+                        kind == 'true_false')
                       TextField(
                         controller: choices,
                         minLines: 2,
@@ -373,6 +376,13 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                         maxLines: 5,
                         decoration: const InputDecoration(
                           labelText: 'الإجابات المقبولة — كل إجابة في سطر',
+                        ),
+                      ),
+                    if (kind == 'multiple_select')
+                      TextField(
+                        controller: answer,
+                        decoration: const InputDecoration(
+                          labelText: 'أرقام الإجابات الصحيحة مفصولة بفواصل',
                         ),
                       ),
                     if (kind == 'matching')
@@ -433,7 +443,16 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
           .toList();
       List<String> options = left;
       dynamic key;
-      if (kindValue == 'matching') {
+      if (kindValue == 'multiple_select') {
+        options = left;
+        key =
+            other
+                .expand((value) => value.split(','))
+                .map((value) => int.tryParse(value.trim()))
+                .whereType<int>()
+                .toList()
+              ..sort();
+      } else if (kindValue == 'matching') {
         options = [...left, ...other];
         key = {
           for (var index = 0; index < left.length; index++)
@@ -508,6 +527,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
 
   String _answerText(Map<String, dynamic> question) {
     final key = question['answer_key'];
+    if (question['kind'] == 'multiple_select' && key is List) {
+      return key.join(',');
+    }
     if (key is Map) {
       return (question['choices'] as List)
           .take((question['choices'] as List).length ~/ 2)
@@ -900,6 +922,16 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                                 leading: const Icon(Icons.radio_button_off),
                                 title: Text('$choice'),
                               ),
+                          if (_questions[index]['kind'] == 'multiple_select')
+                            for (final choice
+                                in _questions[index]['choices'] as List)
+                              ListTile(
+                                dense: true,
+                                leading: const Icon(
+                                  Icons.check_box_outline_blank,
+                                ),
+                                title: Text('$choice'),
+                              ),
                           if (_questions[index]['kind'] == 'fill_blank')
                             const TextField(
                               enabled: false,
@@ -1127,6 +1159,30 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
               ),
           ],
         ),
+      );
+    }
+    if (kind == 'multiple_select') {
+      final selected = value is List
+          ? value.whereType<num>().map((item) => item.toInt()).toSet()
+          : <int>{};
+      return Column(
+        children: [
+          for (var index = 0; index < options.length; index++)
+            CheckboxListTile(
+              value: selected.contains(index),
+              title: Text(options[index]),
+              enabled: !_submitted,
+              onChanged: (checked) {
+                final next = {...selected};
+                if (checked == true) {
+                  next.add(index);
+                } else {
+                  next.remove(index);
+                }
+                setState(() => _answers[id] = next.toList()..sort());
+              },
+            ),
+        ],
       );
     }
     if (kind == 'matching') {
