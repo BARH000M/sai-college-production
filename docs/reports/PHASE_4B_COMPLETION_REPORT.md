@@ -147,10 +147,14 @@ homework, teacher analytics, parent reports or exercise catalog.
   (`docs(learning): finalize Phase 4B local acceptance evidence`), updating
   the build and Phase 4B reports. This final roadmap reconciliation is included
   in the current local report closeout.
-- At final report closeout, local `main` is clean and five commits ahead of
-  the `origin/main` tracking ref (including the preserved Phase 7-M commit).
-  No GitHub push was performed or verified. No generated APK, private key,
-  `live.json`, build output, database dump, or temporary cluster was staged.
+- At final report closeout, local `main` is six commits ahead of the
+  `origin/main` tracking ref (including the preserved Phase 7-M commit).
+  The worktree has one unrelated tracked modification at
+  `prototype/reference-source/previous-flutter-app/mobile/lib/main.dart`;
+  it appeared after the initial status check and was not inspected, staged or
+  changed. No GitHub push was performed or verified. No generated APK, private
+  key, `live.json`, build output, database dump, or temporary cluster was
+  staged.
 - Local implementation gaps: assessment scheduling/assignment/lifecycle
   breadth; remaining question types and media; complete homework lifecycle;
   analytics and report coverage; and full role/branch parity.
