@@ -869,6 +869,73 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     }
   }
 
+  Future<void> _previewQuestions() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('معاينة عرض الطالب'),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0; index < _questions.length; index++)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${index + 1}. ${_questions[index]['prompt']} · '
+                            '${_questions[index]['points']} درجة',
+                          ),
+                          if (_questions[index]['kind'] == 'multiple_choice' ||
+                              _questions[index]['kind'] == 'true_false')
+                            for (final choice
+                                in _questions[index]['choices'] as List)
+                              ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.radio_button_off),
+                                title: Text('$choice'),
+                              ),
+                          if (_questions[index]['kind'] == 'fill_blank')
+                            const TextField(
+                              enabled: false,
+                              decoration: InputDecoration(
+                                hintText: 'إجابة الطالب',
+                              ),
+                            ),
+                          if (_questions[index]['kind'] == 'written')
+                            const TextField(
+                              enabled: false,
+                              maxLines: 3,
+                              decoration: InputDecoration(
+                                hintText: 'إجابة الطالب',
+                              ),
+                            ),
+                          if (_questions[index]['kind'] == 'matching')
+                            const Text('يختار الطالب مطابقة لكل عنصر.'),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_questions.isEmpty) const Text('أضف أسئلة لعرض المعاينة.'),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إغلاق'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _start(String assessmentId) async {
     setState(() {
       _busy = true;
@@ -1155,6 +1222,12 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                       : 'إتاحة النتائج',
                 ),
               ),
+              if (canEditQuestions)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _previewQuestions,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('معاينة الطالب'),
+                ),
               if (canEditQuestions)
                 OutlinedButton.icon(
                   onPressed: _busy ? null : () => _addQuestion(id),

@@ -88,6 +88,7 @@ export function AssessmentsPanel({
   const [openId, setOpenId] = useState("");
   const [questions, setQuestions] = useState<AssessmentQuestionAdmin[]>([]);
   const [bankQuestions, setBankQuestions] = useState<AssessmentQuestionAdmin[]>([]);
+  const [previewMode, setPreviewMode] = useState(false);
   const [results, setResults] = useState<AssessmentResultRow[]>([]);
   const [attempt, setAttempt] = useState<Awaited<ReturnType<typeof startAssessment>> | null>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
@@ -131,6 +132,7 @@ export function AssessmentsPanel({
     setAttempt(null);
     setAnswers({});
     setSubmitted(false);
+    setPreviewMode(false);
     setError("");
     setNotice("");
     if (openId === item.id) return;
@@ -634,6 +636,28 @@ export function AssessmentsPanel({
 
         {canManage && <>
           <h5>بنك أسئلة التقييم</h5>
+          <button type="button" className="text-button"
+            onClick={() => setPreviewMode((current) => !current)}>
+            {previewMode ? "إغلاق معاينة الطالب" : "معاينة عرض الطالب"}
+          </button>
+          {previewMode && <section className="management-form" aria-label="معاينة الطالب">
+            <h6>معاينة الطالب — دون مفاتيح الإجابة</h6>
+            {questions.map((question, index) => <fieldset className="learn-exercise" key={question.id} disabled>
+              <legend>{index + 1}. {question.prompt} · {question.points} درجة</legend>
+              {(question.kind === "multiple_choice" || question.kind === "true_false") && question.choices.map((choice, choiceIndex) =>
+                <label className="learn-quiz-choice" key={choiceIndex}>
+                  <input type="radio" name={`preview-${question.id}`} />
+                  {choice}
+                </label>)}
+              {question.kind === "matching" && question.choices.slice(0, question.choices.length / 2).map((choice) =>
+                <label key={choice}>{choice}<select><option>اختر المطابقة</option>
+                  {question.choices.slice(question.choices.length / 2).map((option) => <option key={option}>{option}</option>)}
+                </select></label>)}
+              {question.kind === "fill_blank" && <input aria-label="إجابة الطالب" />}
+              {question.kind === "written" && <textarea rows={4} aria-label="إجابة الطالب" />}
+            </fieldset>)}
+            {!questions.length && <p className="muted">أضف أسئلة لعرض المعاينة.</p>}
+          </section>}
           {item.status === "draft" && bankQuestions.length > 0 && <section className="management-form" aria-label="الأسئلة المصنفة القابلة لإعادة الاستخدام">
             <h6>أسئلة مصنفة قابلة لإعادة الاستخدام</h6>
             {bankQuestions.map((question) => <div className="actions" key={question.id}>
