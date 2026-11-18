@@ -8,7 +8,7 @@
 
 
 <!-- PHASE7M-CURRENT -->
-**18 November 2026 update — Phase 7-M:** The refreshed Main inventory is **57 local files / 57 GitHub Main files / 16 production history records**. All migration files match origin/main bytes at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. The earlier evidence below is historical wherever it differs. No production write, history repair or deployment occurred; Phase 4B remains paused.
+**Historical Phase 7-M checkpoint — 18 November 2026:** The refreshed Main inventory was **57 local files / 57 GitHub Main files / 16 production history records**. Migration files matched `origin/main` at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. At that checkpoint Phase 4B was still paused. The later Phase 4B local-development refresh above supersedes that status; no production write, history repair or deployment occurred.
 
 **Current checkpoint within Phase 7: Phase 7-M.** Local reconciliation preparation and native SQL/security testing passed; the production baseline is unchanged and remains NO-GO. Retain all **16 development phases** and **24 system-settings requirements** below. Phase 7-M is a checkpoint, not an additional development phase or a waiver of provider/release requirements.
 
@@ -22,9 +22,9 @@
 
 **Roadmap revision:** 18 November 2026 — Phase 7-R local recovery and deployment safeguards verified; production remains NO-GO
 
-**Current execution checkpoint:** Local Main `f2ca63f08ed59455cd8cebb64f99aa0272c93af2` matched live `origin/main` in a read-only check; GitHub reported no hooks or deployments. No commit or push was made in this task because Hostinger control-panel deployment settings remain unverified. The hash-verified backup was recovered into a disposable native PostgreSQL cluster for application-scope testing: 85 tables, 860 rows, 355 constraints, 105 functions, 44 triggers and 113 policies passed integrity checks. The original full `pg_restore` had 56 errors; Supabase-managed Auth, Storage, Realtime, Edge, Cron, Vault and hosted extensions were not recovered. Local maintenance authorization, concurrency and rollback tests passed, with 14 public wrappers still awaiting the Phase 3B grant restrictions. The guarded executor dry-run passed; wrong-project and missing-attestation gates failed safely. Web type-check, lint, build and 105 tests passed; the 3 integration tests and 7 Deno tests passed. Flutter dependency resolution passed, but analysis (30 issues), tests (5 test files failed to compile) and debug APK build failed due Dart/file-picker/homework API errors. Java 21.0.13 is available; release signing is not verified. No production write or deployment occurred. Preserve Phase 4B work and do not replay the historical migration backlog.
+**Historical Phase 7-R preflight checkpoint:** Local Main `f2ca63f08ed59455cd8cebb64f99aa0272c93af2` matched live `origin/main` in a read-only check at that time; GitHub reported no hooks or deployments. No commit or push was made during that preflight because hosting deployment settings were unverified. The hash-verified backup was recovered into a disposable native PostgreSQL cluster for application-scope testing: 85 tables, 860 rows, 355 constraints, 105 functions, 44 triggers and 113 policies passed integrity checks. The original full `pg_restore` had 56 errors; Supabase-managed Auth, Storage, Realtime, Edge, Cron, Vault and hosted extensions were not recovered. Local maintenance authorization, concurrency and rollback tests passed, with 14 public wrappers still awaiting the Phase 3B grant restrictions. The guarded executor dry-run passed; wrong-project and missing-attestation gates failed safely. Web type-check, lint, build and 105 tests passed; the 3 integration tests and 7 Deno tests passed. Flutter dependency resolution passed, but analysis (30 issues), tests (5 test files failed to compile) and debug APK build failed at that preflight. Java 21.0.13 is available; release signing was not verified. No production write or deployment occurred during that checkpoint.
 
-**Disposition:** Production deployment blocked by incomplete Supabase-compatible recovery, externally enforced maintenance hold, mobile build failures, unverified Hostinger configuration and live acceptance. Phase 4B remains paused. This is the active roadmap record; keep all 16 phases and 24 system-settings requirements intact.
+**Historical Phase 7-R disposition:** Production deployment was blocked by incomplete Supabase-compatible recovery, external hold and live acceptance; Phase 4B was paused at that checkpoint. Current Phase 4B status and local validation are above. Production remains NO-GO; keep all 16 phases and 24 system-settings requirements intact.
 
 **Identity:** Yemen SAI Educational College — كلية ساي التعليمية اليمنية الصينية — 也门赛艾教育学院
 
@@ -68,7 +68,7 @@ Status is source/deployment-specific. The scopes below are requirements, not cla
 | 3E | Attendance management | Existing functionality; live parity and gaps to verify |
 | 3F | Finance, fees and accounting | Existing functionality; scoped contracts and remaining gaps to verify |
 | 4A | Examinations and academic results | Pushed; targeted checks reported passing; exam tables absent; production cutover blocked |
-| 4B | Learning exercises, assessments and homework | Partial implementation, uncommitted; paused until live baseline |
+| 4B | Learning exercises, assessments and homework | PARTIAL; local progress committed as `2a13081f771e01f5b73e5fa5aa0648ac938b2054`; local tests/build pass as recorded above; no production deployment |
 | 4C | Chinese language learning engines | Further development required |
 | 5A | HR, staff profiles and documents | Partial/unverified; complete missing workflows |
 | 5B | Student services, certificates and printing | Partial/unverified; complete missing workflows |

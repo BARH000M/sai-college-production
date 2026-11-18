@@ -142,7 +142,12 @@ homework, teacher analytics, parent reports or exercise catalog.
   (`docs(learning): record Phase 4B partial acceptance and blockers`), with
   the roadmap and six report files. A final Git-evidence refresh follows this
   closeout.
-- At final report closeout, local `main` is clean and four commits ahead of
+- Evidence refresh:
+  `b203b0ad2ad8507ba12ed90c495c0c0b86573fc5`
+  (`docs(learning): finalize Phase 4B local acceptance evidence`), updating
+  the build and Phase 4B reports. This final roadmap reconciliation is included
+  in the current local report closeout.
+- At final report closeout, local `main` is clean and five commits ahead of
   the `origin/main` tracking ref (including the preserved Phase 7-M commit).
   No GitHub push was performed or verified. No generated APK, private key,
   `live.json`, build output, database dump, or temporary cluster was staged.
