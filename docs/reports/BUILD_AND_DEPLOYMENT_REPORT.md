@@ -23,8 +23,10 @@ but is ignored, and `key.properties` is absent, so release signing and device
 acceptance remain unverified. No artifact was deployed or published.
 
 The verified partial Phase 4B implementation is committed on local `main` as
-`2a13081f771e01f5b73e5fa5aa0648ac938b2054`; no push was made. The report
-and roadmap updates are being committed separately from implementation.
+`2a13081f771e01f5b73e5fa5aa0648ac938b2054`; no push was made. The report and roadmap updates were committed separately as
+`8758103b70a75922c0446041ae3f821c3afd0522`
+(`docs(learning): record Phase 4B partial acceptance and blockers`). A final
+Git-evidence refresh follows that documentation closeout.
 
 | Target | Current result | Evidence / limitation |
 |---|---|---|

@@ -137,10 +137,15 @@ homework, teacher analytics, parent reports or exercise catalog.
   `supabase/tests/run_learning_assessments.py`,
   `web/tests/learning-assessment.test.cjs`, and
   `web/tests/phase2c-migration-review.test.cjs`.
-- The report and roadmap closeout are committed separately; `main` remains
-  local and ahead of the `origin/main` tracking ref. GitHub push was not
-  performed. No generated APK, private key, `live.json`, build output,
-  database dump, or temporary cluster was staged.
+- Documentation closeout:
+  `8758103b70a75922c0446041ae3f821c3afd0522`
+  (`docs(learning): record Phase 4B partial acceptance and blockers`), with
+  the roadmap and six report files. A final Git-evidence refresh follows this
+  closeout.
+- At final report closeout, local `main` is clean and four commits ahead of
+  the `origin/main` tracking ref (including the preserved Phase 7-M commit).
+  No GitHub push was performed or verified. No generated APK, private key,
+  `live.json`, build output, database dump, or temporary cluster was staged.
 - Local implementation gaps: assessment scheduling/assignment/lifecycle
   breadth; remaining question types and media; complete homework lifecycle;
   analytics and report coverage; and full role/branch parity.
