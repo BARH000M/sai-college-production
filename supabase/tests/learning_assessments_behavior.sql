@@ -491,6 +491,7 @@ end $$;
 select public.as_user('00000000-0000-0000-0000-000000000102');
 do $$
 declare v_started jsonb; v_attempt uuid; v_result jsonb; v_answer uuid; v_practice jsonb;
+  v_resume jsonb;
 begin
   if exists (select 1 from public.learning_exercise_questions
       where bank_category='مفردات') then
@@ -532,6 +533,11 @@ begin
   perform public.sai_learning_assessment_save(v_attempt,'00000000-0000-0000-0000-000000000803','{"صباح":"早","مساء":"晚"}');
   perform public.sai_learning_assessment_save(v_attempt,'00000000-0000-0000-0000-000000000804','"مرحباً"');
   perform public.sai_learning_assessment_save(v_attempt,'00000000-0000-0000-0000-000000000805','"إجابة كتابية مطولة"');
+  v_resume := public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000701');
+  if v_resume->>'attempt_id' <> v_attempt::text
+    or v_resume->'saved_answers'->>'00000000-0000-0000-0000-000000000804' <> 'مرحباً' then
+    raise exception 'Answers were not persisted and restored before submission';
+  end if;
   v_result := public.sai_learning_assessment_submit(v_attempt);
   if v_result->>'status' <> 'submitted' or (v_result->>'needs_manual_grading')::int <> 1 then
     raise exception 'Objective grading or written-review state is wrong: %',v_result;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   assessmentKindLabels,
   assessmentKinds,
@@ -118,6 +118,8 @@ export function AssessmentsPanel({
   const [roster, setRoster] = useState<AssessmentStudent[] | null>(null);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [assignmentBusy, setAssignmentBusy] = useState(false);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveQueue = useRef<Promise<void>>(Promise.resolve());
 
   const reload = useCallback(() => {
     setAssessments(null);
@@ -130,6 +132,26 @@ export function AssessmentsPanel({
   useEffect(() => {
     reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!attempt || submitted) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    const attemptSnapshot = attempt;
+    const answerSnapshot = answers;
+    autosaveTimer.current = setTimeout(() => {
+      autosaveQueue.current = autosaveQueue.current.then(async () => {
+          for (const question of attemptSnapshot.questions) {
+            const answer = answerSnapshot[question.id];
+            if (answer !== undefined) {
+              await saveAssessmentAnswer(attemptSnapshot.attempt_id, question.id, answer);
+            }
+          }
+        }).catch((failure: unknown) => setError(message(failure)));
+    }, 700);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+  }, [attempt, answers, submitted]);
 
   async function openAssessment(item: LearningAssessment) {
     setOpenId(openId === item.id ? "" : item.id);
@@ -376,9 +398,11 @@ export function AssessmentsPanel({
 
   async function saveProgress() {
     if (!attempt || saving) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     setSaving(true);
     setError("");
     try {
+      await autosaveQueue.current;
       for (const question of attempt.questions) {
         const answer = answers[question.id];
         if (answer !== undefined) {
@@ -395,9 +419,11 @@ export function AssessmentsPanel({
 
   async function submit(item: LearningAssessment) {
     if (!attempt || saving) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     setSaving(true);
     setError("");
     try {
+      await autosaveQueue.current;
       for (const question of attempt.questions) {
         const answer = answers[question.id];
         if (answer !== undefined) await saveAssessmentAnswer(attempt.attempt_id, question.id, answer);

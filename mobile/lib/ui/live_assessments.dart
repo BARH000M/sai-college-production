@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -59,10 +61,46 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
   Map<String, dynamic> _answers = {};
   bool _submitted = false;
   bool _busy = false;
+  Timer? _answerSaveTimer;
+  Future<void> _answerSaveQueue = Future<void>.value();
   String? _error;
   String? _notice;
 
   SupabaseClient get _client => Supabase.instance.client;
+
+  @override
+  void dispose() {
+    _answerSaveTimer?.cancel();
+    super.dispose();
+  }
+
+  void _setAnswer(String questionId, dynamic value) {
+    setState(() => _answers[questionId] = value);
+    final attemptId = _attempt?['attempt_id'] as String?;
+    if (attemptId == null || _submitted) return;
+    _answerSaveTimer?.cancel();
+    _answerSaveTimer = Timer(const Duration(milliseconds: 700), () async {
+      final snapshot = Map<String, dynamic>.from(_answers);
+      _answerSaveQueue = _answerSaveQueue
+          .then((_) async {
+            for (final entry in snapshot.entries) {
+              await _client.rpc(
+                'sai_learning_assessment_save',
+                params: {
+                  'p_attempt': attemptId,
+                  'p_question': entry.key,
+                  'p_answer': entry.value,
+                },
+              );
+            }
+          })
+          .catchError((Object error) {
+            if (mounted) {
+              setState(() => _error = 'تعذر حفظ الإجابة تلقائياً: $error');
+            }
+          });
+    });
+  }
 
   @override
   void initState() {
@@ -1036,11 +1074,13 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
   Future<bool> _saveAttempt() async {
     final attemptId = _attempt?['attempt_id'] as String?;
     if (attemptId == null) return false;
+    _answerSaveTimer?.cancel();
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
+      await _answerSaveQueue;
       for (final entry in _answers.entries) {
         await _client.rpc(
           'sai_learning_assessment_save',
@@ -1066,11 +1106,13 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
   Future<void> _submitAttempt(String assessmentId) async {
     final attemptId = _attempt?['attempt_id'] as String?;
     if (attemptId == null) return;
+    _answerSaveTimer?.cancel();
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
+      await _answerSaveQueue;
       final expiresAt = DateTime.tryParse('${_attempt?['expires_at'] ?? ''}');
       final expiredByClock =
           expiresAt != null && !DateTime.now().toUtc().isBefore(expiresAt);
@@ -1179,7 +1221,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       return RadioGroup<int>(
         groupValue: value is num ? value.toInt() : null,
         onChanged: (answer) {
-          if (!_submitted) setState(() => _answers[id] = answer);
+          if (!_submitted) _setAnswer(id, answer);
         },
         child: Column(
           children: [
@@ -1211,7 +1253,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                 } else {
                   next.remove(index);
                 }
-                setState(() => _answers[id] = next.toList()..sort());
+                _setAnswer(id, next.toList()..sort());
               },
             ),
         ],
@@ -1233,7 +1275,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                             final next = [...ordered];
                             final item = next.removeAt(index);
                             next.insert(index - 1, item);
-                            setState(() => _answers[id] = next);
+                            _setAnswer(id, next);
                           },
                     icon: const Icon(Icons.arrow_upward),
                   ),
@@ -1244,7 +1286,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                             final next = [...ordered];
                             final item = next.removeAt(index);
                             next.insert(index + 1, item);
-                            setState(() => _answers[id] = next);
+                            _setAnswer(id, next);
                           },
                     icon: const Icon(Icons.arrow_downward),
                   ),
@@ -1277,9 +1319,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                   .toList(),
               onChanged: _submitted
                   ? null
-                  : (choice) => setState(
-                      () => _answers[id] = {...answers, item: choice},
-                    ),
+                  : (choice) => _setAnswer(id, {...answers, item: choice}),
             ),
         ],
       );
@@ -1293,7 +1333,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       decoration: InputDecoration(
         labelText: kind == 'written' ? 'إجابتك الكتابية' : 'الإجابة',
       ),
-      onChanged: (answer) => _answers[id] = answer,
+      onChanged: (answer) => _setAnswer(id, answer),
     );
   }
 
