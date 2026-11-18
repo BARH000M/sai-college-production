@@ -11,6 +11,8 @@ from pathlib import Path
 import re
 import socket
 import subprocess
+import shutil
+import tempfile
 import time
 import uuid
 
@@ -31,6 +33,7 @@ if args.catalog_dir:
 state=ROOT/'.tmp-phase3b-main'/str(uuid.uuid4())
 data=state/'pgdata'
 state.mkdir(parents=True)
+socket_dir=Path(tempfile.mkdtemp(prefix='sai-main-'))
 with socket.socket() as s:
     s.bind(('127.0.0.1',0)); port=s.getsockname()[1]
 env=os.environ.copy()
@@ -164,7 +167,7 @@ try:
     # File handles avoid an inherited Windows pipe keeping communicate() open
     # for the entire server lifetime after pg_ctl itself exits.
     with (state/'start.log').open('w',encoding='utf-8') as log:
-        start_result=subprocess.run([str(x) for x in [executable('pg_ctl'),'-D',data,'-l',state/'server.log','-o',f'-h 127.0.0.1 -p {port}','-w','-t','20','start']],
+        start_result=subprocess.run([str(x) for x in [executable('pg_ctl'),'-D',data,'-l',state/'server.log','-o',f'-h 127.0.0.1 -p {port} -k {socket_dir}','-w','-t','20','start']],
           env=env,creationflags=flags,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,timeout=30)
     started=(data/'postmaster.pid').exists()
     if start_result.returncode: raise RuntimeError((state/'start.log').read_text())
@@ -239,4 +242,5 @@ try:
 finally:
     if started and (data/'postmaster.pid').exists():
         require(command([BIN/'pg_ctl.exe','-D',data,'-m','fast','-w','stop']),'Stop own cluster')
+    shutil.rmtree(socket_dir,ignore_errors=True)
     print('Artifacts: '+str(state),flush=True)
