@@ -52,31 +52,21 @@ create table public.learning_homework_submissions (
   graded_by uuid,
   unique(homework_id,student_id)
 );
-create table public.learning_exercise_questions (
-  id uuid primary key default gen_random_uuid(),
-  lesson_id uuid not null references public.learning_lessons(id) on delete cascade,
-  vocabulary_id uuid,
-  kind text not null check (kind in ('vocabulary','listening')),
-  prompt text not null check (length(btrim(prompt)) between 2 and 200),
-  choices jsonb not null,
-  correct_choice integer not null,
-  position integer not null default 1,
-  is_published boolean not null default true,
-  created_by uuid,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  check (jsonb_typeof(choices) = 'array'
-    and jsonb_array_length(choices) between 2 and 6
-    and correct_choice >= 0
-    and correct_choice < jsonb_array_length(choices))
+create table public.learning_vocabulary (
+  id uuid primary key, course_id uuid not null references public.learning_courses
 );
-create table public.learning_exercise_attempts (
-  question_id uuid not null references public.learning_exercise_questions(id),
-  student_id uuid not null references public.students(id),
-  selected_choice integer not null,
-  is_correct boolean not null,
-  answered_at timestamptz not null default now(),
-  primary key(question_id,student_id)
+create table public.learning_vocab_progress (
+  vocabulary_id uuid not null, student_id uuid not null, status text,
+  review_count integer, last_reviewed_at timestamptz, updated_at timestamptz,
+  primary key(vocabulary_id,student_id)
+);
+create table public.learning_lesson_progress (
+  lesson_id uuid not null, student_id uuid not null, status text,
+  completion_basis text, updated_at timestamptz,
+  primary key(lesson_id,student_id)
+);
+create table public.audit_logs (
+  actor_user_id uuid, action text, entity_type text, entity_id uuid, metadata jsonb
 );
 
 insert into auth.users values
@@ -170,6 +160,7 @@ grant execute on function private.sai_security_has_role(text),
   private.sai_learning_own_student(uuid),
   private.sai_learning_can_manage_course(uuid),
   private.sai_learning_question_course(uuid) to authenticated;
+\ir ../migrations/20261116013950_learning_scored_exercises.sql
 grant select on public.students to authenticated;
 
 -- Mirror the authenticated client grants and row filters required by the Main
@@ -227,16 +218,47 @@ values
  ('00000000-0000-0000-0000-000000000805','00000000-0000-0000-0000-000000000501',
   'written','اشرح الإجابة','[]',null,5,
   '00000000-0000-0000-0000-000000000701',4,null);
+insert into public.learning_exercise_questions
+ (id,lesson_id,kind,prompt,choices,correct_choice,position,assessment_id)
+values
+ ('00000000-0000-0000-0000-000000000806','00000000-0000-0000-0000-000000000501',
+  'multiple_choice','Temporary question','["A","B"]',0,6,'00000000-0000-0000-0000-000000000701');
+delete from public.learning_exercise_questions where id='00000000-0000-0000-0000-000000000806';
+insert into public.learning_exercise_questions
+ (id,lesson_id,kind,prompt,choices,correct_choice,position)
+values
+ ('00000000-0000-0000-0000-000000000807','00000000-0000-0000-0000-000000000501',
+  'vocabulary','Practice question','["A","B"]',0,7);
 update public.learning_assessments set status='published'
   where id='00000000-0000-0000-0000-000000000701';
+insert into public.learning_assessments (id,course_id,lesson_id,title,due_at)
+values ('00000000-0000-0000-0000-000000000708',
+  '00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000501',
+  'Expired assessment',now()-interval '1 minute');
+insert into public.learning_exercise_questions
+  (lesson_id,kind,prompt,choices,correct_choice,assessment_id)
+values ('00000000-0000-0000-0000-000000000501','multiple_choice','Expired question',
+  '["A","B"]',0,'00000000-0000-0000-0000-000000000708');
+update public.learning_assessments set status='published'
+  where id='00000000-0000-0000-0000-000000000708';
+do $$
+begin
+  if (select count(*) from public.sai_learning_exercise_questions_admin(
+        '00000000-0000-0000-0000-000000000501')) <> 1
+    or not exists (select 1 from public.sai_learning_exercise_questions_admin(
+        '00000000-0000-0000-0000-000000000501')
+      where id='00000000-0000-0000-0000-000000000807') then
+    raise exception 'Practice authoring included assessment questions';
+  end if;
+end $$;
 
 select public.as_user('00000000-0000-0000-0000-000000000102');
 do $$
-declare v_started jsonb; v_attempt uuid; v_result jsonb; v_answer uuid;
+declare v_started jsonb; v_attempt uuid; v_result jsonb; v_answer uuid; v_practice jsonb;
 begin
-  if (select count(*) from public.learning_exercise_questions
-      where assessment_id='00000000-0000-0000-0000-000000000701') <> 5 then
-    raise exception 'Published assessment questions are not visible';
+  if exists (select 1 from public.learning_exercise_questions
+      where assessment_id='00000000-0000-0000-0000-000000000701') then
+    raise exception 'Student can read assessment questions outside an attempt';
   end if;
   begin
     perform correct_choice from public.learning_exercise_questions
@@ -244,7 +266,17 @@ begin
     raise exception 'Student read answer key';
   exception when insufficient_privilege then null;
   end;
+  v_practice := public.sai_learning_submit_exercise(
+    '00000000-0000-0000-0000-000000000501',
+    '[{"question":"00000000-0000-0000-0000-000000000807","choice":0}]');
+  if (v_practice->>'total')::int <> 1 or (v_practice->>'score')::int <> 100
+    or jsonb_array_length(v_practice->'results') <> 1 then
+    raise exception 'Practice grading included assessment questions: %', v_practice;
+  end if;
   v_started := public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000701');
+  if jsonb_array_length(v_started->'questions') <> 5 then
+    raise exception 'Authorized attempt did not receive its questions';
+  end if;
   if v_started::text like '%answer_key%' or v_started::text like '%correct_choice%' then
     raise exception 'Start RPC leaked an answer key';
   end if;
@@ -258,6 +290,17 @@ begin
   if v_result->>'status' <> 'submitted' or (v_result->>'needs_manual_grading')::int <> 1 then
     raise exception 'Objective grading or written-review state is wrong: %',v_result;
   end if;
+  begin
+    perform public.sai_learning_assessment_submit(v_attempt);
+    raise exception 'Duplicate assessment submission succeeded';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000708');
+    raise exception 'Expired assessment started';
+  exception when raise_exception then
+    if sqlerrm <> 'Assessment deadline has passed' then raise; end if;
+  end;
   if exists (select 1 from public.learning_assessment_attempts
       where id=v_attempt and score is not null) then
     raise exception 'Unreleased result score should remain hidden from the student';
@@ -272,17 +315,76 @@ end $$;
 
 select public.as_user('00000000-0000-0000-0000-000000000101');
 do $$
+begin
+  begin
+    insert into public.learning_exercise_questions
+      (lesson_id,kind,prompt,choices,correct_choice,assessment_id)
+    values ('00000000-0000-0000-0000-000000000501','multiple_choice','Late question',
+      '["A","B"]',0,'00000000-0000-0000-0000-000000000701');
+    raise exception 'Question inserted after attempt';
+  exception when check_violation then
+    if sqlerrm <> 'Assessment questions cannot be edited after attempts begin' then raise; end if;
+  end;
+  begin
+    delete from public.learning_exercise_questions
+      where id='00000000-0000-0000-0000-000000000801';
+    raise exception 'Question deleted after attempt';
+  exception when check_violation then
+    if sqlerrm <> 'Assessment questions cannot be edited after attempts begin' then raise; end if;
+  end;
+  begin
+    update public.learning_exercise_questions set assessment_id='00000000-0000-0000-0000-000000000701'
+      where id='00000000-0000-0000-0000-000000000807';
+    raise exception 'Question moved into assessment after attempt';
+  exception when check_violation then
+    if sqlerrm <> 'Assessment questions cannot be edited after attempts begin' then raise; end if;
+  end;
+end $$;
+do $$
 declare v_answer uuid; v_attempt uuid;
 begin
   select x.id,a.id into v_answer,v_attempt
     from public.learning_assessment_answers x
     join public.learning_assessment_attempts a on a.id=x.attempt_id
     where x.question_id='00000000-0000-0000-0000-000000000805';
+  begin
+    perform public.sai_learning_assessment_grade(v_answer,5,'Invalid grade');
+    raise exception 'Written grade exceeded question maximum';
+  exception when check_violation then null;
+  end;
   perform public.sai_learning_assessment_grade(v_answer,3,'إجابة جيدة');
   if (select status from public.learning_assessment_attempts where id=v_attempt) <> 'graded'
     or (select score from public.learning_assessment_attempts where id=v_attempt) <> 9 then
     raise exception 'Teacher grading did not recalculate the authoritative result';
   end if;
+  begin
+    delete from public.learning_assessments
+      where id='00000000-0000-0000-0000-000000000701';
+    raise exception 'Published assessment deleted with grading history';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+reset role;
+do $$
+begin
+  begin
+    delete from public.learning_assessments
+      where id='00000000-0000-0000-0000-000000000701';
+    raise exception 'Published assessment deletion guard did not run';
+  exception when check_violation then
+    if sqlerrm <> 'Published assessments and assessment history cannot be deleted' then raise; end if;
+  end;
+  if not exists (select 1 from public.learning_assessment_attempts
+      where assessment_id='00000000-0000-0000-0000-000000000701') then
+    raise exception 'Assessment deletion removed historical attempts';
+  end if;
+end $$;
+
+set role authenticated;
+select public.as_user('00000000-0000-0000-0000-000000000101');
+do $$
+begin
   update public.learning_assessments set results_released=true
     where id='00000000-0000-0000-0000-000000000701';
 end $$;
@@ -290,6 +392,10 @@ end $$;
 select public.as_user('00000000-0000-0000-0000-000000000103');
 do $$
 begin
+  if exists (select 1 from public.learning_exercise_questions
+      where assessment_id='00000000-0000-0000-0000-000000000701') then
+    raise exception 'Parent can read the assessment question bank';
+  end if;
   if not exists (select 1 from public.sai_learning_assessment_results('00000000-0000-0000-0000-000000000701')
       where score=9 and feedback='إجابة جيدة') then
     raise exception 'Verified parent cannot read released linked result';
@@ -358,4 +464,65 @@ begin
   end;
 end $$;
 select 'PASS: assessment authoring, hidden keys, autosave, objective grading, written review, attempt limits, released-family results, and protected homework grading';
+
+begin;
+set local role authenticated;
+select public.as_user('00000000-0000-0000-0000-000000000101');
+insert into public.learning_assessments (id,course_id,lesson_id,title,due_at)
+values ('00000000-0000-0000-0000-000000000710',
+  '00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000501',
+  'Deadline boundary',clock_timestamp()+interval '2 seconds');
+insert into public.learning_exercise_questions
+  (id,lesson_id,kind,prompt,choices,correct_choice,assessment_id)
+values ('00000000-0000-0000-0000-000000000810',
+  '00000000-0000-0000-0000-000000000501','multiple_choice','Deadline question',
+  '["A","B"]',0,'00000000-0000-0000-0000-000000000710');
+update public.learning_assessments set status='published'
+  where id='00000000-0000-0000-0000-000000000710';
+select public.as_user('00000000-0000-0000-0000-000000000102');
+do $$
+declare v_attempt uuid;
+begin
+  v_attempt := (public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000710')->>'attempt_id')::uuid;
+  perform pg_sleep(2.2);
+  begin
+    perform public.sai_learning_assessment_save(v_attempt,'00000000-0000-0000-0000-000000000810','0');
+    raise exception 'Answer accepted after real deadline';
+  exception when raise_exception then
+    if sqlerrm <> 'Assessment deadline has passed' then raise; end if;
+  end;
+  begin
+    perform public.sai_learning_assessment_submit(v_attempt);
+    raise exception 'Submission accepted after real deadline';
+  exception when raise_exception then
+    if sqlerrm <> 'Assessment deadline has passed' then raise; end if;
+  end;
+  begin
+    perform public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000710');
+    raise exception 'Attempt resumed after real deadline';
+  exception when raise_exception then
+    if sqlerrm <> 'Assessment deadline has passed' then raise; end if;
+  end;
+end $$;
+rollback;
+
+begin isolation level repeatable read;
+set local role authenticated;
+select public.as_user('00000000-0000-0000-0000-000000000102');
+do $$
+begin
+  begin
+    perform public.sai_learning_assessment_start('00000000-0000-0000-0000-000000000701');
+    raise exception 'Repeatable-read attempt was accepted';
+  exception when sqlstate '25001' then null;
+  end;
+  perform public.as_user('00000000-0000-0000-0000-000000000101');
+  begin
+    delete from public.learning_exercise_questions
+      where id='00000000-0000-0000-0000-000000000801';
+    raise exception 'Repeatable-read question edit was accepted';
+  exception when sqlstate '25001' then null;
+  end;
+end $$;
+rollback;
 

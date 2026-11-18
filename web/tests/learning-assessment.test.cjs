@@ -31,7 +31,7 @@ function fakeClient({
           return this;
         },
         eq() { return this; },
-        in() { return this; },
+        in(...args) { calls.push(["in", ...args]); return this; },
         order() { return this; },
         limit() { return Promise.resolve({ data: [{ position: 3 }], error: null }); },
         insert(payload) { calls.push(["insert", payload]); this._wrote = writeResult; return this; },
@@ -80,6 +80,8 @@ test("student question loads never request the answer key column", async () => {
   await api.loadExerciseQuestions("l1");
   const select = client.calls.find((call) => call[0] === "select");
   assert.ok(!String(select[1]).includes("correct_choice"));
+  assert.deepEqual(client.calls.find((call) => call[0] === "in"),
+    ["in", "kind", ["vocabulary", "listening"]]);
   await assert.rejects(
     load(fakeClient(), "bad-shape").then((m) => m.submitExercise("l1", [])),
     /سؤال واحد/,

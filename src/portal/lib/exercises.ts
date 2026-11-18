@@ -61,6 +61,7 @@ export async function loadExerciseQuestions(lessonId: string): Promise<ExerciseQ
     .select(safeColumns)
     .eq("lesson_id", lessonId)
     .eq("is_published", true)
+    .in("kind", [...exerciseKinds])
     .order("position")
     .order("id");
   if (result.error) throw new Error(`تعذر تحميل أسئلة التقييم: ${result.error.message}`);

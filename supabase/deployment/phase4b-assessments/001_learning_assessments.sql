@@ -416,10 +416,6 @@ create policy learning_exercise_questions_select on public.learning_exercise_que
         where l.id = lesson_id and l.is_published
       )
     )
-    or (
-      assessment_id is not null and is_published
-      and private.sai_learning_assessment_read(assessment_id)
-    )
   );
 
 drop policy if exists learning_exercise_questions_write on public.learning_exercise_questions;
@@ -509,14 +505,53 @@ create trigger learning_assessments_guard
   before insert or update on public.learning_assessments
   for each row execute function private.sai_learning_assessment_guard();
 
+create function private.sai_learning_assessment_delete_guard()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if old.status = 'published'
+    or exists (select 1 from public.learning_assessment_attempts a
+      where a.assessment_id = old.id) then
+    raise exception 'Published assessments and assessment history cannot be deleted'
+      using errcode = '23514';
+  end if;
+  return old;
+end;
+$$;
+
+create trigger learning_assessments_delete_guard
+  before delete on public.learning_assessments
+  for each row execute function private.sai_learning_assessment_delete_guard();
+
 create function private.sai_learning_assessment_questions_sync()
 returns trigger language plpgsql security definer
 set search_path = pg_catalog, public, private
 as $$
+declare
+  v_old_assessment uuid;
+  v_new_assessment uuid;
 begin
-  if tg_op = 'UPDATE' and old.assessment_id is not null
-    and exists (select 1 from public.learning_assessment_attempts a where a.assessment_id = old.assessment_id) then
+  if tg_op <> 'INSERT' then
+    v_old_assessment := old.assessment_id;
+  end if;
+  if tg_op <> 'DELETE' then
+    v_new_assessment := new.assessment_id;
+  end if;
+  if v_old_assessment is not null or v_new_assessment is not null then
+    if current_setting('transaction_isolation') <> 'read committed' then
+      raise exception 'Assessment question changes require read committed isolation' using errcode = '25001';
+    end if;
+    perform 1 from public.learning_assessments a
+      where a.id = any (array[v_old_assessment, v_new_assessment])
+      order by a.id for update;
+  end if;
+  if exists (select 1 from public.learning_assessment_attempts a
+    where a.assessment_id = any (array[v_old_assessment, v_new_assessment])) then
     raise exception 'Assessment questions cannot be edited after attempts begin' using errcode = '23514';
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
   end if;
   if new.assessment_id is not null then
     if not exists (select 1 from public.learning_assessments a
@@ -597,7 +632,7 @@ end;
 $$;
 
 create trigger learning_assessment_questions_sync
-  before insert or update on public.learning_exercise_questions
+  before insert or update or delete on public.learning_exercise_questions
   for each row execute function private.sai_learning_assessment_questions_sync();
 
 create function private.sai_learning_assessment_publish_questions()
@@ -648,6 +683,9 @@ declare
   v_attempt public.learning_assessment_attempts%rowtype;
   v_next integer;
 begin
+  if current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'Starting an assessment requires read committed isolation' using errcode = '25001';
+  end if;
   if (select auth.uid()) is null
     or not private.sai_security_has_role('student') then
     raise exception 'Student authentication required' using errcode = '42501';
@@ -665,14 +703,14 @@ begin
   if v_assessment.id is null then
     raise exception 'Assessment is not available to this student' using errcode = '42501';
   end if;
+  if v_assessment.due_at is not null and clock_timestamp() > v_assessment.due_at then
+    raise exception 'Assessment deadline has passed' using errcode = 'P0001';
+  end if;
   select a.* into v_attempt from public.learning_assessment_attempts a
     where a.assessment_id = p_assessment and a.student_id = v_student
       and a.status = 'in_progress'
     order by a.attempt_number desc limit 1;
   if v_attempt.id is null then
-    if v_assessment.due_at is not null and now() > v_assessment.due_at then
-      raise exception 'Assessment deadline has passed' using errcode = 'P0001';
-    end if;
     select coalesce(max(a.attempt_number), 0) + 1 into v_next
       from public.learning_assessment_attempts a
       where a.assessment_id = p_assessment and a.student_id = v_student;
@@ -723,7 +761,7 @@ begin
   end if;
   if exists (select 1 from public.learning_assessments x
     where x.id = v_attempt.assessment_id and x.due_at is not null
-      and now() > x.due_at) then
+      and clock_timestamp() > x.due_at) then
     raise exception 'Assessment deadline has passed' using errcode = 'P0001';
   end if;
   select q.* into v_question from public.learning_exercise_questions q
@@ -772,7 +810,7 @@ begin
   end if;
   if exists (select 1 from public.learning_assessments x
     where x.id = v_attempt.assessment_id and x.due_at is not null
-      and now() > x.due_at) then
+      and clock_timestamp() > x.due_at) then
     raise exception 'Assessment deadline has passed' using errcode = 'P0001';
   end if;
   for v_question in
@@ -916,7 +954,129 @@ as $$
   order by a.attempt_number desc, a.started_at desc, q.position, q.id;
 $$;
 
+-- Keep the existing scored-practice contracts separate from assessment questions.
+create or replace function public.sai_learning_exercise_questions_admin(p_lesson uuid)
+returns table (id uuid, lesson_id uuid, vocabulary_id uuid, kind text, prompt text,
+  choices jsonb, correct_choice integer, "position" integer, is_published boolean,
+  created_at timestamptz, updated_at timestamptz)
+language sql stable security definer
+set search_path = pg_catalog, public, private
+as $$
+  select q.id, q.lesson_id, q.vocabulary_id, q.kind, q.prompt, q.choices, q.correct_choice,
+    q.position, q.is_published, q.created_at, q.updated_at
+  from public.learning_exercise_questions q
+  where q.lesson_id = p_lesson and q.assessment_id is null
+    and private.sai_learning_can_manage_course(private.sai_learning_question_course(p_lesson))
+  order by q.position, q.id;
+$$;
+
+create or replace function public.sai_learning_submit_exercise(p_lesson uuid, p_answers jsonb)
+returns jsonb language plpgsql security definer
+set search_path = pg_catalog, public, private, auth
+as $$
+declare
+  v_student uuid;
+  v_course uuid;
+  v_total integer;
+  v_correct integer := 0;
+  v_score integer;
+  v_passed boolean;
+  v_answer jsonb;
+  v_question public.learning_exercise_questions%rowtype;
+  v_choice integer;
+  v_right boolean;
+  v_results jsonb := '[]'::jsonb;
+begin
+  if (select auth.uid()) is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+  select s.id into v_student from public.students s
+    where s.user_id = (select auth.uid())
+      and exists (select 1 from public.user_roles r
+        where r.user_id = (select auth.uid()) and r.role = 'student');
+  if v_student is null then
+    raise exception 'No enrolled student record for this account' using errcode = '42501';
+  end if;
+  select l.course_id into v_course from public.learning_lessons l
+    where l.id = p_lesson and l.is_published;
+  if v_course is null or not exists (
+    select 1 from public.learning_courses c
+    join public.students s on s.class_id = c.class_id
+    where c.id = v_course and s.id = v_student
+  ) then
+    raise exception 'Not enrolled in this lesson''s course' using errcode = '42501';
+  end if;
+  if p_answers is null or jsonb_typeof(p_answers) <> 'array' then
+    raise exception 'Invalid answers payload' using errcode = '23514';
+  end if;
+
+  select count(*) into v_total from public.learning_exercise_questions q
+    where q.lesson_id = p_lesson and q.is_published and q.assessment_id is null;
+  if v_total = 0 then
+    raise exception 'This lesson has no assessed questions' using errcode = '23514';
+  end if;
+  for v_question in
+    select q.* from public.learning_exercise_questions q
+    where q.lesson_id = p_lesson and q.is_published and q.assessment_id is null
+    order by q.position, q.id
+  loop
+    v_answer := (
+      select a from jsonb_array_elements(p_answers) a
+      where a ->> 'question' = v_question.id::text
+      limit 1
+    );
+    v_choice := null;
+    if v_answer is not null and jsonb_typeof(v_answer -> 'choice') = 'number'
+      and (v_answer ->> 'choice') ~ '^\d+$' then
+      v_choice := (v_answer ->> 'choice')::integer;
+    end if;
+    if v_choice is not null and v_choice >= jsonb_array_length(v_question.choices) then
+      v_choice := null;
+    end if;
+    v_right := v_choice is not null and v_choice = v_question.correct_choice;
+    if v_right then v_correct := v_correct + 1; end if;
+    if v_choice is not null then
+      insert into public.learning_exercise_attempts
+        (question_id, student_id, selected_choice, is_correct, answered_at)
+      values (v_question.id, v_student, v_choice, v_right, now())
+      on conflict (question_id, student_id) do update
+        set selected_choice = excluded.selected_choice,
+            is_correct = excluded.is_correct,
+            answered_at = excluded.answered_at;
+    end if;
+    if not v_right and v_question.kind = 'vocabulary' and v_question.vocabulary_id is not null then
+      insert into public.learning_vocab_progress
+        (vocabulary_id, student_id, status, review_count, last_reviewed_at, updated_at)
+      values (v_question.vocabulary_id, v_student, 'learning', 0, now(), now())
+      on conflict (vocabulary_id, student_id) do update
+        set status = 'learning', review_count = 0,
+            last_reviewed_at = now(), updated_at = now();
+    end if;
+    v_results := v_results || jsonb_build_object('question', v_question.id, 'correct', v_right);
+  end loop;
+  v_score := (v_correct * 100) / v_total;
+  v_passed := v_score >= 70;
+  if v_passed then
+    perform set_config('sai.assessed_completion', 'on', true);
+    insert into public.learning_lesson_progress
+      (lesson_id, student_id, status, completion_basis, updated_at)
+    values (p_lesson, v_student, 'completed', 'assessed', now())
+    on conflict (lesson_id, student_id) do update
+      set status = 'completed', completion_basis = 'assessed', updated_at = now();
+  end if;
+  insert into public.audit_logs (actor_user_id, action, entity_type, entity_id, metadata)
+  values ((select auth.uid()), 'exercise_submit', 'learning_lessons', p_lesson,
+    jsonb_build_object('student_id', v_student, 'score', v_score, 'passed', v_passed,
+      'source', 'sai_learning_submit_exercise'));
+  return jsonb_build_object(
+    'total', v_total, 'correct', v_correct, 'score', v_score, 'passed', v_passed,
+    'results', v_results
+  );
+end;
+$$;
+
 revoke all on function private.sai_learning_assessment_guard(),
+  private.sai_learning_assessment_delete_guard(),
   private.sai_learning_assessment_questions_sync(),
   private.sai_learning_assessment_publish_questions(),
   private.sai_learning_assessment_recalculate(uuid) from public, anon, authenticated;
@@ -932,5 +1092,10 @@ grant execute on function public.sai_learning_assessment_start(uuid),
   public.sai_learning_assessment_grade(uuid, numeric, text),
   public.sai_learning_assessment_questions_admin(uuid),
   public.sai_learning_assessment_results(uuid) to authenticated;
+
+revoke all on function public.sai_learning_exercise_questions_admin(uuid),
+  public.sai_learning_submit_exercise(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.sai_learning_exercise_questions_admin(uuid),
+  public.sai_learning_submit_exercise(uuid, jsonb) to authenticated;
 
 commit;

@@ -348,6 +348,7 @@ class LessonStudyStore {
         .select('id,kind,prompt,choices,position')
         .eq('lesson_id', lessonId)
         .eq('is_published', true)
+        .inFilter('kind', ['vocabulary', 'listening'])
         .order('position');
     return List<Map<String, dynamic>>.from(rows);
   }
