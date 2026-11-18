@@ -6,6 +6,10 @@ publication or authenticated live acceptance occurred.
 
 ## Latest local evidence — 18 November 2026
 
+The Phase 4B local refresh supersedes the prior Flutter analyzer/test/APK
+failure entries in the historical checklist below. Phase 4B is still partial;
+this is not a production release approval.
+
 | Area | Result |
 |---|---|
 | Isolated application recovery | PASS: checksum verified; 85 tables, 860 rows, 355 constraints, 105 functions, 44 triggers and 113 policies; no row-count mismatch. Not a Supabase-compatible platform restore. |
@@ -13,9 +17,10 @@ publication or authenticated live acceptance occurred.
 | Deployment executor | Default dry-run PASS; wrong project and missing-attestation gates failed safely. No production writes. |
 | Web | Type-check, lint, production build and 105 tests PASS; 3 configuration/workflow integration tests PASS. |
 | Edge | 7 focused Deno tests and checks of 10 changed files PASS. |
-| Flutter | Offline dependencies PASS. Analysis FAIL (30 issues); tests FAIL (41 passed, five files failed compilation); debug APK FAIL at Dart compilation. |
-| Android | OpenJDK 21.0.13; Gradle 8.14.3 / AGP 8.11.1. Java/Gradle compatibility failure not established by this build. Release signing not verified; `android/key.properties` absent. |
-| Git / publication | Local `main` matched live `origin/main` at `f2ca63f`. No push because Hostinger settings remain unverified. |
+| Flutter | `pub get` PASS; analysis PASS with no issues; tests PASS 61/61. |
+| Android | Configured debug APK PASS (194,102,078 bytes; SHA-256 `ce925355b2a9c9b347ec4b9e799eabc4d3d7b65b7d583b08b3618325bcbd5d46`). Project URL and runtime variable match; key ownership is not proven. Release signing not verified; `android/key.properties` absent. |
+| Phase 4B status | PARTIAL. Assessment locking/practice separation and current test/build gates pass; broad feature, authorization, hosted Storage and authenticated acceptance requirements remain. |
+| Git / publication | Phase 4B partial progress is locally committed on `main`; local branch is ahead of the `origin/main` tracking ref. No push; live remote synchronization is not claimed. |
 
 ## Recovery and change safety
 
@@ -64,10 +69,10 @@ publication or authenticated live acceptance occurred.
 - [ ] Verify Hostinger deployment configuration, HTTPS, SPA routing, Arabic
   RTL, assets, deployed artifact identity and rollback before website
   deployment.
-- [ ] Fix Flutter analyzer/test compilation failures before release validation.
-- [ ] Produce a successful Android debug APK; verify signed AAB separately
-  when signing inputs are securely configured. Build/sign iOS on macOS if
-  required.
+- [x] Flutter analyzer has no issues and all 61 current tests pass locally.
+- [x] Produce the configured Android debug APK.
+- [ ] Verify signed AAB separately when signing inputs are securely configured;
+  build/sign iOS on macOS if required.
 - [ ] Test all nine roles on web and mobile with controlled accounts: login,
   logout, onboarding, profile, admissions, student/teacher, attendance,
   finance, learning/homework, examinations/results, library and other claimed
@@ -80,12 +85,13 @@ publication or authenticated live acceptance occurred.
 
 - [x] Read-only `git ls-remote` confirmed local `main` and live `origin/main`
   matched before documentation edits.
+- [x] Commit reviewed Phase 4B partial progress locally; keep the push
+  postponed. Current implementation commit:
+  `2a13081f771e01f5b73e5fa5aa0648ac938b2054`.
 - [x] Authenticated GitHub API reported no hooks or deployments; active root
   workflows were CI-only.
-- [ ] Verify Hostinger control-panel/server deployment settings and any
-  external CI/CD before committing or pushing documentation/source.
-- [ ] Preserve paused Phase 4B implementation; stage only explicitly reviewed
-  Phase 7-R files if a push is proven not to trigger production deployment.
+- [x] Preserve the Phase 4B partial-progress local commit; do not push until
+  external automatic-deployment settings are verified.
 - [ ] Obtain explicit project-owner approval before any production write,
   migration, Edge deployment, website deployment or publication.
 - [ ] Release any write hold only after all post-deployment checks pass and

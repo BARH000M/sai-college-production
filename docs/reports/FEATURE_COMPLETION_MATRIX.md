@@ -2,6 +2,25 @@
 
 **Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
 
+## Phase 4B local refresh — 18 November 2026
+
+Phase 4B remains **PARTIAL**. The previously uncommitted assessment integrity
+and practice-isolation changes were preserved and tested; the migration
+regression was strengthened for the full lock inventory, checksums and
+deployment dependencies. The web suite passed 105/105, the isolated assessment,
+native contracts and Phase 3B reconciliation suites passed, web type-check/lint
+passed, Flutter analysis reported no issues and Flutter tests passed 61/61.
+The configured web build and Android debug APK also built successfully. These
+results are local only and do not imply hosted deployment or live acceptance.
+
+| Area | Current disposition | Remaining gap |
+|---|---|---|
+| Assessment management and integrity | PARTIAL; draft/publish, attempt/save/submit, answer-key separation, grading and question-locking contracts are present and isolated database-tested | Scheduling/time limits, assignment variants, duplication/versioning and full authorization lifecycle acceptance |
+| Interactive exercises | PARTIAL; vocabulary/listening practice is isolated from assessment questions on web, mobile and server contracts | Remaining requested question kinds, media, review/feedback and complete reusable cross-client engine |
+| Homework | PARTIAL; existing submissions, private attachments and grading contracts are reused | Full lifecycle, multiple attachments, resubmission/notifications and hosted Storage acceptance |
+| Grading and analytics | PARTIAL; objective/manual assessment grading and existing progress contracts are reused | Partial weighting, audit/correction history and requested student/teacher/parent analytics |
+| Teacher, student and parent portals | PARTIAL; current role-aware web/mobile learning flows are reused | Full role/branch isolation, reporting, responsive/accessibility and parity acceptance |
+| Administration and content management | PARTIAL; existing role navigation and question authoring are reused | Complete admin oversight and content-editor permission contract |
 
 <!-- PHASE7M-CURRENT -->
 **Current Phase 7-M refresh — 18 November 2026:** This checkpoint supplements every existing phase row below; no prior implementation or live-acceptance blocker is waived.

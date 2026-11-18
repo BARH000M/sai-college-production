@@ -6,6 +6,21 @@
 <!-- PHASE7M-CURRENT -->
 **18 November 2026 update — Phase 7-M:** The refreshed Main inventory is **57 local files / 57 GitHub Main files / 16 production history records**. All migration files match origin/main bytes at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. The earlier evidence below is historical wherever it differs. No production write, history repair or deployment occurred; Phase 4B remains paused.
 
+**Phase 4B local refresh — 18 November 2026:** Phase 4B resumed for local
+development and remains **PARTIAL**. Required local database runners, migration
+integrity/tamper tests, 105 web tests, web type-check/lint/build, Flutter
+analysis/61 tests and configured debug APK build passed. Assessment question
+locking and practice/assessment separation are tested in the disposable
+database. The feature remains excluded from the production manifest; no Main
+SQL, Edge, website or mobile deployment occurred. The current public-key
+project binding, hosted Storage behavior and authenticated live acceptance
+remain unverified. This refresh supersedes the earlier "paused"/failed-Flutter
+statements in this report only for local development evidence.
+
+Verified partial progress is committed locally as
+`2a13081f771e01f5b73e5fa5aa0648ac938b2054` on `main`; the documentation
+closeout is separate. Neither commit was pushed. Production remains NO-GO.
+
 **Current disposition: NO-GO.** [Phase 7-M](PHASE_7M_RECONCILIATION.md) supersedes earlier inventory/source assumptions below. Production has 47 public tables with RLS, no private 007 finance schema/owner, no proposed mutation hold or atomic-role RPC, and no examinations schema. Finance aggregate checks found one assignment and zero invalid scope/amount/duplicate-key results. The production baseline has not been changed.
 
 The [updated manifest](../../supabase/deployment/phase7r/main-deployment-manifest.json) integrates existing maintenance/3B/3C/4A packages with tested Main-specific finance/settings corrections. Tracking/enrollment and protected events are pinned as deferred coordinated-cutover packages; unfinished Phase 4B/learning scoring and overlapping timestamped candidates are excluded from execution. The executor commits each package, postcondition and receipt atomically, rejects source changes/retries and follows manifest order. Its `release_ready=false` gate blocks execution.

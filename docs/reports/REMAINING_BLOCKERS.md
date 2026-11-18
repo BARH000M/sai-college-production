@@ -45,18 +45,20 @@ live acceptance was performed.
    cross-client persistence and negative authorization cases still need
    controlled acceptance. Do not repair migration history or replay the
    historical migration directory.
-7. Phase 4B remains paused and incomplete. The latest web suite passed 105
-   tests, and earlier focused SQL/web tests passed. Flutter analysis failed
-   with 30 issues; Flutter tests had 41 passing and five files failing to
-   compile. Errors include file-picker API mismatches, duplicate `_notice`,
-   missing homework-file opening/`launchUrl`, and abstract `PlatformFile`
-   construction. Preserve the feature work and fix these compile/test failures
-   before a mobile release.
-8. The Android debug APK build failed after entering `assembleDebug` because
-   Dart compilation failed. OpenJDK 21.0.13 was verified; Gradle 8.14.3 and
-   AGP 8.11.1 emitted future-support warnings, but this attempt did not
-   establish a Java/Gradle compatibility failure. `android/key.properties` is
-   absent, so release signing and a signed AAB are not verified.
+7. Phase 4B is active for local development but remains incomplete. The
+   refreshed web suite passed 105/105; assessment, native contract and Phase
+   3B reconciliation database runners passed; Flutter analysis reported no
+   issues and Flutter tests passed 61/61. Remaining feature gaps include the
+   full exercise catalog, assignment lifecycle, complete grading/analytics,
+   cross-role/branch acceptance and hosted Storage behavior. See
+   `PHASE_4B_COMPLETION_REPORT.md`; do not infer completion from passing
+   existing tests.
+8. The configured Android debug APK now builds successfully. The public-key
+   format and target URL/runtime variable were checked without printing the
+   value, but key ownership was not independently verified. The local release
+   keystore exists and is ignored; `mobile/android/key.properties` is absent,
+   so release signing, a signed AAB and device acceptance remain unverified.
+   Gradle 8.14.3, AGP 8.11.1 and Kotlin 2.2.20 emitted future-support warnings.
 9. The web production build passed locally, but deployed artifact identity,
    authenticated behavior and live backend requests are unverified.
    Hostinger control-panel/server deployment configuration is also
@@ -67,15 +69,18 @@ live acceptance was performed.
 
 ## Git and deployment controls
 
-- Read-only check: local `main` and live `origin/main` matched at
-  `f2ca63f08ed59455cd8cebb64f99aa0272c93af2`; worktree was clean before this
-  documentation update.
+- Local Phase 7-M commit remains preserved. Verified Phase 4B partial progress
+  was committed on `main` as `2a13081f771e01f5b73e5fa5aa0648ac938b2054`;
+  documentation closeout is separate. Local `main` is ahead of the
+  `origin/main` tracking ref. No current live-remote synchronization check or
+  push was performed.
 - Authenticated GitHub API reported zero hooks and zero deployments. The two
   active root workflows are CI-only. Hostinger control-panel settings and
   external deployment integrations remain unverified; therefore this task
   made no commit or push.
-- Keep GitHub `main` as the source of truth. Do not stage Phase 4B source with
-  unrelated operational files; preserve work. Keep Supabase MCP read-only
-  except for separately approved controlled deployment tooling.
+- Keep GitHub `main` as the source of truth. Preserve the checkpoint-scoped
+  local Phase 4B commit; do not push while automatic deployment settings are
+  unverified. Keep Supabase MCP read-only except for separately approved
+  controlled deployment tooling.
 - No production writes, database resets, Docker, force pushes or credential
   exposure were performed.
