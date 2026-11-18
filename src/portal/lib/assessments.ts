@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 export const assessmentKinds = [
   "multiple_choice",
   "multiple_select",
+  "ordering",
   "true_false",
   "matching",
   "fill_blank",
@@ -13,6 +14,7 @@ export type AssessmentQuestionKind = typeof assessmentKinds[number];
 export const assessmentKindLabels: Record<AssessmentQuestionKind, string> = {
   multiple_choice: "اختيار من متعدد",
   multiple_select: "اختر جميع الإجابات الصحيحة",
+  ordering: "ترتيب العناصر",
   true_false: "صح أو خطأ",
   matching: "مطابقة",
   fill_blank: "أكمل الفراغ",
@@ -372,6 +374,14 @@ function questionPayload(input: AssessmentQuestionInput) {
       throw new Error("حدّد إجابة واحدة أو أكثر من الخيارات.");
     }
     answerKey = [...indexes].sort((left, right) => left - right);
+  } else if (input.kind === "ordering") {
+    if (choices.length < 2 || choices.length > 10 || !Array.isArray(input.answerKey)
+      || input.answerKey.length !== choices.length
+      || !input.answerKey.every((value): value is string =>
+        typeof value === "string" && choices.includes(value))
+      || new Set(input.answerKey).size !== choices.length) {
+      throw new Error("يجب ترتيب جميع العناصر دون حذف أو تكرار.");
+    }
   } else if (input.kind === "matching") {
     if (choices.length < 4 || choices.length > 12 || choices.length % 2 !== 0
       || choices.some((item) => !item || item.length > 300)

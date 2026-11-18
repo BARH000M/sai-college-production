@@ -7,6 +7,7 @@ import 'components.dart';
 const _questionKinds = <String, String>{
   'multiple_choice': 'اختيار من متعدد',
   'multiple_select': 'اختر جميع الإجابات الصحيحة',
+  'ordering': 'ترتيب العناصر',
   'true_false': 'صح أو خطأ',
   'matching': 'مطابقة',
   'fill_blank': 'أكمل الفراغ',
@@ -171,7 +172,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                   ),
                   TextField(
                     controller: starts,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'موعد البدء ISO اختياري',
                     ),
                   ),
@@ -360,13 +361,15 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                           labelText: 'الخيارات — كل خيار في سطر',
                         ),
                       ),
-                    if (kind == 'matching')
+                    if (kind == 'matching' || kind == 'ordering')
                       TextField(
                         controller: choices,
                         minLines: 2,
                         maxLines: 6,
-                        decoration: const InputDecoration(
-                          labelText: 'العناصر المطلوب مطابقتها',
+                        decoration: InputDecoration(
+                          labelText: kind == 'ordering'
+                              ? 'العناصر المطلوب ترتيبها'
+                              : 'العناصر المطلوب مطابقتها',
                         ),
                       ),
                     if (kind == 'fill_blank')
@@ -392,6 +395,15 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                         maxLines: 6,
                         decoration: const InputDecoration(
                           labelText: 'الإجابات المطابقة بالترتيب نفسه',
+                        ),
+                      ),
+                    if (kind == 'ordering')
+                      TextField(
+                        controller: answer,
+                        minLines: 2,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          labelText: 'الترتيب الصحيح — كل عنصر في سطر',
                         ),
                       ),
                     if (kind == 'multiple_choice' || kind == 'true_false')
@@ -443,7 +455,10 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
           .toList();
       List<String> options = left;
       dynamic key;
-      if (kindValue == 'multiple_select') {
+      if (kindValue == 'ordering') {
+        options = left;
+        key = other;
+      } else if (kindValue == 'multiple_select') {
         options = left;
         key =
             other
@@ -527,6 +542,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
 
   String _answerText(Map<String, dynamic> question) {
     final key = question['answer_key'];
+    if (question['kind'] == 'ordering' && key is List) {
+      return key.join('\n');
+    }
     if (question['kind'] == 'multiple_select' && key is List) {
       return key.join(',');
     }
@@ -932,6 +950,20 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                                 ),
                                 title: Text('$choice'),
                               ),
+                          if (_questions[index]['kind'] == 'ordering')
+                            for (
+                              var order = 0;
+                              order <
+                                  (_questions[index]['choices'] as List).length;
+                              order++
+                            )
+                              ListTile(
+                                dense: true,
+                                title: Text(
+                                  '${order + 1}. '
+                                  '${(_questions[index]['choices'] as List)[order]}',
+                                ),
+                              ),
                           if (_questions[index]['kind'] == 'fill_blank')
                             const TextField(
                               enabled: false,
@@ -1181,6 +1213,43 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                 }
                 setState(() => _answers[id] = next.toList()..sort());
               },
+            ),
+        ],
+      );
+    }
+    if (kind == 'ordering') {
+      final ordered = value is List ? List<String>.from(value) : options;
+      return Column(
+        children: [
+          for (var index = 0; index < ordered.length; index++)
+            ListTile(
+              title: Text('${index + 1}. ${ordered[index]}'),
+              trailing: Wrap(
+                children: [
+                  IconButton(
+                    onPressed: _submitted || index == 0
+                        ? null
+                        : () {
+                            final next = [...ordered];
+                            final item = next.removeAt(index);
+                            next.insert(index - 1, item);
+                            setState(() => _answers[id] = next);
+                          },
+                    icon: const Icon(Icons.arrow_upward),
+                  ),
+                  IconButton(
+                    onPressed: _submitted || index == ordered.length - 1
+                        ? null
+                        : () {
+                            final next = [...ordered];
+                            final item = next.removeAt(index);
+                            next.insert(index + 1, item);
+                            setState(() => _answers[id] = next);
+                          },
+                    icon: const Icon(Icons.arrow_downward),
+                  ),
+                ],
+              ),
             ),
         ],
       );

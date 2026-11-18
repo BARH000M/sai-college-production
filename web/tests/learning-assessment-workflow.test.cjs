@@ -86,6 +86,32 @@ test("multiple-select authoring normalizes valid answer indexes and rejects dupl
   assert.equal(denied.calls.filter((call) => call[0] === "insert").length, 0);
 });
 
+test("ordering authoring requires a complete unique choice sequence", async () => {
+  const client = fakeClient();
+  const api = await load(client, "ordering");
+  await api.createAssessmentQuestion({
+    ...question,
+    kind: "ordering",
+    choices: ["A", "B", "C"],
+    correctChoice: null,
+    answerKey: ["C", "A", "B"],
+  });
+  const inserted = client.calls.find((call) => call[0] === "insert")[1];
+  assert.deepEqual(inserted.choices, ["A", "B", "C"]);
+  assert.deepEqual(inserted.answer_key, ["C", "A", "B"]);
+
+  const denied = fakeClient();
+  const deniedApi = await load(denied, "ordering-invalid");
+  await assert.rejects(deniedApi.createAssessmentQuestion({
+    ...question,
+    kind: "ordering",
+    choices: ["A", "B", "C"],
+    correctChoice: null,
+    answerKey: ["A", "A", "C"],
+  }), /ترتيب جميع العناصر/);
+  assert.equal(denied.calls.filter((call) => call[0] === "insert").length, 0);
+});
+
 test("authoring persists a validated matching answer key with lesson and assessment association", async () => {
   const client = fakeClient();
   const api = await load(client, "matching");

@@ -35,6 +35,7 @@ type QuestionForm = {
   choices: string;
   correct: number;
   correctIndexes: string;
+  orderingAnswers: string;
   fillAnswers: string;
   matchingAnswers: string;
 };
@@ -46,6 +47,7 @@ const emptyQuestion: QuestionForm = {
   choices: "",
   correct: 0,
   correctIndexes: "",
+  orderingAnswers: "",
   fillAnswers: "",
   matchingAnswers: "",
 };
@@ -246,6 +248,8 @@ export function AssessmentsPanel({
     if (questionForm.kind === "multiple_select") {
       answerKey = questionForm.correctIndexes.split(/[,\s]+/).filter(Boolean).map(Number);
       choices = choiceLines;
+    } else if (questionForm.kind === "ordering") {
+      answerKey = questionForm.orderingAnswers.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
     } else if (questionForm.kind === "matching") {
       const split = questionForm.matchingAnswers.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
       choices = [...choiceLines, ...split];
@@ -277,6 +281,8 @@ export function AssessmentsPanel({
       ? question.answer_key.join("\n") : "";
     const correctIndexes = question.kind === "multiple_select" && Array.isArray(question.answer_key)
       ? question.answer_key.join(",") : "";
+    const orderingAnswers = question.kind === "ordering" && Array.isArray(question.answer_key)
+      ? question.answer_key.join("\n") : "";
     const key = question.answer_key && !Array.isArray(question.answer_key) ? question.answer_key : {};
     const matchingKey = question.choices.slice(0, choiceCount).map((left) => key[left] ?? "").join("\n");
     setEditingQuestion(question.id);
@@ -289,6 +295,7 @@ export function AssessmentsPanel({
         : question.choices.join("\n"),
       correct: question.correct_choice ?? 0,
       correctIndexes,
+      orderingAnswers,
       fillAnswers: fillKey,
       matchingAnswers: matchingKey,
     });
@@ -663,6 +670,8 @@ export function AssessmentsPanel({
                   <input type="checkbox" />
                   {choice}
                 </label>)}
+              {question.kind === "ordering" && question.choices.map((choice, orderIndex) =>
+                <p key={choice}>{orderIndex + 1}. {choice}</p>)}
               {question.kind === "matching" && question.choices.slice(0, question.choices.length / 2).map((choice) =>
                 <label key={choice}>{choice}<select><option>اختر المطابقة</option>
                   {question.choices.slice(question.choices.length / 2).map((option) => <option key={option}>{option}</option>)}
@@ -693,6 +702,9 @@ export function AssessmentsPanel({
               && <p className="data-note">الإجابة: {question.choices[question.correct_choice ?? 0]}</p>}
             {question.kind === "multiple_select" && <p className="data-note">
               الإجابات: {(question.answer_key as number[] | null)?.map((index) => question.choices[index]).join("، ")}
+            </p>}
+            {question.kind === "ordering" && <p className="data-note">
+              الترتيب الصحيح: {(question.answer_key as string[] | null)?.join(" ← ")}
             </p>}
             {item.status !== "closed" && item.status !== "archived" && <div className="actions">
               <button type="button" className="text-button" onClick={() => beginQuestionEdit(question)}>تعديل</button>
@@ -728,6 +740,12 @@ export function AssessmentsPanel({
                 onChange={(event) => setQuestionForm({ ...questionForm, choices: event.target.value })} /></label>
               <label>أرقام الإجابات الصحيحة، بدءاً من صفر<input value={questionForm.correctIndexes}
                 onChange={(event) => setQuestionForm({ ...questionForm, correctIndexes: event.target.value })} /></label>
+            </>}
+            {questionForm.kind === "ordering" && <>
+              <label>العناصر المطلوب ترتيبها — كل عنصر في سطر<textarea rows={4} value={questionForm.choices}
+                onChange={(event) => setQuestionForm({ ...questionForm, choices: event.target.value })} /></label>
+              <label>الترتيب الصحيح — أعد كتابة العناصر بالترتيب<textarea rows={4} value={questionForm.orderingAnswers}
+                onChange={(event) => setQuestionForm({ ...questionForm, orderingAnswers: event.target.value })} /></label>
             </>}
             {questionForm.kind === "matching" && <>
               <label>العناصر المطلوب مطابقتها — كل عنصر في سطر<textarea rows={3} value={questionForm.choices}
@@ -782,6 +800,8 @@ export function AssessmentsPanel({
           </p>}
           {attempt.questions.map((question, index) => {
             const value = answers[question.id];
+            const orderedChoices = question.kind === "ordering" && Array.isArray(value)
+              ? value as string[] : question.choices;
             return <fieldset className="learn-exercise" key={question.id} disabled={saving}>
               <legend>{index + 1}. {question.prompt} · {question.points} درجة</legend>
               {(question.kind === "multiple_choice" || question.kind === "true_false") && question.choices.map((choice, choiceIndex) =>
@@ -803,6 +823,22 @@ export function AssessmentsPanel({
                   {choice}
                 </label>;
               })}
+              {question.kind === "ordering" && orderedChoices.map((choice, choiceIndex) =>
+                <div className="actions" key={choice}>
+                  <span>{choiceIndex + 1}. {choice}</span>
+                  <button type="button" className="text-button" disabled={saving || submitted || choiceIndex === 0}
+                    onClick={() => {
+                      const next = [...orderedChoices];
+                      [next[choiceIndex - 1], next[choiceIndex]] = [next[choiceIndex], next[choiceIndex - 1]];
+                      setAnswers({ ...answers, [question.id]: next });
+                    }}>↑</button>
+                  <button type="button" className="text-button" disabled={saving || submitted || choiceIndex === orderedChoices.length - 1}
+                    onClick={() => {
+                      const next = [...orderedChoices];
+                      [next[choiceIndex], next[choiceIndex + 1]] = [next[choiceIndex + 1], next[choiceIndex]];
+                      setAnswers({ ...answers, [question.id]: next });
+                    }}>↓</button>
+                </div>)}
               {question.kind === "matching" && Array.from({ length: question.choices.length / 2 }, (_, pairIndex) => {
                 const left = question.choices[pairIndex];
                 const rightOptions = question.choices.slice(question.choices.length / 2);
