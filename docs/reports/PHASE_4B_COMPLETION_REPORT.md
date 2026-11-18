@@ -5,6 +5,29 @@ accepted. The production manifest remains `release_ready=false`; no SQL,
 Edge Function, website or mobile deployment has been performed. Phase 7-M
 commit `7de6eeff03e2552be7bf7243e79da57c0abe7f6b` remains local and unpushed.
 
+## Functional completion sprint refresh — 18 November 2026
+
+The latest local assessment work adds scheduling windows, timed attempts,
+attempt and passing limits, stable randomized question order, individual
+assignment, assessment duplication, lifecycle state guards, a categorized
+reusable question bank, multiple-select and ordering questions, teacher
+previews, and debounced answer autosave in React and Flutter. Closing an
+assessment now preserves attempts and permits later result release; eligible
+students and verified parents can view its closed history without restarting
+it. These changes remain an additive SQL deployment proposal and are not
+deployed to Supabase Main.
+
+| Workstream | Starting status | Existing functionality reused | Sprint implementation and files | Verification performed | Remaining limitation / status |
+|---|---|---|---|---|---|
+| A — assessment management | PARTIAL; draft/publish, attempts, grading and integrity protections existed | Shared `learning_exercise_questions`, lesson/course authorization, isolated PostgreSQL harness and current React/Flutter assessment screens | Added assessment schedule/limits, targeted assignments, duplication, lifecycle handling, categorized bank/import RPCs, multiple-select and ordering data/answers, learner previews, autosave and closed-history access. Updated `supabase/deployment/phase4b-assessments/001_learning_assessments.sql`, `supabase/tests/learning_assessments_behavior.sql`, React assessment service/panel, Flutter `live_assessments.dart`, and focused web/mobile tests. | `python supabase/tests/run_learning_assessments.py`: PASS including concurrency, timed finalization, answer-key protection, bank access denial/import, multi-select/order grading, autosave resume, closure/history visibility and restart denial. `node --test web/tests/learning-assessment-workflow.test.cjs`: 10/10 PASS. `npm run type-check`: PASS. Flutter focused analysis: no issues; assessment settings tests: 2/2 PASS. | PARTIAL for Phase 4B acceptance: SQL remains proposal-only; full regression/build suites and live acceptance are pending. |
+
+Current sprint commits on local `main` (not pushed): `54deda5`, `42c85a6`,
+`b6cccbf`, `77088f7`, `bbf71e3`, `d759e3b`, `4dd16e2`, and `6d695b2`.
+The next unimplemented mandatory requirement is Workstream B's full reusable
+exercise engine across student-facing React and Flutter clients, including
+image/audio questions and specialized Chinese character, pinyin, tone,
+translation and sentence-arrangement interactions.
+
 The starting point was the existing uncommitted assessment and homework work,
 including the assessment question-locking and practice-isolation changes.
 The checklist below records implementation and evidence, not an assertion that
@@ -13,8 +36,9 @@ untested requirements are absent from every part of the application.
 ## Master checkpoint checklist
 
 - [x] Checkpoint 01 — PASS: web migration regression corrected and validated.
-- [ ] Checkpoint 02 — PARTIAL: assessment integrity improved; required lifecycle
-  and assignment workflows remain.
+- [ ] Checkpoint 02 — PARTIAL: management, assignments, schedules, duplication,
+  categorized question reuse, autosave and closed history implemented/tested;
+  SQL remains undeployed and comprehensive acceptance remains.
 - [ ] Checkpoint 03 — PARTIAL: practice and formal assessment separation tested;
   required exercise catalog is incomplete.
 - [ ] Checkpoint 04 — PARTIAL: existing homework reused; full lifecycle and
@@ -35,8 +59,8 @@ untested requirements are absent from every part of the application.
 | Checkpoint | Starting status and reused functionality | Implementation and files changed in this work | Tests and actual results | Missing work / final status |
 |---|---|---|---|---|
 | 01 Web regression | One of 105 web tests failed because it assumed historical migrations were the latest. Reused the migration lock, integrity validator and deployment manifest. | Updated `web/tests/phase2c-migration-review.test.cjs` to check full migration/lock inventory and checksums, unique versions, pinned historical hashes and relative order, deployment dependency order, pinned SQL package paths, and Phase 4B exclusion/NO-GO without assuming no later migrations. Existing SQL security assertions remain. | Focused test: 3/3 passed. `npm --prefix web test`: 105/105 passed, none skipped. `python supabase/tools/validate_migrations.py --base-ref origin/main`: passed. `python supabase/tests/test_migration_validation.py`: 6/6 passed, including migration and manifest tamper cases. | **PASS.** Future additive migrations remain supported when included in the lock and integrity review. |
-| 02 Assessments | Partial: existing SQL proposal and web/mobile assessment screens support draft/publish, several question kinds, attempts, objective and written grading. | Preserved question locking and practice separation; restricted direct question-bank reads; enforced real-time deadlines; added a deletion guard that prevents published assessments and their grading history from being cascaded away. Changed `supabase/deployment/phase4b-assessments/001_learning_assessments.sql` and `supabase/tests/learning_assessments_behavior.sql`. | Isolated assessment suite passed: student/parent question-bank denial, authorized attempt, deadline during long transactions, duplicate submission, max grade, attempt limit, question mutation, concurrent start/insert, direct delete denial and trigger-level history preservation. | **PARTIAL.** Scheduling windows, time limits, lifecycle states, duplication, assignments, snapshots/versioning where needed and complete authorization/concurrency acceptance remain. |
-| 03 Interactive exercises | Partial: scored vocabulary/listening practice and five assessment kinds exist. | Reused the pending filters in `src/portal/lib/exercises.ts` and `mobile/lib/ui/live_courses.dart` and the practice RPC changes in the SQL proposal. | Isolated tests exercised the actual historical scored-practice migration and confirmed practice grading/admin reads exclude assessment questions; web practice tests passed. | **PARTIAL.** Multiple answers, ordering, media, specialized Chinese exercise types, feedback/review and reusable cross-client coverage are not complete. |
+| 02 Assessments | Partial: existing SQL proposal and React/Flutter screens support attempts and objective/written grading. | Preserved question locking, practice separation and answer-key protections; reused the common question table and native PostgreSQL harness. | Added scheduled/timed attempts, random-order snapshots, assignments, duplication, lifecycle guards, categorized reusable questions, multiple-select and ordering types, teacher previews, debounced autosave, closed history access. Updated the assessment SQL proposal, native behavior tests, React service/panel, Flutter assessment page and focused tests. | Isolated assessment suite PASS, including timeouts, concurrency, protected question-bank import/denial, multiple-answer and ordering grading, save/resume, closure/result release and history access. Focused web workflow tests 10/10; TypeScript check PASS; Flutter focused analysis clean and settings tests 2/2. | **PARTIAL.** SQL is not deployed; all-role/device acceptance and full regression/build suites remain. |
+| 03 Interactive exercises | Partial: scored vocabulary/listening practice and five assessment kinds existed. | Reused the common question/answer table, server-side grading and existing practice separation. | Added validated multiple-select and ordering questions to the shared assessment contract and both student clients, with server-side correctness checks and focused tests. | Native PostgreSQL acceptance and focused web/mobile checks passed as recorded for Checkpoint 02. | **PARTIAL.** Image/audio authoring and rendering, Chinese character/pinyin/tone, translation, sentence-arrangement and full reusable practice-engine coverage remain. |
 | 04 Homework | Partial: existing homework screens, private attachment proposal and text/file submissions. | Reused existing homework guard and storage policies; no new homework feature was claimed complete. | Isolated assessment suite exercised protected homework grading. Web homework file tests passed as part of 105/105. | **PARTIAL.** Full lifecycle, multiple attachments, resubmission, notifications and managed Storage acceptance remain unverified/incomplete. |
 | 05 Grading and analytics | Partial: objective and written grading, homework grading, progress views and exports exist. | Reused existing grading and progress contracts; added an invalid written-score regression in `supabase/tests/learning_assessments_behavior.sql`. | Isolated assessment suite passed automatic grading, written grading and score-bound checks. | **PARTIAL.** Multiple-answer/partial scoring, grade corrections, audit/history, comprehensive analytics and reporting remain. |
 | 06 Role-based web/mobile integration | Partial: existing React and Flutter learning, assessment and homework screens. | Reused current clients and practice filters; no claim of complete parity. Relevant files include `src/portal/pages/learning/AssessmentsPanel.tsx` and `mobile/lib/ui/live_assessments.dart`. | Web type-check and lint passed; Flutter analysis reported no issues and 61 tests passed in this run; all 105 web tests passed. | **PARTIAL.** Full role/branch isolation, content-editor contract, accessibility, responsive and cross-client acceptance remain. |
@@ -49,8 +73,8 @@ untested requirements are absent from every part of the application.
 
 | Requirement area | Local classification | Production / live classification |
 |---|---|---|
-| Assessment management, integrity and grading history | PARTIAL | PRODUCTION DEPLOYMENT PENDING |
-| Interactive exercise types and Phase 4C interfaces | PARTIAL | PRODUCTION DEPLOYMENT PENDING |
+| Assessment management, integrity and grading history | PARTIAL; sprint features locally tested, SQL proposal only | PRODUCTION DEPLOYMENT PENDING |
+| Interactive exercise types and Phase 4C interfaces | PARTIAL; multiple-select and ordering added; requested catalog incomplete | PRODUCTION DEPLOYMENT PENDING |
 | Homework lifecycle and private attachment behavior | PARTIAL | PRODUCTION DEPLOYMENT PENDING |
 | Scoring, learning analytics and reports | PARTIAL | PRODUCTION DEPLOYMENT PENDING |
 | Teacher, student and parent portals | PARTIAL | PRODUCTION DEPLOYMENT PENDING |
@@ -155,8 +179,7 @@ homework, teacher analytics, parent reports or exercise catalog.
   changed. No GitHub push was performed or verified. No generated APK, private
   key, `live.json`, build output, database dump, or temporary cluster was
   staged.
-- Local implementation gaps: assessment scheduling/assignment/lifecycle
-  breadth; remaining question types and media; complete homework lifecycle;
+- Local implementation gaps: remaining question types and media; complete homework lifecycle;
   analytics and report coverage; and full role/branch parity.
 - Testing gaps: comprehensive all-role negative authorization, hosted Storage
   acceptance, cross-client persistence and device acceptance. All recorded
