@@ -128,7 +128,7 @@
     },
     {
       "path": "supabase/tests/phase3b-main/run_local.py",
-      "sha256": "88ce9bfbafd31ca342c241a85ad602271b3b38e195e8e41fe85e325d475f3669"
+      "sha256": "5ad9aab1c5e07d4d8cdd2c56fdf361c2eb7450d8f71556046092431421b8b307"
     },
     {
       "path": "supabase/tests/phase3b-main/fixtures.sql",
@@ -148,7 +148,7 @@
     },
     {
       "path": "supabase/tests/run_native_contracts.py",
-      "sha256": "868b1e41f00779103be930f540e0f2289ad5ae8e5a3ce2dd74cc181d2200ccbc"
+      "sha256": "3497b40a1b073ad9526fbbbe0fa128105fae37a3c867bd02f6e315fba9f0b71e"
     },
     {
       "path": "supabase/tests/test_migration_validation.py",
