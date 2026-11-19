@@ -1,15 +1,37 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/assessment_settings.dart';
 import 'components.dart';
 
 const _questionKinds = <String, String>{
   'multiple_choice': 'اختيار من متعدد',
+  'multiple_select': 'اختر جميع الإجابات الصحيحة',
+  'ordering': 'ترتيب العناصر',
   'true_false': 'صح أو خطأ',
   'matching': 'مطابقة',
   'fill_blank': 'أكمل الفراغ',
   'written': 'إجابة كتابية',
 };
+
+String _assessmentStatusLabel(Object? status) => switch (status) {
+  'draft' => 'مسودة',
+  'published' => 'منشور',
+  'closed' => 'مغلق',
+  'archived' => 'مؤرشف',
+  _ => 'غير معروف',
+};
+
+bool _assessmentIsOpen(Map<String, dynamic> item) {
+  if (item['status'] != 'published') return false;
+  final now = DateTime.now().toUtc();
+  final startsAt = DateTime.tryParse('${item['starts_at'] ?? ''}');
+  final dueAt = DateTime.tryParse('${item['due_at'] ?? ''}');
+  return (startsAt == null || !now.isBefore(startsAt)) &&
+      (dueAt == null || !now.isAfter(dueAt));
+}
 
 class LiveAssessmentsPage extends StatefulWidget {
   const LiveAssessmentsPage({
@@ -33,15 +55,52 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
   late Future<List<Map<String, dynamic>>> _assessments;
   String? _openId;
   List<Map<String, dynamic>> _questions = [];
+  List<Map<String, dynamic>> _bankQuestions = [];
   List<Map<String, dynamic>> _results = [];
   Map<String, dynamic>? _attempt;
   Map<String, dynamic> _answers = {};
   bool _submitted = false;
   bool _busy = false;
+  Timer? _answerSaveTimer;
+  Future<void> _answerSaveQueue = Future<void>.value();
   String? _error;
   String? _notice;
 
   SupabaseClient get _client => Supabase.instance.client;
+
+  @override
+  void dispose() {
+    _answerSaveTimer?.cancel();
+    super.dispose();
+  }
+
+  void _setAnswer(String questionId, dynamic value) {
+    setState(() => _answers[questionId] = value);
+    final attemptId = _attempt?['attempt_id'] as String?;
+    if (attemptId == null || _submitted) return;
+    _answerSaveTimer?.cancel();
+    _answerSaveTimer = Timer(const Duration(milliseconds: 700), () async {
+      final snapshot = Map<String, dynamic>.from(_answers);
+      _answerSaveQueue = _answerSaveQueue
+          .then((_) async {
+            for (final entry in snapshot.entries) {
+              await _client.rpc(
+                'sai_learning_assessment_save',
+                params: {
+                  'p_attempt': attemptId,
+                  'p_question': entry.key,
+                  'p_answer': entry.value,
+                },
+              );
+            }
+          })
+          .catchError((Object error) {
+            if (mounted) {
+              setState(() => _error = 'تعذر حفظ الإجابة تلقائياً: $error');
+            }
+          });
+    });
+  }
 
   @override
   void initState() {
@@ -53,7 +112,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     _assessments = _client
         .from('learning_assessments')
         .select(
-          'id,course_id,lesson_id,title,instructions,due_at,attempt_limit,status,results_released',
+          'id,course_id,lesson_id,title,instructions,starts_at,due_at,time_limit_minutes,attempt_limit,passing_score,randomize_questions,status,results_released',
         )
         .eq('lesson_id', widget.lessonId)
         .order('created_at', ascending: false);
@@ -72,9 +131,30 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       _error = null;
       _notice = null;
       _questions = [];
+      _bankQuestions = [];
       _results = [];
     });
     await _loadDetail('${assessment['id']}');
+    if (widget.canManage) {
+      await _loadBank('${assessment['course_id']}');
+    }
+  }
+
+  Future<void> _loadBank(String courseId) async {
+    try {
+      final result = await _client.rpc(
+        'sai_learning_assessment_question_bank',
+        params: {'p_course': courseId, 'p_category': null},
+      );
+      if (result is! List) throw StateError('استجابة بنك الأسئلة غير صالحة.');
+      if (mounted) {
+        setState(
+          () => _bankQuestions = List<Map<String, dynamic>>.from(result),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = 'تعذر تحميل بنك الأسئلة: $error');
+    }
   }
 
   Future<void> _loadDetail(String id) async {
@@ -103,71 +183,114 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
   Future<void> _createAssessment() async {
     final title = TextEditingController();
     final instructions = TextEditingController();
+    final starts = TextEditingController();
     final deadline = TextEditingController();
+    final timeLimit = TextEditingController();
     final attempts = TextEditingController(text: '1');
+    final passingScore = TextEditingController(text: '70');
+    var randomizeQuestions = false;
     try {
-      final values = await showDialog<Map<String, String>>(
+      final values = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('إنشاء تقييم — مسودة'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: title,
-                  decoration: const InputDecoration(labelText: 'العنوان'),
-                ),
-                TextField(
-                  controller: instructions,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'التعليمات'),
-                ),
-                TextField(
-                  controller: deadline,
-                  decoration: const InputDecoration(
-                    labelText: 'موعد نهائي ISO اختياري',
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('إنشاء تقييم — مسودة'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: title,
+                    decoration: const InputDecoration(labelText: 'العنوان'),
                   ),
-                ),
-                TextField(
-                  controller: attempts,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'الحد الأقصى للمحاولات (١–١٠)',
+                  TextField(
+                    controller: instructions,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'التعليمات'),
                   ),
-                ),
-              ],
+                  TextField(
+                    controller: starts,
+                    decoration: InputDecoration(
+                      labelText: 'موعد البدء ISO اختياري',
+                    ),
+                  ),
+                  TextField(
+                    controller: deadline,
+                    decoration: const InputDecoration(
+                      labelText: 'موعد الإغلاق ISO اختياري',
+                    ),
+                  ),
+                  TextField(
+                    controller: timeLimit,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'مدة المحاولة بالدقائق (١–٣٠٠، اختياري)',
+                    ),
+                  ),
+                  TextField(
+                    controller: attempts,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'الحد الأقصى للمحاولات (١–١٠)',
+                    ),
+                  ),
+                  TextField(
+                    controller: passingScore,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'درجة الاجتياز (٠–١٠٠٪)',
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('ترتيب عشوائي ثابت لكل محاولة'),
+                    value: randomizeQuestions,
+                    onChanged: (value) => setDialogState(
+                      () => randomizeQuestions = value ?? false,
+                    ),
+                  ),
+                ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, {
+                  'title': title.text.trim(),
+                  'instructions': instructions.text.trim(),
+                  'starts': starts.text.trim(),
+                  'deadline': deadline.text.trim(),
+                  'timeLimit': timeLimit.text.trim(),
+                  'attempts': attempts.text.trim(),
+                  'passingScore': passingScore.text.trim(),
+                  'randomizeQuestions': randomizeQuestions,
+                }),
+                child: const Text('حفظ المسودة'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, {
-                'title': title.text.trim(),
-                'instructions': instructions.text.trim(),
-                'deadline': deadline.text.trim(),
-                'attempts': attempts.text.trim(),
-              }),
-              child: const Text('حفظ المسودة'),
-            ),
-          ],
         ),
       );
       if (values == null) return;
-      final limit = int.tryParse(values['attempts'] ?? '');
-      final due = values['deadline']?.isEmpty == true
-          ? null
-          : DateTime.tryParse(values['deadline']!)?.toUtc().toIso8601String();
-      if ((values['title'] ?? '').length < 2 ||
-          limit == null ||
-          limit < 1 ||
-          limit > 10 ||
-          (values['deadline']!.isNotEmpty && due == null)) {
-        throw StateError('راجع العنوان وموعد التسليم وعدد المحاولات.');
+      if ((values['title'] as String).length < 2 ||
+          (values['title'] as String).length > 200) {
+        throw const FormatException(
+          'عنوان التقييم يجب أن يكون بين حرفين و٢٠٠ حرف.',
+        );
       }
+      final settings = AssessmentSettings.fromInput(
+        startsAt: values['starts'] as String,
+        dueAt: values['deadline'] as String,
+        timeLimitMinutes: values['timeLimit'] as String,
+        attemptLimit: values['attempts'] as String,
+        passingScore: values['passingScore'] as String,
+        randomizeQuestions: values['randomizeQuestions'] as bool,
+      );
       await _client.from('learning_assessments').insert({
         'course_id': widget.courseId,
         'lesson_id': widget.lessonId,
@@ -175,8 +298,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
         'instructions': values['instructions']!.isEmpty
             ? null
             : values['instructions'],
-        'due_at': due,
-        'attempt_limit': limit,
+        ...settings.toJson(),
       });
       if (mounted) {
         setState(() {
@@ -189,8 +311,11 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     } finally {
       title.dispose();
       instructions.dispose();
+      starts.dispose();
       deadline.dispose();
+      timeLimit.dispose();
       attempts.dispose();
+      passingScore.dispose();
     }
   }
 
@@ -201,6 +326,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     String kind = '${current?['kind'] ?? 'multiple_choice'}';
     final prompt = TextEditingController(text: '${current?['prompt'] ?? ''}');
     final points = TextEditingController(text: '${current?['points'] ?? 1}');
+    final category = TextEditingController(
+      text: '${current?['bank_category'] ?? ''}',
+    );
     final choices = TextEditingController(
       text: current == null
           ? ''
@@ -253,7 +381,16 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                       ),
                       decoration: const InputDecoration(labelText: 'الدرجة'),
                     ),
-                    if (kind == 'multiple_choice' || kind == 'true_false')
+                    TextField(
+                      controller: category,
+                      maxLength: 80,
+                      decoration: const InputDecoration(
+                        labelText: 'تصنيف بنك الأسئلة (اختياري)',
+                      ),
+                    ),
+                    if (kind == 'multiple_choice' ||
+                        kind == 'multiple_select' ||
+                        kind == 'true_false')
                       TextField(
                         controller: choices,
                         minLines: 2,
@@ -262,13 +399,15 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                           labelText: 'الخيارات — كل خيار في سطر',
                         ),
                       ),
-                    if (kind == 'matching')
+                    if (kind == 'matching' || kind == 'ordering')
                       TextField(
                         controller: choices,
                         minLines: 2,
                         maxLines: 6,
-                        decoration: const InputDecoration(
-                          labelText: 'العناصر المطلوب مطابقتها',
+                        decoration: InputDecoration(
+                          labelText: kind == 'ordering'
+                              ? 'العناصر المطلوب ترتيبها'
+                              : 'العناصر المطلوب مطابقتها',
                         ),
                       ),
                     if (kind == 'fill_blank')
@@ -280,6 +419,13 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                           labelText: 'الإجابات المقبولة — كل إجابة في سطر',
                         ),
                       ),
+                    if (kind == 'multiple_select')
+                      TextField(
+                        controller: answer,
+                        decoration: const InputDecoration(
+                          labelText: 'أرقام الإجابات الصحيحة مفصولة بفواصل',
+                        ),
+                      ),
                     if (kind == 'matching')
                       TextField(
                         controller: answer,
@@ -287,6 +433,15 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                         maxLines: 6,
                         decoration: const InputDecoration(
                           labelText: 'الإجابات المطابقة بالترتيب نفسه',
+                        ),
+                      ),
+                    if (kind == 'ordering')
+                      TextField(
+                        controller: answer,
+                        minLines: 2,
+                        maxLines: 6,
+                        decoration: const InputDecoration(
+                          labelText: 'الترتيب الصحيح — كل عنصر في سطر',
                         ),
                       ),
                     if (kind == 'multiple_choice' || kind == 'true_false')
@@ -313,6 +468,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                   'kind': kind,
                   'prompt': prompt.text.trim(),
                   'points': double.tryParse(points.text),
+                  'category': category.text.trim(),
                   'choices': choices.text,
                   'answer': answer.text,
                   'correct': correct,
@@ -337,7 +493,19 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
           .toList();
       List<String> options = left;
       dynamic key;
-      if (kindValue == 'matching') {
+      if (kindValue == 'ordering') {
+        options = left;
+        key = other;
+      } else if (kindValue == 'multiple_select') {
+        options = left;
+        key =
+            other
+                .expand((value) => value.split(','))
+                .map((value) => int.tryParse(value.trim()))
+                .whereType<int>()
+                .toList()
+              ..sort();
+      } else if (kindValue == 'matching') {
         options = [...left, ...other];
         key = {
           for (var index = 0; index < left.length; index++)
@@ -352,7 +520,8 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       final numericPoints = values['points'] as double?;
       if ((values['prompt'] as String).length < 2 ||
           numericPoints == null ||
-          numericPoints <= 0) {
+          numericPoints <= 0 ||
+          (values['category'] as String).length > 80) {
         throw StateError('أدخل نص السؤال ودرجة صحيحة أكبر من صفر.');
       }
       final payload = {
@@ -367,6 +536,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
             : null,
         'answer_key': key,
         'points': numericPoints,
+        'bank_category': (values['category'] as String).isEmpty
+            ? null
+            : values['category'],
         'is_published': false,
       };
       if (current == null) {
@@ -393,12 +565,14 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
             .eq('assessment_id', assessmentId);
       }
       await _loadDetail(assessmentId);
+      await _loadBank(widget.courseId);
       if (mounted) setState(() => _notice = 'حُفظ السؤال.');
     } catch (error) {
       if (mounted) setState(() => _error = 'تعذر حفظ السؤال: $error');
     } finally {
       prompt.dispose();
       points.dispose();
+      category.dispose();
       choices.dispose();
       answer.dispose();
     }
@@ -406,6 +580,12 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
 
   String _answerText(Map<String, dynamic> question) {
     final key = question['answer_key'];
+    if (question['kind'] == 'ordering' && key is List) {
+      return key.join('\n');
+    }
+    if (question['kind'] == 'multiple_select' && key is List) {
+      return key.join(',');
+    }
     if (key is Map) {
       return (question['choices'] as List)
           .take((question['choices'] as List).length ~/ 2)
@@ -416,20 +596,46 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     return '';
   }
 
-  Future<void> _toggleStatus(Map<String, dynamic> item) async {
+  Future<void> _changeStatus(Map<String, dynamic> item, String status) async {
     try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(switch (status) {
+            'published' => 'نشر التقييم؟',
+            'closed' => 'إغلاق التقييم؟',
+            'archived' => 'أرشفة التقييم؟',
+            _ => 'إعادة التقييم إلى المسودات؟',
+          }),
+          content: const Text(
+            'سيُطبّق التغيير على الطلاب المعيّنين وفق صلاحياتهم.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('تأكيد'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
       await _client
           .from('learning_assessments')
-          .update({
-            'status': item['status'] == 'published' ? 'draft' : 'published',
-          })
+          .update({'status': status})
           .eq('id', item['id']);
       if (mounted) {
         setState(() {
           _reload();
-          _notice = item['status'] == 'published'
-              ? 'أُوقف نشر التقييم.'
-              : 'نُشر التقييم.';
+          _notice = switch (status) {
+            'published' => 'نُشر التقييم.',
+            'closed' => 'أُغلق التقييم ومنع بدء محاولات جديدة.',
+            'archived' => 'أُرشف التقييم.',
+            _ => 'أُعيد التقييم إلى المسودات.',
+          };
         });
       }
     } catch (error) {
@@ -442,82 +648,128 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     final instructions = TextEditingController(
       text: '${item['instructions'] ?? ''}',
     );
+    final starts = TextEditingController(text: '${item['starts_at'] ?? ''}');
     final deadline = TextEditingController(text: '${item['due_at'] ?? ''}');
+    final timeLimit = TextEditingController(
+      text: '${item['time_limit_minutes'] ?? ''}',
+    );
     final attempts = TextEditingController(
       text: '${item['attempt_limit'] ?? 1}',
     );
+    final passingScore = TextEditingController(
+      text: '${item['passing_score'] ?? 70}',
+    );
+    var randomizeQuestions = item['randomize_questions'] == true;
     try {
-      final values = await showDialog<Map<String, String>>(
+      final values = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('تعديل التقييم'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: title,
-                  decoration: const InputDecoration(labelText: 'العنوان'),
-                ),
-                TextField(
-                  controller: instructions,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'التعليمات'),
-                ),
-                TextField(
-                  controller: deadline,
-                  decoration: const InputDecoration(
-                    labelText: 'موعد نهائي ISO اختياري',
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('تعديل التقييم'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: title,
+                    decoration: const InputDecoration(labelText: 'العنوان'),
                   ),
-                ),
-                TextField(
-                  controller: attempts,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'الحد الأقصى للمحاولات (١–١٠)',
+                  TextField(
+                    controller: instructions,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'التعليمات'),
                   ),
-                ),
-              ],
+                  TextField(
+                    controller: starts,
+                    decoration: const InputDecoration(
+                      labelText: 'موعد البدء ISO اختياري',
+                    ),
+                  ),
+                  TextField(
+                    controller: deadline,
+                    decoration: const InputDecoration(
+                      labelText: 'موعد الإغلاق ISO اختياري',
+                    ),
+                  ),
+                  TextField(
+                    controller: timeLimit,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'مدة المحاولة بالدقائق (١–٣٠٠، اختياري)',
+                    ),
+                  ),
+                  TextField(
+                    controller: attempts,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'الحد الأقصى للمحاولات (١–١٠)',
+                    ),
+                  ),
+                  TextField(
+                    controller: passingScore,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'درجة الاجتياز (٠–١٠٠٪)',
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('ترتيب عشوائي ثابت لكل محاولة'),
+                    value: randomizeQuestions,
+                    onChanged: (value) => setDialogState(
+                      () => randomizeQuestions = value ?? false,
+                    ),
+                  ),
+                ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, {
+                  'title': title.text.trim(),
+                  'instructions': instructions.text.trim(),
+                  'starts': starts.text.trim(),
+                  'deadline': deadline.text.trim(),
+                  'timeLimit': timeLimit.text.trim(),
+                  'attempts': attempts.text.trim(),
+                  'passingScore': passingScore.text.trim(),
+                  'randomizeQuestions': randomizeQuestions,
+                }),
+                child: const Text('حفظ'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, {
-                'title': title.text.trim(),
-                'instructions': instructions.text.trim(),
-                'deadline': deadline.text.trim(),
-                'attempts': attempts.text.trim(),
-              }),
-              child: const Text('حفظ'),
-            ),
-          ],
         ),
       );
       if (values == null) return;
-      final limit = int.tryParse(values['attempts'] ?? '');
-      final due = values['deadline']?.isEmpty == true
-          ? null
-          : DateTime.tryParse(values['deadline']!)?.toUtc().toIso8601String();
-      if ((values['title'] ?? '').length < 2 ||
-          limit == null ||
-          limit < 1 ||
-          limit > 10 ||
-          (values['deadline']!.isNotEmpty && due == null)) {
-        throw StateError('راجع العنوان وموعد التسليم وعدد المحاولات.');
+      final titleValue = values['title'] as String;
+      if (titleValue.length < 2 || titleValue.length > 200) {
+        throw const FormatException(
+          'عنوان التقييم يجب أن يكون بين حرفين و٢٠٠ حرف.',
+        );
       }
+      final settings = AssessmentSettings.fromInput(
+        startsAt: values['starts'] as String,
+        dueAt: values['deadline'] as String,
+        timeLimitMinutes: values['timeLimit'] as String,
+        attemptLimit: values['attempts'] as String,
+        passingScore: values['passingScore'] as String,
+        randomizeQuestions: values['randomizeQuestions'] as bool,
+      );
       await _client
           .from('learning_assessments')
           .update({
-            'title': values['title'],
-            'instructions': values['instructions']!.isEmpty
+            'title': titleValue,
+            'instructions': (values['instructions'] as String).isEmpty
                 ? null
                 : values['instructions'],
-            'due_at': due,
-            'attempt_limit': limit,
+            ...settings.toJson(),
           })
           .eq('id', item['id'])
           .select('id');
@@ -532,8 +784,120 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     } finally {
       title.dispose();
       instructions.dispose();
+      starts.dispose();
       deadline.dispose();
+      timeLimit.dispose();
       attempts.dispose();
+      passingScore.dispose();
+    }
+  }
+
+  Future<void> _duplicateAssessment(String assessmentId) async {
+    try {
+      await _client.rpc(
+        'sai_learning_assessment_duplicate',
+        params: {'p_assessment': assessmentId, 'p_title': null},
+      );
+      if (mounted) {
+        setState(() {
+          _reload();
+          _notice = 'أُنشئت نسخة مسودة دون نسخ المحاولات أو الطلاب المعيّنين.';
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = 'تعذر نسخ التقييم: $error');
+    }
+  }
+
+  Future<void> _manageAssignments(String assessmentId) async {
+    try {
+      final response = await _client.rpc(
+        'sai_learning_assessment_roster',
+        params: {'p_assessment': assessmentId},
+      );
+      if (response is! List) {
+        throw StateError('استجابة قائمة الطلاب غير صالحة.');
+      }
+      final roster = List<Map<String, dynamic>>.from(response);
+      final selected = roster
+          .where((student) => student['assigned'] == true)
+          .map((student) => '${student['student_id']}')
+          .toSet();
+      if (!mounted) return;
+      final values = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('تعيين الطلاب'),
+            content: SizedBox(
+              width: 440,
+              child: roster.isEmpty
+                  ? const Text('لا يوجد طلاب نشطون في الصف.')
+                  : ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final student in roster)
+                          CheckboxListTile(
+                            title: Text('${student['full_name']}'),
+                            subtitle: Text('${student['admission_no']}'),
+                            value: selected.contains(
+                              '${student['student_id']}',
+                            ),
+                            onChanged: (checked) => setDialogState(() {
+                              final id = '${student['student_id']}';
+                              if (checked == true) {
+                                selected.add(id);
+                              } else {
+                                selected.remove(id);
+                              }
+                            }),
+                          ),
+                      ],
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء'),
+              ),
+              TextButton(
+                onPressed: roster.isEmpty
+                    ? null
+                    : () => Navigator.pop(context, {'classWide': true}),
+                child: const Text('الصف بالكامل'),
+              ),
+              FilledButton(
+                onPressed: selected.isEmpty
+                    ? null
+                    : () => Navigator.pop(context, {
+                        'classWide': false,
+                        'studentIds': selected.toList(),
+                      }),
+                child: const Text('حفظ التعيين'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (values == null) return;
+      await _client.rpc(
+        'sai_learning_assessment_assign',
+        params: {
+          'p_assessment': assessmentId,
+          'p_student_ids': values['classWide'] == true
+              ? <String>[]
+              : values['studentIds'],
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _notice = values['classWide'] == true
+              ? 'أُسند التقييم إلى الصف بالكامل.'
+              : 'حُفظ تعيين الطلاب.';
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = 'تعذر حفظ تعيين الطلاب: $error');
     }
   }
 
@@ -570,6 +934,110 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
     }
   }
 
+  Future<void> _addFromBank(String assessmentId, String questionId) async {
+    try {
+      await _client.rpc(
+        'sai_learning_assessment_add_from_bank',
+        params: {'p_assessment': assessmentId, 'p_question': questionId},
+      );
+      await _loadDetail(assessmentId);
+      if (mounted) setState(() => _notice = 'أُضيف سؤال البنك إلى المسودة.');
+    } catch (error) {
+      if (mounted) setState(() => _error = 'تعذر إضافة سؤال البنك: $error');
+    }
+  }
+
+  Future<void> _previewQuestions() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('معاينة عرض الطالب'),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0; index < _questions.length; index++)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${index + 1}. ${_questions[index]['prompt']} · '
+                            '${_questions[index]['points']} درجة',
+                          ),
+                          if (_questions[index]['kind'] == 'multiple_choice' ||
+                              _questions[index]['kind'] == 'true_false')
+                            for (final choice
+                                in _questions[index]['choices'] as List)
+                              ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.radio_button_off),
+                                title: Text('$choice'),
+                              ),
+                          if (_questions[index]['kind'] == 'multiple_select')
+                            for (final choice
+                                in _questions[index]['choices'] as List)
+                              ListTile(
+                                dense: true,
+                                leading: const Icon(
+                                  Icons.check_box_outline_blank,
+                                ),
+                                title: Text('$choice'),
+                              ),
+                          if (_questions[index]['kind'] == 'ordering')
+                            for (
+                              var order = 0;
+                              order <
+                                  (_questions[index]['choices'] as List).length;
+                              order++
+                            )
+                              ListTile(
+                                dense: true,
+                                title: Text(
+                                  '${order + 1}. '
+                                  '${(_questions[index]['choices'] as List)[order]}',
+                                ),
+                              ),
+                          if (_questions[index]['kind'] == 'fill_blank')
+                            const TextField(
+                              enabled: false,
+                              decoration: InputDecoration(
+                                hintText: 'إجابة الطالب',
+                              ),
+                            ),
+                          if (_questions[index]['kind'] == 'written')
+                            const TextField(
+                              enabled: false,
+                              maxLines: 3,
+                              decoration: InputDecoration(
+                                hintText: 'إجابة الطالب',
+                              ),
+                            ),
+                          if (_questions[index]['kind'] == 'matching')
+                            const Text('يختار الطالب مطابقة لكل عنصر.'),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_questions.isEmpty) const Text('أضف أسئلة لعرض المعاينة.'),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إغلاق'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _start(String assessmentId) async {
     setState(() {
       _busy = true;
@@ -587,7 +1055,14 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
         setState(() {
           _attempt = started;
           _answers = saved is Map ? Map<String, dynamic>.from(saved) : {};
+          _submitted = started['status'] != 'in_progress';
+          _notice = started['timed_out'] == true
+              ? 'انتهى الوقت وأُرسلت الإجابات المحفوظة تلقائياً.'
+              : 'ستظهر النتيجة بعد إتاحتها من المعلم.';
         });
+      }
+      if (started['timed_out'] == true) {
+        await _loadDetail(assessmentId);
       }
     } catch (error) {
       if (mounted) setState(() => _error = 'تعذر بدء التقييم: $error');
@@ -599,11 +1074,13 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
   Future<bool> _saveAttempt() async {
     final attemptId = _attempt?['attempt_id'] as String?;
     if (attemptId == null) return false;
+    _answerSaveTimer?.cancel();
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
+      await _answerSaveQueue;
       for (final entry in _answers.entries) {
         await _client.rpc(
           'sai_learning_assessment_save',
@@ -629,12 +1106,21 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
   Future<void> _submitAttempt(String assessmentId) async {
     final attemptId = _attempt?['attempt_id'] as String?;
     if (attemptId == null) return;
+    _answerSaveTimer?.cancel();
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      if (!await _saveAttempt()) return;
+      await _answerSaveQueue;
+      final expiresAt = DateTime.tryParse('${_attempt?['expires_at'] ?? ''}');
+      final expiredByClock =
+          expiresAt != null && !DateTime.now().toUtc().isBefore(expiresAt);
+      if (!await _saveAttempt() &&
+          !expiredByClock &&
+          !(_error?.contains('Assessment time limit has passed') ?? false)) {
+        return;
+      }
       final outcome = await _client.rpc(
         'sai_learning_assessment_submit',
         params: {'p_attempt': attemptId},
@@ -735,7 +1221,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       return RadioGroup<int>(
         groupValue: value is num ? value.toInt() : null,
         onChanged: (answer) {
-          if (!_submitted) setState(() => _answers[id] = answer);
+          if (!_submitted) _setAnswer(id, answer);
         },
         child: Column(
           children: [
@@ -747,6 +1233,67 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
               ),
           ],
         ),
+      );
+    }
+    if (kind == 'multiple_select') {
+      final selected = value is List
+          ? value.whereType<num>().map((item) => item.toInt()).toSet()
+          : <int>{};
+      return Column(
+        children: [
+          for (var index = 0; index < options.length; index++)
+            CheckboxListTile(
+              value: selected.contains(index),
+              title: Text(options[index]),
+              enabled: !_submitted,
+              onChanged: (checked) {
+                final next = {...selected};
+                if (checked == true) {
+                  next.add(index);
+                } else {
+                  next.remove(index);
+                }
+                _setAnswer(id, next.toList()..sort());
+              },
+            ),
+        ],
+      );
+    }
+    if (kind == 'ordering') {
+      final ordered = value is List ? List<String>.from(value) : options;
+      return Column(
+        children: [
+          for (var index = 0; index < ordered.length; index++)
+            ListTile(
+              title: Text('${index + 1}. ${ordered[index]}'),
+              trailing: Wrap(
+                children: [
+                  IconButton(
+                    onPressed: _submitted || index == 0
+                        ? null
+                        : () {
+                            final next = [...ordered];
+                            final item = next.removeAt(index);
+                            next.insert(index - 1, item);
+                            _setAnswer(id, next);
+                          },
+                    icon: const Icon(Icons.arrow_upward),
+                  ),
+                  IconButton(
+                    onPressed: _submitted || index == ordered.length - 1
+                        ? null
+                        : () {
+                            final next = [...ordered];
+                            final item = next.removeAt(index);
+                            next.insert(index + 1, item);
+                            _setAnswer(id, next);
+                          },
+                    icon: const Icon(Icons.arrow_downward),
+                  ),
+                ],
+              ),
+            ),
+        ],
       );
     }
     if (kind == 'matching') {
@@ -772,9 +1319,7 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                   .toList(),
               onChanged: _submitted
                   ? null
-                  : (choice) => setState(
-                      () => _answers[id] = {...answers, item: choice},
-                    ),
+                  : (choice) => _setAnswer(id, {...answers, item: choice}),
             ),
         ],
       );
@@ -788,40 +1333,90 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
       decoration: InputDecoration(
         labelText: kind == 'written' ? 'إجابتك الكتابية' : 'الإجابة',
       ),
-      onChanged: (answer) => _answers[id] = answer,
+      onChanged: (answer) => _setAnswer(id, answer),
     );
   }
 
   Widget _detail(Map<String, dynamic> item) {
     final id = '${item['id']}';
     if (widget.canManage) {
+      final status = '${item['status']}';
+      final canEditQuestions = status == 'draft' || status == 'published';
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Wrap(
             spacing: 8,
             children: [
-              TextButton(
-                onPressed: _busy ? null : () => _toggleStatus(item),
-                child: Text(
-                  item['status'] == 'published' ? 'إيقاف النشر' : 'نشر للطلاب',
+              if (status == 'draft')
+                TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () => _changeStatus(item, 'published'),
+                  child: const Text('نشر للطلاب'),
                 ),
-              ),
+              if (status == 'published')
+                TextButton(
+                  onPressed: _busy ? null : () => _changeStatus(item, 'closed'),
+                  child: const Text('إغلاق التقييم'),
+                ),
+              if (status == 'closed')
+                TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () => _changeStatus(item, 'archived'),
+                  child: const Text('أرشفة التقييم'),
+                ),
+              if (status != 'archived')
+                TextButton(
+                  onPressed: _busy ? null : () => _duplicateAssessment(id),
+                  child: const Text('نسخ التقييم'),
+                ),
+              if (status != 'closed' && status != 'archived')
+                TextButton(
+                  onPressed: _busy ? null : () => _manageAssignments(id),
+                  child: const Text('تعيين الطلاب'),
+                ),
               TextButton(
-                onPressed: _busy ? null : () => _toggleResults(item),
+                onPressed: _busy || status == 'draft' || status == 'archived'
+                    ? null
+                    : () => _toggleResults(item),
                 child: Text(
                   item['results_released'] == true
                       ? 'إخفاء النتائج'
                       : 'إتاحة النتائج',
                 ),
               ),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : () => _addQuestion(id),
-                icon: const Icon(Icons.add),
-                label: const Text('إضافة سؤال'),
-              ),
+              if (canEditQuestions)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _previewQuestions,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('معاينة الطالب'),
+                ),
+              if (canEditQuestions)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _addQuestion(id),
+                  icon: const Icon(Icons.add),
+                  label: const Text('إضافة سؤال'),
+                ),
             ],
           ),
+          if (status == 'draft' && _bankQuestions.isNotEmpty) ...[
+            const Text('أسئلة مصنفة قابلة لإعادة الاستخدام'),
+            for (final question in _bankQuestions)
+              ListTile(
+                title: Text('${question['prompt']}'),
+                subtitle: Text('${question['bank_category']}'),
+                trailing: canEditQuestions
+                    ? TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _addFromBank(id, '${question['id']}'),
+                        child: const Text('إضافة'),
+                      )
+                    : null,
+              ),
+          ],
           if (_questions.isEmpty)
             const Text('لا توجد أسئلة بعد. أضف سؤالاً قبل النشر.'),
           for (final question in _questions)
@@ -830,18 +1425,22 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
               subtitle: Text(
                 '${_questionKinds[question['kind']]} · ${question['points']} درجة',
               ),
-              trailing: PopupMenuButton<String>(
-                onSelected: (choice) {
-                  if (choice == 'edit') _addQuestion(id, current: question);
-                  if (choice == 'delete') {
-                    _deleteQuestion(id, '${question['id']}');
-                  }
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('تعديل')),
-                  PopupMenuItem(value: 'delete', child: Text('حذف')),
-                ],
-              ),
+              trailing: canEditQuestions
+                  ? PopupMenuButton<String>(
+                      onSelected: (choice) {
+                        if (choice == 'edit') {
+                          _addQuestion(id, current: question);
+                        }
+                        if (choice == 'delete') {
+                          _deleteQuestion(id, '${question['id']}');
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'edit', child: Text('تعديل')),
+                        PopupMenuItem(value: 'delete', child: Text('حذف')),
+                      ],
+                    )
+                  : null,
             ),
           const Divider(),
           const Text('المحاولات والتصحيح'),
@@ -871,11 +1470,20 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
 
     if (widget.canTake) {
       if (_attempt == null) {
+        final startsAt = DateTime.tryParse('${item['starts_at'] ?? ''}');
+        final waitingForStart =
+            startsAt != null && DateTime.now().toUtc().isBefore(startsAt);
         return Align(
           alignment: AlignmentDirectional.centerStart,
           child: FilledButton(
-            onPressed: _busy ? null : () => _start(id),
-            child: const Text('بدء أو استكمال المحاولة المحفوظة'),
+            onPressed: _busy || !_assessmentIsOpen(item)
+                ? null
+                : () => _start(id),
+            child: Text(
+              waitingForStart
+                  ? 'يفتح في ${item['starts_at']}'
+                  : 'بدء أو استكمال المحاولة المحفوظة',
+            ),
           ),
         );
       }
@@ -886,7 +1494,9 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_attempt!['due_at'] != null)
-            Text('موعد التسليم: ${_attempt!['due_at']}'),
+            Text('موعد الإغلاق: ${_attempt!['due_at']}'),
+          if (_attempt!['expires_at'] != null && !_submitted)
+            Text('تنتهي المحاولة: ${_attempt!['expires_at']}'),
           for (var index = 0; index < questions.length; index++)
             Card(
               child: Padding(
@@ -940,7 +1550,14 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
               title: Text(
                 'النتيجة: ${result['score']} من ${result['max_score']}',
               ),
-              subtitle: Text(result['feedback']?.toString() ?? ''),
+              subtitle: Text(
+                '${result['passed'] == null
+                    ? ''
+                    : result['passed'] == true
+                    ? 'مجتاز'
+                    : 'لم يجتز'}'
+                '${result['feedback'] == null ? '' : ' · ${result['feedback']}'}',
+              ),
             ),
       ],
     );
@@ -1000,8 +1617,11 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                       ListTile(
                         title: Text('${item['title']}'),
                         subtitle: Text(
-                          '${item['status'] == 'published' ? 'منشور' : 'مسودة'}'
+                          '${_assessmentStatusLabel(item['status'])}'
+                          '${item['starts_at'] == null ? '' : ' · يبدأ ${item['starts_at']}'}'
                           ' · ${item['attempt_limit']} محاولات'
+                          '${item['time_limit_minutes'] == null ? '' : ' · ${item['time_limit_minutes']} دقيقة'}'
+                          ' · الاجتياز ${item['passing_score'] ?? 70}%'
                           '${item['due_at'] == null ? '' : ' · ${item['due_at']}'}',
                         ),
                         trailing: widget.canManage
@@ -1009,11 +1629,13 @@ class _LiveAssessmentsPageState extends State<LiveAssessmentsPage> {
                                 onSelected: (choice) {
                                   if (choice == 'edit') _editAssessment(item);
                                 },
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('تعديل الإعدادات'),
-                                  ),
+                                itemBuilder: (_) => [
+                                  if (item['status'] == 'draft' ||
+                                      item['status'] == 'published')
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('تعديل الإعدادات'),
+                                    ),
                                 ],
                               )
                             : const Icon(Icons.chevron_left),

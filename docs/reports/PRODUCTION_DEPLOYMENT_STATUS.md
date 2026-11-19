@@ -2,6 +2,37 @@
 
 **Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
 
+## Final backend/synchronization follow-up — 19 November 2026
+
+- **Local configuration:** `.env.local`, `web/.env.local`, `mobile/config/live.json` and `supabase/target.local.json` are synchronized to Main, ignored and untracked. The browser uses only `VITE_PUBLIC_SUPABASE_URL`, `VITE_PUBLIC_SUPABASE_ANON_KEY` and `VITE_SAI_TARGET=production`; the existing supported publishable key is reused and never printed. No privileged key was introduced.
+- **Web architecture:** The root React app is authoritative and its Vite output is `out/`. Secondary `web/` dev/build/preview commands delegate to the root; the root GitHub workflow invokes the root build. The current GitHub workflows are checks-only, with no repository webhook, Actions deployment secrets/variables, Pages site, or deployment record. The public website loads but reports a CORS preflight failure to a non-Main Supabase function. The Hostinger panel could not be reached, so its external auto-deployment settings remain unverified; no changes were made to that other backend.
+- **Live read-only checks:** Supabase Main is `ACTIVE_HEALTHY`, PostgreSQL 17.11, with 16 recorded migrations and seven active Edge Functions at the manifest's expected versions. The publishable-key Auth health request returned HTTP 200. This is endpoint/key connectivity, not a signed-in user acceptance test.
+- **Migration status:** The 16 recorded versions are `001`–`006`, `008`–`014`, `20261110172940`, `20261110173339` and `20261110173506`. The package-receipt table is empty. The manifest validator and Phase 4B-exclusion test pass, but `release_ready=false`; live catalog checks show the examinations tables, mutation-hold state and atomic role-management RPC are still absent. Unreceipted production SQL steps are the mutation hold, Phase 3B role/teacher/onboarding, Phase 3C contact guard, Phase 4A examinations, and Phase 7M finance/settings packages; guard refresh, hold activation and coordinated Edge Functions are also not executed. Phase 7M admissions-tracking and event packages remain deferred. These are reviewed package candidates, not authorization to replay; the partial Phase 4B package remains outside the production manifest. No historical migration was replayed, no history was repaired, and no SQL or Edge function was deployed.
+- **Recovery and release blockers:** The latest local backup inventory is only a 17 November 2026 record (backup `2295604002`); its current managed status/PITR window was not freshly queried. The existing native PostgreSQL restore is not a Supabase-compatible platform restore. Fresh managed recovery evidence, isolated compatible-restore proof, external write-hold attestation, and hash-bound owner approval are still required.
+- **Git review:** At the start of this follow-up, local `main` was 12 commits ahead of `origin/main` (`af0c23bd1820472d014f43c1fe3d778996944fb2`) and had no divergence. Configuration/build corrections are committed locally as `9153079916433d32996857be951350d758c289b3`; all pre-existing commits were preserved, and no push was performed. No credential pattern was found in the unpublished diff. The only migration-package delta is the local/partial Phase 4B development proposal, excluded from the production manifest. No production operation was performed.
+
+**Latest local launch-preparation refresh — 18 November 2026:** A true/false
+lesson-practice flow was added and locally committed as
+`5c61b7b0d87df23a042d1b8fbf20915b741de31d`. The isolated assessment,
+native-contract, Phase 3B reconciliation, migration validation and six
+migration-tamper tests pass; TypeScript check/lint pass; web tests pass 112/112;
+Flutter analysis has no issues and Flutter tests pass 64/64. The React
+production build succeeds and the public output contains no secret API-key
+value or service-role JWT. The mobile publishable key passed a non-mutating
+Main Auth health check (HTTP 200); its value was not logged. Live `origin/main`
+matches the cached tracking ref; local `main` is clean, 11 commits ahead and
+0 behind. No push, backup creation, production write, deployment or live
+role workflow was performed.
+
+**Disposition remains NO-GO.** Phase 4B remains PARTIAL and Phase 4C is not
+started. The production manifest remains `release_ready=false`; production
+password/security findings, current recovery evidence and Supabase-compatible
+restore, external hosting/backend binding and security headers, hosted
+Storage, authenticated nine-role acceptance, and Android release signing
+remain open. `mobile/android/key.properties` is absent, so no signed release
+APK/AAB can be produced. This update supersedes earlier local suite counts
+and the earlier statement that mobile key project binding was unverified;
+it does not authorize or request production release approval.
 
 <!-- PHASE7M-CURRENT -->
 **18 November 2026 update — Phase 7-M:** The refreshed Main inventory is **57 local files / 57 GitHub Main files / 16 production history records**. All migration files match origin/main bytes at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. The earlier evidence below is historical wherever it differs. No production write, history repair or deployment occurred; Phase 4B remains paused.

@@ -39,6 +39,7 @@ class _FakeStore extends LessonStudyStore {
 
   List<Map<String, dynamic>> questions = const [];
   Map<String, dynamic>? quizOutcome;
+  List<Map<String, dynamic>>? lastSubmittedAnswers;
 
   @override
   Future<List<Map<String, dynamic>>> loadQuestions(String lessonId) async => questions;
@@ -48,6 +49,7 @@ class _FakeStore extends LessonStudyStore {
     String lessonId,
     List<Map<String, dynamic>> answers,
   ) async {
+    lastSubmittedAnswers = answers.map((answer) => Map<String, dynamic>.from(answer)).toList();
     writes.add('quiz:${answers.length}');
     return quizOutcome ?? {
       'total': answers.length,
@@ -226,6 +228,38 @@ void main() {
     expect(find.textContaining('النتيجة: 0 من 1'), findsOneWidget);
     expect(find.text('إعادة المحاولة'), findsWidgets);
     expect(find.textContaining('اجتزت تقييم'), findsNothing);
+  });
+
+  testWidgets('true/false exercises submit the selected choice for server grading', (
+    tester,
+  ) async {
+    final store = _FakeStore(
+      progress: {'status': 'in_progress', 'completion_basis': null},
+    )..questions = const [
+      {
+        'id': 'q-true-false',
+        'kind': 'true_false',
+        'prompt': 'الشمس نجم؟',
+        'choices': ['صح', 'خطأ'],
+        'position': 1,
+      },
+    ];
+    await tester.pumpWidget(MaterialApp(
+      home: LiveLessonPage(lesson: _lesson(), canTrack: true, store: store),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('صح'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'إرسال الإجابات (1 / 1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'إرسال الإجابات (1 / 1)'));
+    await tester.pumpAndSettle();
+
+    expect(store.lastSubmittedAnswers, [
+      {'question': 'q-true-false', 'choice': 0},
+    ]);
+    expect(find.textContaining('النتيجة: 1 من 1'), findsOneWidget);
   });
 }
 

@@ -171,6 +171,19 @@ drop policy if exists branch_memberships_update_self_or_super_admin on public.br
 create policy branch_memberships_update_super_admin on public.branch_memberships for update to authenticated
  using(private.sai_security_has_role('super_admin')) with check(private.sai_security_has_role('super_admin'));
 
+-- Browser-authored generic events are not trustworthy audit evidence.
+revoke insert on public.audit_logs from public,anon,authenticated;
+revoke insert(actor_user_id,action,entity_type,entity_id,metadata)
+ on public.audit_logs from public,anon,authenticated;
+drop policy if exists audit_logs_insert_self on public.audit_logs;
+
+-- These invoker RPCs resolve only trusted schemas when called with a mutable
+-- session search_path.
+alter function public.sai_library_issue(uuid,uuid,date)
+ set search_path = pg_catalog, public, auth;
+alter function public.sai_library_return(uuid)
+ set search_path = pg_catalog, public, auth;
+
 -- Existing policies already use private helpers. Close only the public layer.
 revoke execute on function public.sai_security_branch_member(uuid),public.sai_security_can_read_branch(uuid),
  public.sai_security_can_read_class(uuid),public.sai_security_can_read_session(uuid),

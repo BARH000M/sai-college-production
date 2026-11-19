@@ -10,6 +10,7 @@ def validate(root=ROOT,base_ref=None,release=False):
     errors=[]
     lock=json.loads((root/(BASE+'migration-lock.json')).read_text())
     entries=lock['migrations']; files=list((root/'supabase/migrations').glob('*.sql'))
+    archived_files=list((root/'supabase/archive/demo').glob('*.sql'))
     expected={e['filename']:e for e in entries}; seen=set()
     if len(expected)!=len(entries): errors.append('duplicate lock filenames')
     for p in files:
@@ -23,7 +24,19 @@ def validate(root=ROOT,base_ref=None,release=False):
         if e['version']!=version or digest(p,True)!=e['sha256_lf']: errors.append('checksum/version mismatch: '+p.name)
         if not p.read_text(encoding='utf-8-sig').strip() and not e['empty']: errors.append('empty migration: '+p.name)
         if release and (e['empty'] or e['classification']=='CONFLICTING'): errors.append('unresolved release migration: '+p.name)
-    for missing in set(expected)-{p.name for p in files}: errors.append('missing migration file: '+missing)
+    for p in archived_files:
+        match=re.fullmatch(r'(\d+)_[A-Za-z0-9_]+\.sql',p.name)
+        if not match: errors.append('invalid archived migration name: '+p.name); continue
+        version=match[1]
+        if version in seen: errors.append('duplicate migration version: '+version)
+        seen.add(version)
+        e=expected.get(p.name)
+        if e is None: errors.append('unreviewed archived migration: '+p.name); continue
+        if e['version']!=version or digest(p,True)!=e['sha256_lf']:
+            errors.append('archived checksum/version mismatch: '+p.name)
+        if e['history']: errors.append('applied migration stored in archive: '+p.name)
+    present={p.name for p in files}|{p.name for p in archived_files}
+    for missing in set(expected)-present: errors.append('missing migration file: '+missing)
     for n in range(1,32):
         if f'{n:03}' not in seen: errors.append(f'missing legacy version {n:03}')
     if base_ref:

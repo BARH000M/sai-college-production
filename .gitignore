@@ -82,3 +82,7 @@ auth-state*.json
 /supabase/tests/phase3b-main/main_baseline.sql
 # Accidental shell-output artifact (preserve locally)
 /t No Stripe or Firebase references found in src, web, or the root package.json.
+/web/.env.local
+/supabase/target.local.json
+/.env.local
+/.tsupgrader/

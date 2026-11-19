@@ -23,13 +23,13 @@ for (const name of ['AcademicAffairs', 'Timetable']) {
     if (name === 'AcademicAffairs') assert.equal((source.match(/type="button" disabled/g) ?? []).length, 4);
   });
 }
-test('project MCP is exclusively Preview read-only and backups are ignored', () => {
+test('project MCP is exclusively Main read-only and backups are ignored', () => {
   const config = JSON.parse(read('.mcp.json'));
-  assert.deepEqual(Object.keys(config.mcpServers), ['supabase-preview']);
-  const server = config.mcpServers['supabase-preview'];
+  assert.deepEqual(Object.keys(config.mcpServers), ['supabase-main']);
+  const server = config.mcpServers['supabase-main'];
   const url = new URL(server.url);
   assert.equal(url.origin, 'https://mcp.supabase.com');
-  assert.equal(url.searchParams.get('project_ref'), 'mgibjusuglafbnlrkbep');
+  assert.equal(url.searchParams.get('project_ref'), 'aeryusbrulqdxjdynwfh');
   assert.equal(url.searchParams.get('read_only'), 'true');
   assert.equal(server.command, undefined);
   assert.equal(server.headers, undefined);

@@ -41,3 +41,32 @@ test('both push workflows remain checks-only, without deployment credentials or 
     assert.doesNotMatch(workflow, /supabase (?:db push|functions deploy)|vercel|netlify|SUPABASE_ACCESS_TOKEN|SUPABASE_SERVICE_ROLE|environment: production/);
   }
 });
+
+test('all GitHub Actions are pinned to immutable commit hashes', () => {
+  for (const file of [
+    '.github/workflows/database-ci.yml',
+    '.github/workflows/mobile-ci.yml',
+    '.github/workflows/web-ci.yml',
+  ]) {
+    const actions = read(file).match(/^\s*(?:-\s*)?uses:\s+\S+/gm) ?? [];
+    assert.ok(actions.length > 0, `${file} has no actions to verify`);
+    for (const action of actions) {
+      assert.match(action, /@[0-9a-f]{40}$/i, `${file} contains a mutable action reference`);
+    }
+  }
+});
+
+test('root React app owns the production build and secondary web commands delegate to it', () => {
+  const rootPackage = JSON.parse(read('package.json'));
+  const webPackage = JSON.parse(read('web/package.json'));
+  assert.equal(rootPackage.scripts.build, 'vite build');
+  assert.equal(webPackage.scripts.dev, 'npm --prefix .. run dev');
+  assert.equal(webPackage.scripts.build, 'npm --prefix .. run build');
+  assert.equal(webPackage.scripts.preview, 'npm --prefix .. run preview');
+  assert.match(read('vite.config.ts'), /outDir:\s*['"]out['"]/);
+
+  const workflow = read('.github/workflows/web-ci.yml');
+  const productionJob = workflow.split('  secondary-web:')[0];
+  assert.match(productionJob, /- run: npm run build/);
+  assert.match(workflow, /root app is built in main-web/);
+});

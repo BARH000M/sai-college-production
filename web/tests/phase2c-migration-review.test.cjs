@@ -5,7 +5,18 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const root = path.resolve(__dirname, '../..');
 const read = file => fs.readFileSync(path.join(root,file),'utf8');
-const names = fs.readdirSync(path.join(root,'supabase/migrations')).filter(n => n.endsWith('.sql')).sort();
+const migrationDirectory = path.join(root, 'supabase/migrations');
+const migrationSources = new Map(
+  fs.readdirSync(migrationDirectory)
+    .filter(name => name.endsWith('.sql'))
+    .map(name => [name, path.join(migrationDirectory, name)]),
+);
+const relocatedDemoMigration = '017_demo_attendance_week.sql';
+const archivedDemoMigration = path.join(root, 'supabase/archive/demo', relocatedDemoMigration);
+assert.equal(migrationSources.has(relocatedDemoMigration), false, 'demo migration must stay out of production migrations');
+assert.equal(fs.existsSync(archivedDemoMigration), true, 'relocated demo migration is missing from the archive');
+migrationSources.set(relocatedDemoMigration, archivedDemoMigration);
+const names = [...migrationSources.keys()].sort();
 const phase3bProposals = [
   '20261116142308_atomic_role_management.sql',
   '20261116151509_branch_membership_write_lockdown.sql',
@@ -30,7 +41,7 @@ test('Main migration proposals remain separate from the Phase 2C baseline', () =
     const entry = locked.get(name);
     const version = name.split('_')[0];
     assert.equal(entry.version, version, `${name} version differs from the lock`);
-    const normalized = fs.readFileSync(path.join(root, 'supabase/migrations', name))
+    const normalized = fs.readFileSync(migrationSources.get(name))
       .toString('utf8').replace(/\r\n/g, '\n');
     assert.equal(crypto.createHash('sha256').update(normalized).digest('hex'), entry.sha256_lf,
       `${name} checksum differs from the lock`);

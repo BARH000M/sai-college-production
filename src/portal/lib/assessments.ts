@@ -2,6 +2,8 @@ import { supabase } from "./supabase";
 
 export const assessmentKinds = [
   "multiple_choice",
+  "multiple_select",
+  "ordering",
   "true_false",
   "matching",
   "fill_blank",
@@ -11,6 +13,8 @@ export const assessmentKinds = [
 export type AssessmentQuestionKind = typeof assessmentKinds[number];
 export const assessmentKindLabels: Record<AssessmentQuestionKind, string> = {
   multiple_choice: "اختيار من متعدد",
+  multiple_select: "اختر جميع الإجابات الصحيحة",
+  ordering: "ترتيب العناصر",
   true_false: "صح أو خطأ",
   matching: "مطابقة",
   fill_blank: "أكمل الفراغ",
@@ -25,9 +29,13 @@ export type LearningAssessment = {
   academic_session_id: string;
   title: string;
   instructions: string | null;
+  starts_at: string | null;
   due_at: string | null;
+  time_limit_minutes: number | null;
   attempt_limit: number;
-  status: "draft" | "published";
+  passing_score: number;
+  randomize_questions: boolean;
+  status: "draft" | "published" | "closed" | "archived";
   results_released: boolean;
   created_at: string;
 };
@@ -43,13 +51,18 @@ export type AssessmentQuestion = {
 
 export type AssessmentQuestionAdmin = AssessmentQuestion & {
   correct_choice: number | null;
-  answer_key: Record<string, string> | string[] | null;
+  answer_key: Record<string, string> | string[] | number[] | null;
+  bank_category: string | null;
 };
 
 export type AssessmentStart = {
   attempt_id: string;
   attempt_number: number;
   due_at: string | null;
+  expires_at: string | null;
+  passing_score: number;
+  status?: "in_progress" | "submitted" | "graded";
+  timed_out?: boolean;
   questions: AssessmentQuestion[];
   saved_answers: Record<string, unknown>;
 };
@@ -70,6 +83,15 @@ export type AssessmentResultRow = {
   feedback: string | null;
   prompt: string | null;
   kind: AssessmentQuestionKind | null;
+  passed: boolean | null;
+};
+
+export type AssessmentStudent = {
+  student_id: string;
+  full_name: string;
+  admission_no: string;
+  assigned: boolean;
+  class_wide: boolean;
 };
 
 function message(error: { message: string } | null, label: string): never {
@@ -100,7 +122,7 @@ export async function loadAssessments(lessonId: string): Promise<LearningAssessm
   if (!lessonId) return [];
   const { data, error } = await supabase
     .from("learning_assessments")
-    .select("id,course_id,lesson_id,class_id,academic_session_id,title,instructions,due_at,attempt_limit,status,results_released,created_at")
+    .select("id,course_id,lesson_id,class_id,academic_session_id,title,instructions,starts_at,due_at,time_limit_minutes,attempt_limit,passing_score,randomize_questions,status,results_released,created_at")
     .eq("lesson_id", lessonId)
     .order("created_at", { ascending: false });
   if (error) message(error, "تعذر تحميل التقييمات");
@@ -112,22 +134,23 @@ export async function createAssessment(input: {
   lessonId: string;
   title: string;
   instructions: string;
+  startsAt: string | null;
   dueAt: string | null;
+  timeLimitMinutes: number | null;
   attemptLimit: number;
+  passingScore: number;
+  randomizeQuestions: boolean;
 }): Promise<string> {
   const title = input.title.trim();
   if (!input.courseId || !input.lessonId) throw new Error("اختر المقرر والدرس.");
   if (title.length < 2 || title.length > 200) throw new Error("عنوان التقييم يجب أن يكون بين حرفين و٢٠٠ حرف.");
-  if (!Number.isInteger(input.attemptLimit) || input.attemptLimit < 1 || input.attemptLimit > 10) {
-    throw new Error("عدد المحاولات يجب أن يكون بين ١ و١٠.");
-  }
+  const settings = validatedSettings(input);
   const { data, error } = await supabase.from("learning_assessments").insert({
     course_id: input.courseId,
     lesson_id: input.lessonId,
     title,
     instructions: input.instructions.trim() || null,
-    due_at: input.dueAt,
-    attempt_limit: input.attemptLimit,
+    ...settings,
   }).select("id");
   if (error) message(error, "تعذر إنشاء التقييم");
   const id = data?.[0]?.id;
@@ -135,7 +158,10 @@ export async function createAssessment(input: {
   return id;
 }
 
-export async function setAssessmentStatus(id: string, status: "draft" | "published"): Promise<void> {
+export async function setAssessmentStatus(
+  id: string,
+  status: "draft" | "published" | "closed" | "archived",
+): Promise<void> {
   const { data, error } = await supabase.from("learning_assessments")
     .update({ status }).eq("id", id).select("id");
   if (error) message(error, status === "published" ? "تعذر نشر التقييم" : "تعذر إيقاف النشر");
@@ -146,22 +172,100 @@ export async function updateAssessment(input: {
   id: string;
   title: string;
   instructions: string;
+  startsAt: string | null;
   dueAt: string | null;
+  timeLimitMinutes: number | null;
   attemptLimit: number;
+  passingScore: number;
+  randomizeQuestions: boolean;
 }): Promise<void> {
   const title = input.title.trim();
   if (title.length < 2 || title.length > 200) throw new Error("عنوان التقييم يجب أن يكون بين حرفين و٢٠٠ حرف.");
-  if (!Number.isInteger(input.attemptLimit) || input.attemptLimit < 1 || input.attemptLimit > 10) {
-    throw new Error("عدد المحاولات يجب أن يكون بين ١ و١٠.");
-  }
+  const settings = validatedSettings(input);
   const { data, error } = await supabase.from("learning_assessments").update({
     title,
     instructions: input.instructions.trim() || null,
-    due_at: input.dueAt,
-    attempt_limit: input.attemptLimit,
+    ...settings,
   }).eq("id", input.id).select("id");
   if (error) message(error, "تعذر تعديل التقييم");
   if (!data?.length) throw new Error("لم يُحفظ تعديل التقييم.");
+}
+
+function validatedSettings(input: {
+  startsAt: string | null;
+  dueAt: string | null;
+  timeLimitMinutes: number | null;
+  attemptLimit: number;
+  passingScore: number;
+  randomizeQuestions: boolean;
+}) {
+  const startsAt = input.startsAt ? new Date(input.startsAt) : null;
+  const dueAt = input.dueAt ? new Date(input.dueAt) : null;
+  if ((startsAt && Number.isNaN(startsAt.getTime())) || (dueAt && Number.isNaN(dueAt.getTime()))) {
+    throw new Error("موعد التقييم غير صالح.");
+  }
+  if (startsAt && dueAt && startsAt >= dueAt) {
+    throw new Error("يجب أن يكون موعد الإغلاق بعد موعد البدء.");
+  }
+  if (!Number.isInteger(input.attemptLimit) || input.attemptLimit < 1 || input.attemptLimit > 10) {
+    throw new Error("عدد المحاولات يجب أن يكون بين ١ و١٠.");
+  }
+  if (input.timeLimitMinutes !== null
+    && (!Number.isInteger(input.timeLimitMinutes) || input.timeLimitMinutes < 1 || input.timeLimitMinutes > 300)) {
+    throw new Error("المدة يجب أن تكون بين دقيقة واحدة و٣٠٠ دقيقة.");
+  }
+  if (!Number.isFinite(input.passingScore) || input.passingScore < 0 || input.passingScore > 100) {
+    throw new Error("درجة الاجتياز يجب أن تكون بين صفر و١٠٠ بالمئة.");
+  }
+  if (typeof input.randomizeQuestions !== "boolean") {
+    throw new Error("إعداد ترتيب الأسئلة غير صالح.");
+  }
+  return {
+    starts_at: startsAt?.toISOString() ?? null,
+    due_at: dueAt?.toISOString() ?? null,
+    time_limit_minutes: input.timeLimitMinutes,
+    attempt_limit: input.attemptLimit,
+    passing_score: input.passingScore,
+    randomize_questions: input.randomizeQuestions,
+  };
+}
+
+export async function duplicateAssessment(id: string, title?: string): Promise<string> {
+  const { data, error } = await supabase.rpc("sai_learning_assessment_duplicate", {
+    p_assessment: id,
+    p_title: title?.trim() || null,
+  });
+  if (error) message(error, "تعذر نسخ التقييم");
+  if (typeof data !== "string") throw new Error("لم تُحفظ نسخة التقييم.");
+  return data;
+}
+
+export async function loadAssessmentRoster(id: string): Promise<AssessmentStudent[]> {
+  const { data, error } = await supabase.rpc("sai_learning_assessment_roster", {
+    p_assessment: id,
+  });
+  if (error) message(error, "تعذر تحميل طلاب الصف");
+  if (!Array.isArray(data)) throw new Error("استجابة قائمة الطلاب غير صالحة.");
+  return data.map((item) => {
+    const row = item as Record<string, unknown>;
+    if (typeof row.student_id !== "string" || typeof row.full_name !== "string"
+      || typeof row.admission_no !== "string" || typeof row.assigned !== "boolean"
+      || typeof row.class_wide !== "boolean") {
+      throw new Error("استجابة قائمة الطلاب غير صالحة.");
+    }
+    return row as AssessmentStudent;
+  });
+}
+
+export async function assignAssessmentStudents(id: string, studentIds: string[]): Promise<number> {
+  if (new Set(studentIds).size !== studentIds.length) throw new Error("قائمة الطلاب تحتوي على تكرار.");
+  const { data, error } = await supabase.rpc("sai_learning_assessment_assign", {
+    p_assessment: id,
+    p_student_ids: studentIds,
+  });
+  if (error) message(error, "تعذر حفظ تعيين الطلاب");
+  if (typeof data !== "number") throw new Error("لم يُحفظ تعيين الطلاب.");
+  return data;
 }
 
 export async function setAssessmentResultsReleased(id: string, resultsReleased: boolean): Promise<void> {
@@ -190,9 +294,46 @@ export async function loadAssessmentQuestionsAdmin(
     return {
       ...question,
       correct_choice: correctChoice as number | null,
-      answer_key: row.answer_key as Record<string, string> | string[] | null,
+      answer_key: row.answer_key as Record<string, string> | string[] | number[] | null,
+      bank_category: typeof row.bank_category === "string" ? row.bank_category : null,
     };
   });
+}
+
+export async function loadAssessmentQuestionBank(
+  courseId: string,
+): Promise<AssessmentQuestionAdmin[]> {
+  const { data, error } = await supabase.rpc("sai_learning_assessment_question_bank", {
+    p_course: courseId,
+    p_category: null,
+  });
+  if (error) message(error, "تعذر تحميل بنك الأسئلة");
+  if (!Array.isArray(data)) throw new Error("استجابة بنك الأسئلة غير صالحة.");
+  return data.map((item) => {
+    const row = item as Record<string, unknown>;
+    const question = parseQuestion(row);
+    if (typeof row.category !== "string" || !row.category.trim()) {
+      throw new Error("تصنيف سؤال البنك غير صالح.");
+    }
+    return {
+      ...question,
+      correct_choice: typeof row.correct_choice === "number" ? row.correct_choice : null,
+      answer_key: row.answer_key as Record<string, string> | string[] | number[] | null,
+      bank_category: row.category,
+    };
+  });
+}
+
+export async function addAssessmentQuestionFromBank(
+  assessmentId: string,
+  questionId: string,
+): Promise<void> {
+  const { data, error } = await supabase.rpc("sai_learning_assessment_add_from_bank", {
+    p_assessment: assessmentId,
+    p_question: questionId,
+  });
+  if (error) message(error, "تعذر إضافة سؤال البنك");
+  if (typeof data !== "string") throw new Error("لم يُضف سؤال بنك الأسئلة.");
 }
 
 export type AssessmentQuestionInput = {
@@ -201,15 +342,19 @@ export type AssessmentQuestionInput = {
   kind: AssessmentQuestionKind;
   prompt: string;
   points: number;
+  bankCategory?: string | null;
   choices: string[];
   correctChoice: number | null;
-  answerKey: Record<string, string> | string[] | null;
+  answerKey: Record<string, string> | string[] | number[] | null;
 };
 
 function questionPayload(input: AssessmentQuestionInput) {
   const prompt = input.prompt.trim();
+  const bankCategory = input.bankCategory?.trim() || null;
   const choices = input.choices.map((choice) => choice.trim());
+  let answerKey = input.answerKey;
   if (prompt.length < 2 || prompt.length > 200) throw new Error("نص السؤال يجب أن يكون بين حرفين و٢٠٠ حرف.");
+  if (bankCategory !== null && bankCategory.length > 80) throw new Error("التصنيف يجب ألا يتجاوز ٨٠ حرفاً.");
   if (!Number.isFinite(input.points) || input.points <= 0 || input.points > 1000) throw new Error("درجة السؤال يجب أن تكون أكبر من صفر وحتى ١٠٠٠.");
   if (input.kind === "multiple_choice" || input.kind === "true_false") {
     if (choices.length < 2 || choices.length > 6 || choices.some((item) => !item || item.length > 300)) {
@@ -218,6 +363,24 @@ function questionPayload(input: AssessmentQuestionInput) {
     if (input.kind === "true_false" && choices.length !== 2) throw new Error("سؤال الصح والخطأ يحتاج خيارين فقط.");
     if (!Number.isInteger(input.correctChoice) || input.correctChoice! < 0 || input.correctChoice! >= choices.length) {
       throw new Error("حدّد الإجابة الصحيحة.");
+    }
+  } else if (input.kind === "multiple_select") {
+    const indexes = Array.isArray(input.answerKey) ? input.answerKey : [];
+    if (choices.length < 2 || choices.length > 6 || !Array.isArray(input.answerKey)
+      || !indexes.length || !indexes.every((index): index is number =>
+        typeof index === "number" && Number.isInteger(index) && index >= 0
+        && index < choices.length)
+      || new Set(indexes).size !== indexes.length) {
+      throw new Error("حدّد إجابة واحدة أو أكثر من الخيارات.");
+    }
+    answerKey = [...indexes].sort((left, right) => left - right);
+  } else if (input.kind === "ordering") {
+    if (choices.length < 2 || choices.length > 10 || !Array.isArray(input.answerKey)
+      || input.answerKey.length !== choices.length
+      || !input.answerKey.every((value): value is string =>
+        typeof value === "string" && choices.includes(value))
+      || new Set(input.answerKey).size !== choices.length) {
+      throw new Error("يجب ترتيب جميع العناصر دون حذف أو تكرار.");
     }
   } else if (input.kind === "matching") {
     if (choices.length < 4 || choices.length > 12 || choices.length % 2 !== 0
@@ -250,8 +413,9 @@ function questionPayload(input: AssessmentQuestionInput) {
     correct_choice: input.kind === "multiple_choice" || input.kind === "true_false"
       ? input.correctChoice
       : null,
-    answer_key: input.answerKey,
+    answer_key: answerKey,
     points: input.points,
+    bank_category: bankCategory,
     is_published: false,
   };
 }
@@ -296,6 +460,10 @@ export async function startAssessment(id: string): Promise<AssessmentStart> {
     attempt_id: row.attempt_id,
     attempt_number: row.attempt_number,
     due_at: typeof row.due_at === "string" ? row.due_at : null,
+    expires_at: typeof row.expires_at === "string" ? row.expires_at : null,
+    passing_score: typeof row.passing_score === "number" ? row.passing_score : 70,
+    status: row.status === "submitted" || row.status === "graded" ? row.status : "in_progress",
+    timed_out: row.timed_out === true,
     questions: row.questions.map((question) => parseQuestion(question as Record<string, unknown>)),
     saved_answers: (row.saved_answers && typeof row.saved_answers === "object"
       ? row.saved_answers

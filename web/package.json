@@ -7,9 +7,9 @@
     "test": "node --test tests/*.test.cjs",
     "test:management:db": "node ..\\supabase\\tests\\run-wave1-local.cjs",
     "test:admissions:db": "node ..\\supabase\\tests\\run-wave1-local.cjs --admissions",
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "npm --prefix .. run dev",
+    "build": "npm --prefix .. run build",
+    "preview": "npm --prefix .. run preview"
   },
   "keywords": [],
   "author": "",
