@@ -1,6 +1,18 @@
 # Yemen SAI V2 — Building and production roadmap
 
-**Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
+**Current owner-directed priority — 20 November 2026:** Task 2 (Phases 5A–6B) is the exclusive active development scope. Phase 4B remains **PARTIAL**; defer its nonessential remainder. Defer Phase 4C until after core college launch. Stop Phase 7 preflight/audit work; do one final integration and release checkpoint after Task 2. Preserve all completed functionality. Do not modify production, push, or deploy during Task 2.
+
+| Module | Database implementation | React implementation | Flutter implementation | Authorization | Functional tests | Local commit | Remaining requirements |
+|---|---|---|---|---|---|---|---|
+| 5A HR | Employee directory implemented and isolated-SQL tested | Employee directory wired | Employee directory wired | Super Admin/Admin; branch RLS tested | Focused web, mobile and SQL tests pass | This local commit | Next: managed departments/designations; then contracts, documents, attendance, leave, payroll, salaries, payslips and reports |
+| 5B Student services | Pending | Pending | Pending | Pending | Pending | Pending | Requests, certificates, ID cards, letters, transcripts, CV, documents, downloads, PDF and print |
+| 5C Settings | Existing partial contract; requirements pending | Existing partial UI; pending | Existing partial UI; pending | Existing contract; verify behavior by setting | Pending | Pending | Implement and synchronize all 24 approved settings |
+| 5D Communications | Existing partial contract; pending | Existing partial UI; pending | Existing partial UI; pending | Pending | Pending | Pending | Announcements, messaging, templates, recipients, read states and workflow integration |
+| 5E Front CMS | Existing partial contract; pending | Existing partial UI; pending | Pending | Pending | Pending | Pending | Pages, programs, courses, news, events, galleries, admissions, menus, SEO and multilingual publishing |
+| 6A Operations | Existing partial contracts; pending | Existing partial UI; pending | Existing partial UI; pending | Pending | Pending | Pending | Library, inventory, warehouses, assets, transport, dormitories and accommodation |
+| 6B Advanced administration | Existing partial contracts; pending | Existing partial UI; pending | Existing partial UI; pending | Pending | Pending | Pending | Scholarships, aid, alumni, recruitment, applications, dashboards and printable reports |
+
+Tracker statuses describe newly verified implementation in this task, not historic claims. Update it after each coherent module; do not mark a module complete from navigation, placeholder UI, or an unverified schema alone.
 
 **Final backend/synchronization follow-up — 19 November 2026:** The four ignored local configuration files now share the Main URL and supported publishable key; the web variables match `src/portal/lib/supabase.ts` and set `VITE_SAI_TARGET=production`. The root React app remains authoritative, builds to `out/`, and `web/` dev/build/preview commands delegate to it. Focused integration tests, the secondary build, and the migration/manifest validator pass. The live Main project is `ACTIVE_HEALTHY` on PostgreSQL 17.11; read-only inventory confirms 16 recorded migrations and seven active Edge Functions at the expected versions. Auth health returned HTTP 200 with the local publishable key; no user sign-in was attempted.
 
@@ -183,24 +195,13 @@ The reference report's row-level classifications total 4 complete, 7 partial, 4 
 | 23 | Protected audit history | All phases |
 | 24 | Student/parent portal widgets with actual behavior | 5C |
 
-## 5. Immediate execution sequence — recovery-first
+## 5. Immediate execution sequence — Task 2
 
-### 7-R — Recovery and cutover readiness (active; operational gate, not a new feature phase)
-
-1. Preserve uncommitted Phase 4B and documentation changes. Verify `main`, HEAD, origin, project identity, backup inventory and current diff. Do not clean, reset, merge, or discard work. Check automated deployment hooks before any push.
-2. Obtain authorized read-only evidence of latest completed Main managed backup, PITR status and recovery window. If inaccessible, provide exact dashboard evidence required of the operator. Do not invent timestamps or request secrets in chat.
-3. Keep the successful application-scope native recovery rehearsal disposable and separate from any production restore. The original full restore had 56 errors; native roles were placeholders without original attributes, memberships or passwords. Auth, Storage object bytes, Edge runtimes/secrets, Cron, Vault and hosted extensions remain outside this recovery. Require operator-supported Supabase-compatible recovery and verified Storage/Edge restoration before any production change.
-4. Preserve the locally tested, disabled-by-default database hold and fail-closed Edge gates. Before any cutover, independently enforce and verify containment of legacy Edge ingress, direct API/RPC mutations, scheduled jobs and privileged/platform writers. Keep emergency Super Admin access and rehearse denial and release; do not activate the local hold on Main.
-5. Use the dry-run-first executor and pinned manifest in `supabase/deployment/phase7r/`; verify current backup/PITR, Supabase-compatible recovery, external hold, SQL/function hashes and owner approval bound to the exact manifest/executor/commit. Resolve Flutter failures, release signing and authenticated acceptance first. Do not replay migration history. Until every gate passes, report NO-GO and leave production unchanged.
-
-### Approved cutover sequence (future, after all gates pass)
-
-6. Activate and verify the approved write hold **before** SQL; deploy reviewed Phase 3B package `supabase/deployment/phase3b-main/01_role_contract.sql` → `02_teacher_assignment.sql` → `03_verified_onboarding.sql`, coordinated with `manage-roles`, `school-admin`, `provision-learning-account`, `link-student-account`. Exact Edge/SQL interleaving and dependencies must be proven before execution. Verify atomic roles, usable-super-admin protection, negative permission tests and authenticated cutover.
-7. Deploy Phase 3C `supabase/deployment/phase3c-main/001_own_contact_validation.sql`; verify own name/phone/locale, server timestamps, protected role/email and cross-client persistence.
-8. Deploy Phase 4A `supabase/deployment/phase4a-examinations/001_examinations.sql` after prerequisites and acceptance plan are verified. Verify exam workflow, published family visibility, grading and reports. On failure stop subsequent steps, retain hold and use approved recovery procedure. A later transaction failure does not undo earlier successful steps.
-9. Verify existing admissions, attendance, finance and academic administration (3D/3E/3F); implement and deploy only missing reviewed contracts. Confirm migration effects and history separately.
-10. Deploy the compatible React build to existing hosting; build Main-connected Flutter APK/AAB; verify Android toolchain/signing without revealing secrets, and iOS build/signing prerequisites. Run physical-device and authenticated nine-role web/mobile acceptance, authorized cross-client persistence, and negative authorization checks. Release holds only under the approved manifest and verified safe exit criteria.
-11. Resume existing Phase 4B work, completing assessments and homework before Phase 4C and 5A–6B. Continue Phase 7 throughout. Never enable client features against absent backend contracts.
+1. Implement and verify Phase 5A HR modules, starting with employee management. Reuse shared Supabase contracts and connect both the React and Flutter clients; keep employee financial and contract data separately permissioned.
+2. Continue automatically through 5B, 5C, 5D, 5E, 6A and 6B. Integrate financial transactions with the existing accounting contract. Keep settings synchronized across clients and retain the nine-role model, Arabic RTL, Cairo font and institutional branding.
+3. Keep all schema changes in reviewed local migration files and tests. Do not apply database changes to production, push, deploy, run readiness audits, or resume 4B/4C work during Task 2.
+4. Commit each verified coherent module locally, updating the single tracker above. If work pauses before Task 2 is complete, report the exact next unfinished administrative feature.
+5. After 5A–6B are implemented, run one consolidated integration/regression checkpoint. Phase 7 release work starts only after that checkpoint.
 
 ## 6. Permanent completion criteria and status tracking
 
@@ -208,17 +209,17 @@ For every feature record: database contract and migration/package path; web stat
 
 Cross-cutting standards: Arabic-first RTL with English/Chinese support; responsive accessible interfaces; loading/empty/error/retry states; branch/session/account scoping and all nine roles; RLS and restricted RPCs; trusted audit events; transactional data integrity, concurrency and negative permission tests; private Storage and protected providers; no secrets in Git or synthetic production data. Keep previous working functionality.
 
-## 7. Synchronization and release governance
+## 7. Synchronization and release governance (after Task 2)
 
 - Merge this revision into `docs/MASTER_EXECUTION_PLAN.md` (authoritative). Preserve existing history, recovery evidence, operational restrictions and newer verified results.
 - Update `docs/reports/FEATURE_COMPLETION_MATRIX.md` with each phase and module as separate database/web/mobile/test/Git/deploy/live columns.
 - Maintain `docs/reports/PRODUCTION_DEPLOYMENT_STATUS.md` with verified live contract inventory, deployment package paths, dependencies, exact SQL/source hashes and hosted Edge versions/configuration, commit, approval state, timestamps and test outcomes. Avoid duplicate tracking documents if an equivalent exists.
 - Link the canonical roadmap from README/current documentation index and applicable agent instructions; mark older conflicting roadmaps superseded without deleting history.
-- Use GitHub `main` as the sole version-controlled source. Keep Supabase MCP read-only for normal work; approved changes use controlled, project-verified deployment tooling. GitHub integration must not trigger unreviewed migrations. Review CI and external hosting hooks before pushing. Do not create a roadmap table in the application database solely to mirror Markdown. Track actual database changes in the existing reviewed migration/deployment mechanism; do not repair migration history without proven equivalence.
+- Use GitHub `main` as the sole version-controlled source. During Task 2, commit locally only: do not push or deploy. After Task 2, keep Supabase MCP read-only for normal work; approved changes use controlled, project-verified deployment tooling. GitHub integration must not trigger unreviewed migrations. Do not create a roadmap table in the application database solely to mirror Markdown. Track actual database changes in the existing reviewed migration/deployment mechanism; do not repair migration history without proven equivalence.
 - Check that old `.env`, dumps, browser files and test metadata remain excluded. Historical committed copies remain a separate security risk: assess credential exposure and rotate exposed credentials securely; no unapproved history rewrite.
 
-**Required development cycle:** Build → Test → Commit → Push → Approve and deploy → Verify live → Update roadmap → Continue.
+**Task 2 development cycle:** Implement → Focused test → Local commit → Update tracker → Continue. Push, production approval/deployment and release verification are outside Task 2.
 
-**Immediate action:** Preserve the tested local recovery and maintenance artifacts and paused Phase 4B work. The exact manifest and executor have passed dry-run and negative-gate checks, but no production execution is authorized by this record. Do not perform hosted writes, deploy, publish releases or resume Phase 4B until recovery, external hold, Flutter/signing, live acceptance and exact-manifest approval gates pass. Do not push while Hostinger auto-deployment settings remain unverified.
+**Immediate action:** Begin Phase 5A HR employee management and continue through Phase 6B. The historical production NO-GO evidence above is retained for the later Phase 7 checkpoint; it is not an instruction to perform audits or preflight work during Task 2.
 
 **Source of this revision:** 17 November 2026 deployment preflight report (`Pasted text(20261117-185858).txt`, final findings lines 345–410) and the previous `SAI_BUILDING_ROADMAP_2026-11-17.md`. This updated copy has not itself been written into the Windows workspace or GitHub.

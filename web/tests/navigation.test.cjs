@@ -68,6 +68,7 @@ test("navigation matches the approved prototype role mapping", async () => {
       expected.splice(expected.indexOf("parent"), 1);
     }
     if (module.id === "settings") expected.splice(0, expected.length, "super_admin", "admin");
+    if (module.id === "staff") expected.splice(0, expected.length, "super_admin", "admin");
     assert.deepEqual([...actual.roles].sort(), [...expected].sort(), module.id);
   }
 });
@@ -77,5 +78,17 @@ test("modules without the proposed schema stay hidden until it is installed", as
   for (const id of ["downloads", "inventory", "transport", "portfolio", "housing", "certificates", "frontCms", "alumni"]) {
     assert.equal(isModuleAvailable(id), false, `${id} must not expose a missing database table`);
     assert.equal(isModulePending(id), true, `${id} must explain why it is unavailable`);
+  }
+  assert.equal(isModuleAvailable("staff"), true);
+  assert.equal(isModulePending("staff"), false);
+});
+
+test("staff records are available only to HR administrators", async () => {
+  const { visibleNavigation } = await navigationModule;
+  for (const role of ["super_admin", "admin"]) {
+    assert.ok(visibleNavigation([role]).some(({ id }) => id === "staff"));
+  }
+  for (const role of ["teacher", "accountant", "receptionist", "librarian", "student", "parent", "content_editor"]) {
+    assert.equal(visibleNavigation([role]).some(({ id }) => id === "staff"), false, role);
   }
 });

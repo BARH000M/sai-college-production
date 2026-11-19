@@ -493,15 +493,16 @@ class _LiveModuleScreenState extends State<LiveModuleScreen> {
                               if (choice == 'edit') _edit(r);
                               if (choice == 'delete') _delete(r);
                             },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
                                 value: 'edit',
                                 child: Text('تعديل'),
                               ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Text('حذف'),
-                              ),
+                              if (widget.spec.allowDelete)
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('حذف'),
+                                ),
                             ],
                           )
                         : const Icon(Icons.chevron_left_rounded),
@@ -617,7 +618,7 @@ class _ModuleEditorState extends State<_ModuleEditor> {
       for (final field in widget.spec.fields)
         if (!field.boolean)
           field.key: TextEditingController(
-            text: '${widget.existing?[field.key] ?? ''}',
+            text: '${widget.existing?[field.key] ?? field.initialValue ?? ''}',
           ),
     };
     booleanExtra = {
@@ -727,11 +728,14 @@ class _ModuleEditorState extends State<_ModuleEditor> {
                         ? TextInputType.number
                         : TextInputType.text,
                     validator: (value) =>
-                        field.numeric &&
-                            value != null &&
-                            value.trim().isNotEmpty &&
-                            (int.tryParse(value.trim()) == null ||
-                                int.parse(value.trim()) < 0)
+                        field.required &&
+                            (value == null || value.trim().isEmpty)
+                        ? 'هذا الحقل مطلوب'
+                        : field.numeric &&
+                              value != null &&
+                              value.trim().isNotEmpty &&
+                              (int.tryParse(value.trim()) == null ||
+                                  int.parse(value.trim()) < 0)
                         ? 'أدخل عدداً صحيحاً غير سالب'
                         : null,
                   ),

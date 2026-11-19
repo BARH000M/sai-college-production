@@ -44,7 +44,7 @@ export function UnifiedModulePage({spec,roles}:{spec:UnifiedSpec;roles:readonly 
   },[permitted,branch,spec,refresh]);
   if (!permitted) return <main className="workspace"><section className="panel"><h1>وصول غير مصرح</h1></section></main>;
   const fieldValue=(key:string)=>form[key]==null?"":String(form[key]);
-  const openEditor=(row:UnifiedRow|null)=>{setEditing(row);setForm(row?{...row}:{title:"",description:""});setOpen(true);setError(null);setNotice(null);};
+  const openEditor=(row:UnifiedRow|null)=>{setEditing(row);setForm(row?{...row}:{title:"",description:"",...Object.fromEntries(spec.fields.filter(field=>field.defaultValue!==undefined).map(field=>[field.key,field.defaultValue]))});setOpen(true);setError(null);setNotice(null);};
   async function save(){
     setBusy(true);setError(null);setNotice(null);
     try{await saveUnifiedRow(spec,branch,editing?.id??null,form);setOpen(false);setNotice("تم حفظ السجل في قاعدة بيانات الكلية المشتركة.");refresh();}
@@ -63,6 +63,7 @@ export function UnifiedModulePage({spec,roles}:{spec:UnifiedSpec;roles:readonly 
     if (field.kind==="boolean")return <select id={`${spec.id}-${field.key}`} value={value||"false"} onChange={e=>setForm(v=>({...v,[field.key]:e.target.value==="true"}))}>
       <option value="false">لا</option><option value="true">نعم</option></select>;
     return <input id={`${spec.id}-${field.key}`} value={value} type={field.kind==="number"?"number":field.kind==="date"?"date":"text"}
+      required={field.required}
       onChange={e=>setForm(v=>({...v,[field.key]:field.kind==="number"?(e.target.value===""?null:Number(e.target.value)):e.target.value}))} />;
   }
   return <main className="workspace" dir="rtl"><section className="panel">

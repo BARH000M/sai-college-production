@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sai_approved_mobile/core/access.dart';
 import 'package:sai_approved_mobile/data/admissions_repository.dart';
+import 'package:sai_approved_mobile/data/module_registry.dart';
 
 void main() {
   test('All nine roles retain settings boundaries', () {
@@ -42,6 +43,19 @@ void main() {
       }
       expect(Access.allows({r}, PageId.classes), false);
       expect(Access.allows({r}, PageId.attendance), false);
+    }
+  });
+  test('Staff directory is wired to the HR contract and admin roles only', () {
+    final staff = onlineModules[PageId.staff]!;
+    expect(staff.table, 'sai_hr_employees');
+    expect(staff.writable, true);
+    expect(staff.allowDelete, false);
+    expect(Access.allows({Role.super_admin}, PageId.staff), true);
+    expect(Access.allows({Role.admin}, PageId.staff), true);
+    for (final role in Role.values.where(
+      (role) => role != Role.super_admin && role != Role.admin,
+    )) {
+      expect(Access.allows({role}, PageId.staff), false, reason: role.name);
     }
   });
   test(

@@ -9,11 +9,15 @@ class ModuleField {
     this.label, {
     this.numeric = false,
     this.boolean = false,
+    this.required = false,
+    this.initialValue,
   });
   final String key;
   final String label;
   final bool numeric;
   final bool boolean;
+  final bool required;
+  final String? initialValue;
 }
 
 class ModuleSpec {
@@ -23,6 +27,7 @@ class ModuleSpec {
     required this.title,
     this.subtitle = '',
     this.writable = false,
+    this.allowDelete = true,
     this.fields = const [],
   });
   final PageId page;
@@ -31,10 +36,28 @@ class ModuleSpec {
   final String subtitle;
   /// This only enables client controls. All actual permissions are server RLS.
   final bool writable;
+  final bool allowDelete;
   final List<ModuleField> fields;
 }
 
 const onlineModules = <PageId, ModuleSpec>{
+  PageId.staff: ModuleSpec(
+    page: PageId.staff,
+    table: 'sai_hr_employees',
+    title: 'شؤون الموظفين',
+    subtitle: 'دليل الموظفين حسب صلاحية الفرع',
+    writable: true,
+    allowDelete: false,
+    fields: [
+      ModuleField('employee_code', 'الرقم الوظيفي', required: true),
+      ModuleField('department', 'القسم', required: true),
+      ModuleField('designation', 'المسمى الوظيفي', required: true),
+      ModuleField('contact_phone', 'هاتف العمل'),
+      ModuleField('contact_email', 'بريد العمل'),
+      ModuleField('hired_on', 'تاريخ التعيين'),
+      ModuleField('employment_status', 'الحالة', initialValue: 'active'),
+    ],
+  ),
   PageId.assignments: ModuleSpec(
     page: PageId.assignments,
     table: 'learning_homework',

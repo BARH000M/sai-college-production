@@ -48,7 +48,7 @@ export const navigation: readonly NavigationItem[] = [
   { id: "authoring", label: "تأليف الدروس", icon: "ri-edit-2-line", roles: ["super_admin", "admin", "content_editor", "teacher"] },
   { id: "media", label: "مكتبة الوسائط", icon: "ri-image-line", roles: ["super_admin", "admin", "content_editor", "teacher"] },
   { id: "approvals", label: "المراجعة والنشر", icon: "ri-checkbox-circle-line", roles: ["super_admin", "admin", "content_editor", "teacher"] },
-  { id: "staff", label: "شؤون الموظفين", icon: "ri-team-line", roles: ["super_admin", "admin", "teacher", "accountant", "receptionist", "librarian", "content_editor"] },
+  { id: "staff", label: "شؤون الموظفين", icon: "ri-team-line", roles: ["super_admin", "admin"] },
   { id: "reception", label: "الاستقبال", icon: "ri-customer-service-2-line", roles: ["super_admin", "admin", "receptionist"] },
   { id: "library", label: "المكتبة", icon: "ri-book-shelf-line", roles: ["super_admin", "admin", "librarian", "teacher", "parent", "student"] },
   { id: "finance", label: "الرسوم والمالية", icon: "ri-money-dollar-circle-line", roles: ["super_admin", "admin", "accountant", "parent", "student"] },
@@ -79,7 +79,7 @@ const availableModuleIds: readonly string[] = [
   "home", "profile", "notifications", "branches", "sessions", "classes", "students", "admissions", "scanner",
   "courses", "homework", "progress", "attendance", "exams", "roles", "reports", "cms",
   "academics", "timetable", "qr", "vocabulary", "library", "communications", "finance",
-  "settings", "systemCatalog",
+  "settings", "systemCatalog", "staff",
 ];
 
 export function isAppRole(value: string): value is AppRole {
@@ -115,7 +115,6 @@ export const pendingModules: readonly { id: string; label: string; reason: strin
   { id: "authoring", label: "تأليف الدروس", reason: "المحرر الكامل للمحتوى غير مبني بعد؛ تُدار الدروس حالياً من المقررات." },
   { id: "media", label: "مكتبة الوسائط", reason: "تحتاج تخزين ملفات وربطه بمساحة Supabase Storage." },
   { id: "approvals", label: "المراجعة والنشر", reason: "تحتاج حالات مراجعة واعتماد للمحتوى." },
-  { id: "staff", label: "شؤون الموظفين", reason: "تحتاج سجلات موظفين وعقوداً وحضوراً إدارياً." },
   { id: "reception", label: "الاستقبال", reason: "تحتاج مسار زوار ومواعيد مستقل عن القبول." },
   { id: "downloads", label: "مركز التحميل", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
   { id: "inventory", label: "المخزون", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },

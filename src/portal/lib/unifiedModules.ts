@@ -3,8 +3,8 @@ import { supabase } from "./supabase";
 // EXACT table names and record columns used by the Yemen SAI Flutter v1.2 package.
 // These eight tables are defined by the proposed 029 migration and must be installed
 // before enabling the pages in production. Existing homework/library/finance stay unchanged.
-export type UnifiedId = "downloads" | "inventory" | "transport" | "portfolio" | "housing" | "certificates" | "frontCms" | "alumni";
-export type Field = { key: string; label: string; kind?: "number" | "date" | "boolean" | "text" };
+export type UnifiedId = "staff" | "downloads" | "inventory" | "transport" | "portfolio" | "housing" | "certificates" | "frontCms" | "alumni";
+export type Field = { key: string; label: string; kind?: "number" | "date" | "boolean" | "text"; required?: boolean; defaultValue?: string };
 export type UnifiedSpec = {
   id: UnifiedId; title: string; table: string; roles: readonly string[];
   writeRoles: readonly string[]; fields: readonly Field[]; allowDelete?: boolean;
@@ -13,6 +13,15 @@ const campus = ["super_admin", "admin"] as const;
 const operations = ["super_admin", "admin", "receptionist"] as const;
 const editors = ["super_admin", "admin", "content_editor"] as const;
 export const unifiedModules: Record<UnifiedId, UnifiedSpec> = {
+  staff: { id:"staff", title:"شؤون الموظفين", table:"sai_hr_employees", roles:campus, writeRoles:campus, fields:[
+    {key:"employee_code",label:"الرقم الوظيفي",required:true},
+    {key:"department",label:"القسم",required:true},
+    {key:"designation",label:"المسمى الوظيفي",required:true},
+    {key:"contact_phone",label:"هاتف العمل"},
+    {key:"contact_email",label:"بريد العمل"},
+    {key:"hired_on",label:"تاريخ التعيين",kind:"date"},
+    {key:"employment_status",label:"الحالة",defaultValue:"active"},
+  ] },
   downloads: { id: "downloads", title: "مركز التحميل", table: "sai_download_resources", roles: ["super_admin","admin","teacher","student","parent","librarian","content_editor"], writeRoles: ["super_admin","admin","content_editor","librarian"], fields: [{key:"category",label:"التصنيف"},{key:"storage_path",label:"مسار الملف الخاص"},{key:"is_published",label:"منشور",kind:"boolean"}], allowDelete: true },
   inventory: { id:"inventory", title:"المخزون", table:"sai_inventory_items", roles:["super_admin","admin","accountant"], writeRoles:["super_admin","admin","accountant"], fields:[{key:"sku",label:"رمز الصنف"},{key:"quantity",label:"الكمية",kind:"number"},{key:"warehouse",label:"المخزن"}] },
   transport: { id:"transport", title:"النقل", table:"sai_transport_routes", roles:[...campus,"receptionist","student","parent"], writeRoles:[...operations], fields:[{key:"vehicle",label:"المركبة"},{key:"driver_name",label:"السائق"},{key:"capacity",label:"السعة",kind:"number"}], allowDelete: true },
@@ -32,6 +41,9 @@ export async function loadUnifiedRows(spec: UnifiedSpec, branchId: string): Prom
 }
 export async function saveUnifiedRow(spec: UnifiedSpec, branchId: string, id: string | null, draft: Record<string, unknown>) {
   if (!branchId || !String(draft.title ?? "").trim()) throw new Error("اختر الفرع وأدخل عنواناً للسجل.");
+  if (spec.fields.some(field => field.required && !String(draft[field.key] ?? "").trim())) {
+    throw new Error("أكمل جميع الحقول المطلوبة.");
+  }
   const data = Object.fromEntries(["title", "description", ...spec.fields.map(f=>f.key)]
     .filter(key => key in draft).map(key=>[key,draft[key]]));
   const result = id
