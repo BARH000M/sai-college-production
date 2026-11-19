@@ -46,6 +46,7 @@ test('root React app owns the production build and secondary web commands delega
   const rootPackage = JSON.parse(read('package.json'));
   const webPackage = JSON.parse(read('web/package.json'));
   assert.equal(rootPackage.scripts.build, 'vite build');
+  assert.equal(webPackage.scripts.dev, 'npm --prefix .. run dev');
   assert.equal(webPackage.scripts.build, 'npm --prefix .. run build');
   assert.equal(webPackage.scripts.preview, 'npm --prefix .. run preview');
   assert.match(read('vite.config.ts'), /outDir:\s*['"]out['"]/);
