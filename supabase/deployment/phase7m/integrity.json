@@ -1,5 +1,5 @@
 {
-  "supabase/deployment/phase7r/main-deployment-manifest.json": "e32ac8aaceaaa29673b063f3e097441326dc09ca8d4a66efe49d3216c9f703a5",
+  "supabase/deployment/phase7r/main-deployment-manifest.json": "e5cec0f15eaf48105b377ae2518d3cbdcef89424a4c459f60fc17910e353c182",
   "supabase/deployment/maintenance/001_global_mutation_hold.sql": "4a682ce38e6c900f2b338f7d5d41896b6efb8ea435753beb4cf7bf8fff5767cf",
   "supabase/deployment/maintenance/rollback_global_mutation_hold.sql": "49daa73d598cb15d643c90263dc39e641c8ec449d2510c076393f2a3bb7d0580",
   "supabase/deployment/phase3b-main/01_role_contract.sql": "8b2a2db0c4db8b33c0190a3e538414ba1a5781a8d5697e5785683236ce817417",
@@ -33,7 +33,7 @@
   "supabase/tests/phase3b-main/behavior.sql": "797cd6682652ab2c978fedd2e137091fc6ab4101c48ad6c2b541ba7dc9cdef15",
   "supabase/tests/phase7m_behavior.sql": "3d1692288626b25b0e483c350e9544d0f3a8294a82e039f2eebf14bbe66fd67f",
   "supabase/tests/phase7m_executor_tracking.ps1": "552d6bbadba9d3a21478c5003390b94dd43ac5edafb0fe36a5c54d252a80b573",
-  "supabase/tests/run_native_contracts.py": "fa4480c7e60f580b9d2f8842446adde5447501ccf293719302b5df21eec99414",
+  "supabase/tests/run_native_contracts.py": "3497b40a1b073ad9526fbbbe0fa128105fae37a3c867bd02f6e315fba9f0b71e",
   "supabase/tests/test_migration_validation.py": "efdcf6981b2ebc8434c4e727d996c9e15c0834c805b16df26691f77e401a41c4",
   "supabase/tests/finance_completion_behavior.sql": "fd680c381698a0193c620bf1e41619269a2a962799fd75b3042b864f566369bb",
   "supabase/tests/admissions_behavior.sql": "850c719901baf8c87ac0493aaa04a095a3b2545f8edb8493043a6753a825c6d7",

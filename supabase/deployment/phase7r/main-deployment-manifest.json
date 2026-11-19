@@ -148,7 +148,7 @@
     },
     {
       "path": "supabase/tests/run_native_contracts.py",
-      "sha256": "fa4480c7e60f580b9d2f8842446adde5447501ccf293719302b5df21eec99414"
+      "sha256": "3497b40a1b073ad9526fbbbe0fa128105fae37a3c867bd02f6e315fba9f0b71e"
     },
     {
       "path": "supabase/tests/test_migration_validation.py",
