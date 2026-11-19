@@ -54,4 +54,4 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm test
-      # Standalone web/ build excluded: incomplete entrypoint.
+      # The root app is built in main-web; web/ remains compatibility tests only.

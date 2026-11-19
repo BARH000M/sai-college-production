@@ -41,3 +41,17 @@ test('both push workflows remain checks-only, without deployment credentials or 
     assert.doesNotMatch(workflow, /supabase (?:db push|functions deploy)|vercel|netlify|SUPABASE_ACCESS_TOKEN|SUPABASE_SERVICE_ROLE|environment: production/);
   }
 });
+
+test('root React app owns the production build and secondary web commands delegate to it', () => {
+  const rootPackage = JSON.parse(read('package.json'));
+  const webPackage = JSON.parse(read('web/package.json'));
+  assert.equal(rootPackage.scripts.build, 'vite build');
+  assert.equal(webPackage.scripts.build, 'npm --prefix .. run build');
+  assert.equal(webPackage.scripts.preview, 'npm --prefix .. run preview');
+  assert.match(read('vite.config.ts'), /outDir:\s*['"]out['"]/);
+
+  const workflow = read('.github/workflows/web-ci.yml');
+  const productionJob = workflow.split('  secondary-web:')[0];
+  assert.match(productionJob, /- run: npm run build/);
+  assert.match(workflow, /root app is built in main-web/);
+});

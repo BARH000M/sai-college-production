@@ -2,6 +2,15 @@
 
 **Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
 
+## Final backend/synchronization follow-up — 19 November 2026
+
+- **Local configuration:** `.env.local`, `web/.env.local`, `mobile/config/live.json` and `supabase/target.local.json` are synchronized to Main, ignored and untracked. The browser uses only `VITE_PUBLIC_SUPABASE_URL`, `VITE_PUBLIC_SUPABASE_ANON_KEY` and `VITE_SAI_TARGET=production`; the existing supported publishable key is reused and never printed. No privileged key was introduced.
+- **Web architecture:** The root React app is authoritative and its Vite output is `out/`. Secondary `web/` build and preview commands delegate to the root; the root GitHub workflow invokes the root build. The current GitHub workflows are checks-only, with no repository webhook or deployment record. Hostinger-side auto-deployment settings remain unverified.
+- **Live read-only checks:** Supabase Main is `ACTIVE_HEALTHY`, PostgreSQL 17.11, with 16 recorded migrations and seven active Edge Functions at the manifest's expected versions. The publishable-key Auth health request returned HTTP 200. This is endpoint/key connectivity, not a signed-in user acceptance test.
+- **Migration status:** The manifest validator passes, but `release_ready=false`. Live catalog checks show the examinations tables, mutation-hold state and atomic role-management RPC are still absent; the proposed production work is not complete. No historical migration was replayed, no history was repaired, and no SQL or Edge function was deployed.
+- **Recovery and release blockers:** The latest local backup inventory is only a 17 November 2026 record (backup `2295604002`); its current managed status/PITR window was not freshly queried. The existing native PostgreSQL restore is not a Supabase-compatible platform restore. Fresh managed recovery evidence, isolated compatible-restore proof, external write-hold attestation, and hash-bound owner approval are still required.
+- **Git review:** At the start of this follow-up, local `main` was 12 commits ahead of `origin/main` (`af0c23bd1820472d014f43c1fe3d778996944fb2`) and had no divergence. No credential pattern was found in the unpublished diff. The only migration-package delta is the local/partial Phase 4B development proposal, excluded from the production manifest. No push or production operation was performed.
+
 **Latest local launch-preparation refresh — 18 November 2026:** A true/false
 lesson-practice flow was added and locally committed as
 `5c61b7b0d87df23a042d1b8fbf20915b741de31d`. The isolated assessment,
