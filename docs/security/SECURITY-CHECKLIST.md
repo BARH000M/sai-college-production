@@ -4,6 +4,8 @@ Date: 2026-11-19. 60 defined audit checks: PASS 32, FAIL 12, UNVERIFIED 13, BLOC
 
 PASS covers only the stated tested condition. FAIL is a verified weakness. BLOCKED means a prerequisite/restriction prevents verification; UNVERIFIED means insufficient evidence. These are audit work units, not counts of every requirement in OWASP standards. A bounded negative scan or a source-only PASS does not clear deployment security.
 
+**Follow-up — 20 November 2026:** C17's mutable-action finding is remediated in the current local source: all actions in the three root workflows use immutable commit hashes, verified by the root regression suite. This does not indicate a merge to `main` or a production release; the remote PR checks still refer to the previous head, and the Supabase Preview integration points to a different project. The project ID/name/organization were confirmed separately through read-only metadata; opaque publishable-key ownership is not proven by prefix. Production remains NO-GO.
+
 | ID | Check | Result | Evidence | Scope / limitation |
 |---|---|---|---|---|
 | C01 | Repository and branch identity | PASS | E01 | Local main/origin match; deployment commit unknown |

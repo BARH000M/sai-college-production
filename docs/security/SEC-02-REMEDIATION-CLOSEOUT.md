@@ -2,9 +2,18 @@
 
 ## Release decision
 
-**Production remains NO-GO.** This work prepared and validated local source changes only. No hosted database writes, migration-history changes, production deployment, credential rotation, GitHub settings changes, commits, or pushes were made.
+**Production remains NO-GO.** This work prepared and validated local source changes only. No hosted database writes, migration-history changes, production deployment, credential rotation, or GitHub settings changes were made. The PR branch is reconciled locally with `origin/main` at `38b03e096c9d61a68cac8438a7100a2a473c18f`; a local backup preserves its pre-merge head. No force-push was used.
 
-The checkout is `copilot/fix-isolated-contracts-job`, one commit behind its origin, rather than the locked `main` branch. It was not switched. Existing staged and unstaged work was preserved. The demo migration remains archived at `supabase/archive/demo/017_demo_attendance_week.sql`; it was not restored to the production migration directory.
+The checkout remains `copilot/fix-isolated-contracts-job`, not `main`. The demo migration remains archived at `supabase/archive/demo/017_demo_attendance_week.sql`; it is absent from the production migration directory. The accidental zero-byte root file `0` was removed.
+
+## SEC-02 final GitHub integration — 20 November 2026
+
+- **Conflict and migration integrity:** Resolved the `phase7m/integrity.json` conflict by preserving the merged source state and verifying it against the current files. `python supabase\tools\validate_migrations.py --base-ref origin/main` passes. The archived 017 file retains its original blob/checksum; it is not installed as a production migration.
+- **CI build configuration:** The production SPA workflow now supplies the authorized production URL, target flag, an empty preview flag, and a synthetic publishable-key-shaped value. The placeholder is not a credential and is not used to contact Supabase. The local production build passes with that configuration.
+- **Local verification:** Root tests 31/31, type-check and lint pass; web tests 112/112; Flutter strict analysis and tests pass; migration validation and tamper tests 8/8 pass; profile/contact, examinations, learning-assessment, native contracts, and Phase 3B reconciliation suites pass on task-owned loopback PostgreSQL clusters. No Docker was used.
+- **Workflow integrity:** The root regression test confirms all GitHub Actions references are immutable commit SHAs.
+- **Project/key boundary:** Read-only Supabase metadata confirms project `aeryusbrulqdxjdynwfh` (`sai-college-production`) is under organization `BARH000M`, is `ACTIVE_HEALTHY`, and has the expected API URL. The production guard checks the exact project URL, rejects secret keys, accepts only the publishable-key syntax or a legacy anon JWT for that ref, and checks bundle identity. An opaque publishable key's project ownership cannot be proven from its prefix; no key value was fetched or logged.
+- **Remote blockers:** Existing GitHub checks are for the previous PR head. The production SPA check failed because CI lacked the required environment, now fixed locally. The separate Supabase Preview check links to a different project; that project was not accessed or modified. Do not push until the owner verifies/rebinds or disables that integration. Main deployment remains NO-GO and no hosted changes were made.
 
 ## SEC-01 finding status
 
@@ -33,12 +42,12 @@ No hosted finding is claimed resolved. F08 and F09 require the separately approv
 |---|---:|
 | Root Node tests (`npm test`) | 31/31 passed |
 | Web compatibility tests (`npm --prefix web test`) | 112/112 passed |
-| Flutter tests | 68/68 passed |
+| Flutter tests | Passed (latest run: 67 tests) |
 | Migration-validation tamper tests | 8/8 passed |
 | TypeScript type-check | Passed |
 | Production website build | Passed; Vite reported the existing large JavaScript chunk warning |
 | Flutter strict analysis (`--fatal-infos --fatal-warnings`) | Passed; no issues |
-| Native PostgreSQL contracts | Passed: profile/contact and examinations suites, plus Phase 3B/Phase 7M reconciliation and security regressions on a task-owned loopback cluster |
+| Native PostgreSQL contracts | Passed: profile/contact, examinations, learning-assessment, native contract suites, plus Phase 3B/Phase 7M reconciliation and security regressions on task-owned loopback clusters |
 | Standalone runtime validation | 5/5 assertions passed: type-check, root tests, web tests, production build, and HTTP 200 on the local home route |
 | Targeted source secret scan | 0 private-key or `sb_secret_` markers in 230 production-source files |
 | Android release-signing guard | Passed for APK and AAB: unsigned release builds were blocked because signing configuration is missing |

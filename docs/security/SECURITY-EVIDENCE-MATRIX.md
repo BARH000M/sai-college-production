@@ -2,6 +2,12 @@
 
 Date: 2026-11-19, Asia/Aden. Sanitized contemporaneous observations; no private credential values or student records included. Controls: 60; PASS 32, FAIL 12, BLOCKED 3, UNVERIFIED 13. Confirmed findings: P0 0, P1 2, P2 8, P3 2. PASS applies only to explicitly stated scope.
 
+## Follow-up — 20 November 2026
+
+This follow-up supersedes E10/C17 only for the current checked-in workflow source; it does not change the historical audit snapshot or establish production deployment. Root, mobile, and database workflow action references are full immutable commit hashes, and the root test suite's immutable-action regression passes. The SEC-02 branch's migration integrity and deployment manifest validate locally; 017 remains archived and no production migration was applied.
+
+The production build now uses a non-secret synthetic publishable-key-shaped CI fixture with the authorized URL and target flags. The code checks the endpoint's exact project URL, rejects secret keys, and constrains legacy anon JWT project claims. The opaque publishable key is not fetched, and its project ownership is not inferred from its prefix. Separate read-only Supabase metadata confirms that the authoritative project is `sai-college-production` in organization `BARH000M`. The previous PR's Supabase Preview status links to a different project; it was not accessed or changed. Push remains blocked pending owner confirmation that the integration cannot modify a retired/non-authoritative project. Production remains NO-GO.
+
 ## E01 — Repository identity and existing work
 
 Read-only git branch, remote, status and cached raw diff. Branch main; origin https://github.com/BARH000M/sai-college-production.git. Before/after staged relocation remained R100, modes 100644, old/new blob prefix 312c944. Paths: supabase/migrations/017_demo_attendance_week.sql -> supabase/archive/demo/017_demo_attendance_week.sql. No index writes.

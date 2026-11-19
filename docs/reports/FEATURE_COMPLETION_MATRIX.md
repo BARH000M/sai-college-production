@@ -1,5 +1,9 @@
 # Feature completion matrix
 
+## SEC-02 integration regression verification — 20 November 2026
+
+The SEC-02 branch was reconciled locally with current `origin/main`; this was a source-integration and release-verification pass, not new feature acceptance. Root tests passed 31/31, web tests 112/112, Flutter strict analysis and all 67 tests passed, migration validation and 8 tamper tests passed, and the isolated native PostgreSQL suites plus Phase 3B reconciliation passed. The root production SPA built successfully with a non-secret CI fixture. Phase 4B remains **PARTIAL**, the deployment manifest remains `release_ready=false`, and production remains **NO-GO**. No production migration or deployment occurred.
+
 **Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
 
 ## Latest local feature and release-preparation update — 18 November 2026

@@ -1,5 +1,9 @@
 # Phase 4B completion and acceptance report
 
+## SEC-02 integration regression verification — 20 November 2026
+
+After reconciling the SEC-02 branch with current `origin/main`, the full local validation passed: root tests 31/31, web tests 112/112, Flutter strict analysis and 67 tests, migration validation and 8 tamper tests, isolated profile/contact, examinations and assessment contracts, Phase 3B reconciliation, type-check/lint, and production SPA build using non-secret CI fixture values. This confirms integration and regression status only; it does not complete Phase 4B, authorize its SQL proposal, or change the production **NO-GO** decision.
+
 **Disposition: PARTIAL.** Local development only; Phase 4B is not complete or
 accepted. The production manifest remains `release_ready=false`; no SQL,
 Edge Function, website or mobile deployment has been performed. Phase 7-M

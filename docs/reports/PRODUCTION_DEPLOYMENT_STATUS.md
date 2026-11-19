@@ -2,6 +2,15 @@
 
 **Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
 
+## SEC-02 integration readiness — 20 November 2026
+
+- PR #8 is reconciled locally with `origin/main` at `38b03e096c9d61a68cac8438a7100a2a473c18f`; its pre-merge head is preserved on a local backup branch. The integrity conflict is resolved, the archived 017 migration remains out of `supabase/migrations/`, and the accidental empty file `0` is removed.
+- Migration checksums and manifest integrity pass `python supabase\tools\validate_migrations.py --base-ref origin/main`; its tamper suite passes 8/8. Root 31/31, web 112/112, Flutter, native PostgreSQL and Phase 3B reconciliation checks pass. The production SPA build passes with non-secret CI fixture configuration.
+- Read-only Supabase metadata confirms the authorized project ref/name and `BARH000M` organization. No key was retrieved. The validator enforces URL/project identity; opaque publishable-key ownership remains unprovable from the key prefix alone.
+- GitHub Actions in the three root workflows are pinned to immutable commit hashes. The remote SPA check on the prior PR head failed due to missing CI configuration and is fixed locally. Supabase Preview still references a different project; no remote Supabase project was touched.
+
+**Disposition: NO-GO.** Do not push until the owner confirms the Supabase Preview integration is rebound to the authoritative project or disabled. Recovery, external write-hold, hash-bound owner approval, hosted security fixes, authenticated acceptance, release signing and hosting approvals remain outstanding. No production SQL, migration, website deployment, or remote project mutation was performed.
+
 ## Final backend/synchronization follow-up — 19 November 2026
 
 - **Local configuration:** `.env.local`, `web/.env.local`, `mobile/config/live.json` and `supabase/target.local.json` are synchronized to Main, ignored and untracked. The browser uses only `VITE_PUBLIC_SUPABASE_URL`, `VITE_PUBLIC_SUPABASE_ANON_KEY` and `VITE_SAI_TARGET=production`; the existing supported publishable key is reused and never printed. No privileged key was introduced.
