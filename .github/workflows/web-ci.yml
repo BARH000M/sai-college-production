@@ -39,6 +39,10 @@ jobs:
       - run: node --test tests/main-integration.test.mjs
       - run: npm run type-check
       - run: npm run build
+        env:
+          VITE_SAI_TARGET: production
+          VITE_PUBLIC_SUPABASE_URL: https://aeryusbrulqdxjdynwfh.supabase.co
+          VITE_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ci
   secondary-web:
     name: web/ compatibility and unit tests
     runs-on: ubuntu-latest
