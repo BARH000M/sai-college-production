@@ -1,3 +1,6 @@
 <full-backup-content>
   <exclude domain="sharedpref" path="FlutterSharedPreferences.xml" />
+  <exclude domain="sharedpref" path="yemen_sai_auth_v1.xml" />
+  <exclude domain="sharedpref" path="FlutterSecureKeyStorage:yemen_sai_auth_v1.xml" />
+  <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration:yemen_sai_auth_v1.xml" />
 </full-backup-content>

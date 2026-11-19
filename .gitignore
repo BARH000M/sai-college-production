@@ -85,3 +85,4 @@ auth-state*.json
 /web/.env.local
 /supabase/target.local.json
 /.env.local
+/.tsupgrader/

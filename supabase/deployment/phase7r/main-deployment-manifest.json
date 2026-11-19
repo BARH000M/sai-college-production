@@ -24,7 +24,7 @@
     },
     {
       "path": "supabase/deployment/phase3b-main/01_role_contract.sql",
-      "sha256": "8b2a2db0c4db8b33c0190a3e538414ba1a5781a8d5697e5785683236ce817417"
+      "sha256": "238cb46000745239cfd5cb010a05c0cfef1e279ca6b6838fb353891b7017c3a8"
     },
     {
       "path": "supabase/deployment/phase3b-main/02_teacher_assignment.sql",
@@ -116,7 +116,7 @@
     },
     {
       "path": "supabase/tools/validate_migrations.py",
-      "sha256": "9d1e252e7ef2788d76160ac0f63aff0de59c9a89097ba7236440b746cdd98d08"
+      "sha256": "a3d03c3aae8174825d2f66be049a9f9c94a76161da983d34e9cf6085c1e52ef0"
     },
     {
       "path": "supabase/deployment/phase7r/Invoke-MainDeployment.ps1",
@@ -136,7 +136,7 @@
     },
     {
       "path": "supabase/tests/phase3b-main/behavior.sql",
-      "sha256": "797cd6682652ab2c978fedd2e137091fc6ab4101c48ad6c2b541ba7dc9cdef15"
+      "sha256": "3d08ebb909cc121c7e23d8cf7b0e5785f528835d509b397603c91daa13ba8afb"
     },
     {
       "path": "supabase/tests/phase7m_behavior.sql",
@@ -152,7 +152,7 @@
     },
     {
       "path": "supabase/tests/test_migration_validation.py",
-      "sha256": "efdcf6981b2ebc8434c4e727d996c9e15c0834c805b16df26691f77e401a41c4"
+      "sha256": "bdf1a982bb70ec39cc7f8c0269081a671073543199806a5f6e74db4e513b1521"
     },
     {
       "path": "supabase/tests/finance_completion_behavior.sql",
@@ -168,7 +168,7 @@
     },
     {
       "path": "supabase/tests/admission_event_integrity.sql",
-      "sha256": "c3dc7c44aa6b5cdd1b96f04b1442031e6c0c1d4479ae9dcadd4f4386b0b5ce77"
+      "sha256": "26c7967cb2f56f925952d7015ca623057852595319fcbe6808b32e297875ac09"
     },
     {
       "path": "supabase/tests/student_parent_access.sql",
@@ -204,7 +204,7 @@
     },
     {
       "path": ".github/workflows/database-ci.yml",
-      "sha256": "32adb005994c6c27616d5fb76cc0eb055786c4a030adb26028e41a12cab35ba0"
+      "sha256": "a336b46307499aa7c810f9d7ac0c07567b9f5127572f22b950683731a70d7ec6"
     }
   ],
   "steps": [
