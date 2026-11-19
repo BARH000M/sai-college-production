@@ -68,5 +68,11 @@ test('root React app owns the production build and secondary web commands delega
   const workflow = read('.github/workflows/web-ci.yml');
   const productionJob = workflow.split('  secondary-web:')[0];
   assert.match(productionJob, /- run: npm run build/);
+  assert.ok(productionJob.includes([
+    '        env:',
+    '          VITE_SAI_TARGET: production',
+    '          VITE_PUBLIC_SUPABASE_URL: https://aeryusbrulqdxjdynwfh.supabase.co',
+    '          VITE_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ci',
+  ].join('\n')));
   assert.match(workflow, /root app is built in main-web/);
 });
