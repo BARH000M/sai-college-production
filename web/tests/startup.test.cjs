@@ -14,63 +14,82 @@ async function moduleUrl(file, replace = (source) => source) {
   return `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
 }
 
-test("startup errors are explicit and configured authentication options are preserved", async () => {
-  const errorUrl = await moduleUrl("lib/initializationError.ts");
-  const { SupabaseInitializationError } = await import(errorUrl);
+const PRODUCTION = "https://aeryusbrulqdxjdynwfh.supabase.co";
+const PLACEHOLDER = "sb_publishable_unconfigured";
+
+test("startup stays renderable and never connects to an unauthorized backend", async () => {
   const loadSupabase = async (env, createClient) => {
     globalThis.__startupEnv = env;
     globalThis.__startupCreateClient = createClient;
     const url = await moduleUrl("lib/supabase.ts", (source) => source
       .replace('import { createClient } from "@supabase/supabase-js";', "const createClient = globalThis.__startupCreateClient;")
-      .replace('"./initializationError"', JSON.stringify(errorUrl))
       .replaceAll("import.meta.env", "globalThis.__startupEnv"));
     return import(`${url}#${Math.random()}`);
   };
-  const prodEnv = { VITE_PUBLIC_SUPABASE_URL: "https://aeryusbrulqdxjdynwfh.supabase.co", VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test" };
+  const prodEnv = {
+    VITE_SAI_TARGET: "production",
+    VITE_PUBLIC_SUPABASE_URL: PRODUCTION,
+    VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test",
+  };
   const prevEnv = {
     VITE_SAI_TARGET: "preview",
     VITE_PUBLIC_SUPABASE_URL: "https://mgibjusuglafbnlrkbep.supabase.co",
     VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test",
   };
+  const prodJwt = `x.${Buffer.from(JSON.stringify({ role: "anon", ref: "aeryusbrulqdxjdynwfh" })).toString("base64url")}.x`;
+  const prevJwt = `x.${Buffer.from(JSON.stringify({ role: "anon", ref: "mgibjusuglafbnlrkbep" })).toString("base64url")}.x`;
   try {
-    await assert.rejects(loadSupabase({}, () => assert.fail("must not create a client")), SupabaseInitializationError);
-    const cause = new Error("invalid URL");
-    await assert.rejects(
-      loadSupabase(prodEnv, () => { throw cause; }),
-      (error) => error instanceof SupabaseInitializationError && error.cause === cause,
-    );
+    // A valid deployment keeps every configured authentication option.
     const client = {};
-    const result = await loadSupabase(
-      prodEnv,
-      (url, key, options) => {
-        assert.equal(url, prodEnv.VITE_PUBLIC_SUPABASE_URL);
-        assert.equal(key, prodEnv.VITE_PUBLIC_SUPABASE_ANON_KEY);
-        assert.deepEqual(options.auth, {
-          autoRefreshToken: true, detectSessionInUrl: true, persistSession: true,
-          storageKey: "sai-production-auth",
-        });
-        return client;
-      },
-    );
+    let seen = null;
+    const result = await loadSupabase(prodEnv, (url, key, options) => {
+      seen = { url, key, options };
+      return client;
+    });
+    assert.equal(result.isSupabaseConfigured, true);
+    assert.equal(result.supabaseConfigurationError, null);
     assert.equal(result.supabase, client);
     assert.equal(result.supabaseTarget, "production");
+    assert.deepEqual(seen.url, PRODUCTION);
+    assert.equal(seen.key, "sb_publishable_test");
+    assert.deepEqual(seen.options.auth, {
+      autoRefreshToken: true, detectSessionInUrl: true, persistSession: true,
+      storageKey: "sai-production-auth",
+    });
 
-    // Retired targets fail before client creation, even with their own key.
-    await assert.rejects(loadSupabase(prevEnv, () => assert.fail("retired target")), SupabaseInitializationError);
+    // Every rejected configuration still renders and falls back to the
+    // authorized project with a non-usable key, never to another backend.
+    const rejectedCases = [
+      ["no environment at all", {}],
+      ["retired target", prevEnv],
+      ["unsupported target", { ...prodEnv, VITE_SAI_TARGET: "staging" }],
+      ["retired project url", { ...prodEnv, VITE_PUBLIC_SUPABASE_URL: "https://mgibjusuglafbnlrkbep.supabase.co" }],
+      ["foreign project url", { ...prodEnv, VITE_PUBLIC_SUPABASE_URL: "https://other.supabase.co" }],
+      ["foreign project key", { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: prevJwt }],
+      ["malformed url", { ...prodEnv, VITE_PUBLIC_SUPABASE_URL: "not-a-url" }],
+      ["secret key", { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_private" }],
+      ["service role key", {
+        ...prodEnv,
+        VITE_PUBLIC_SUPABASE_ANON_KEY: `x.${Buffer.from(JSON.stringify({ role: "service_role", ref: "aeryusbrulqdxjdynwfh" })).toString("base64url")}.x`,
+      }],
+      ["missing key", { VITE_SAI_TARGET: "production", VITE_PUBLIC_SUPABASE_URL: PRODUCTION }],
+    ];
+    for (const [label, env] of rejectedCases) {
+      const fallback = await loadSupabase(env, (url, key) => {
+        assert.equal(url, PRODUCTION, `${label}: url must stay authorized`);
+        assert.equal(key, PLACEHOLDER, `${label}: placeholder key expected`);
+        return {};
+      });
+      assert.equal(fallback.isSupabaseConfigured, false, `${label}: must not be usable`);
+      assert.ok(fallback.supabaseConfigurationError, `${label}: reason required`);
+    }
 
-    // Fail closed on every cross-project or unsupported combination.
-    const prodJwt = `x.${Buffer.from(JSON.stringify({ role: "anon", ref: "aeryusbrulqdxjdynwfh" })).toString("base64url")}.x`;
-    const prevJwt = `x.${Buffer.from(JSON.stringify({ role: "anon", ref: "mgibjusuglafbnlrkbep" })).toString("base64url")}.x`;
-    for (const env of [
-      { ...prodEnv, VITE_PUBLIC_SUPABASE_URL: "https://mgibjusuglafbnlrkbep.supabase.co" },
-      { ...prodEnv, VITE_SAI_TARGET: "staging" },
-      { ...prevEnv, VITE_PUBLIC_SUPABASE_URL: "https://aeryusbrulqdxjdynwfh.supabase.co" },
-      { ...prevEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: prodJwt },
-      { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: prevJwt },
-      { ...prodEnv, VITE_PUBLIC_SUPABASE_URL: "https://other.supabase.co" },
-      { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_private" },
-      { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: `x.${Buffer.from(JSON.stringify({ role: "service_role", ref: "aeryusbrulqdxjdynwfh" })).toString("base64url")}.x` },
-    ]) await assert.rejects(loadSupabase(env, () => assert.fail("must reject before client creation")), SupabaseInitializationError);
+    // Legacy anon JWTs for the authorized project still work.
+    const jwtResult = await loadSupabase(
+      { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: prodJwt },
+      () => (),
+    );
+    assert.equal(jwtResult.isSupabaseConfigured, true);
   } finally {
     delete globalThis.__startupEnv;
     delete globalThis.__startupCreateClient;

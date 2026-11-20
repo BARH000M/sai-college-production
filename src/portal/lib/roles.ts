@@ -108,9 +108,17 @@ export async function loadDirectoryUsers(): Promise<{ users: DirectoryUser[]; br
 }
 
 export async function loadSuperAdminSummary(): Promise<SuperAdminSummary> {
-  const data = await call({ action: "summary" });
-  if (!data.summary) throw new Error("استجابة ملخص الإدارة العامة غير مكتملة.");
-  return data.summary;
+  try {
+    const data = await call({ action: "summary" });
+    if (!data.summary) throw new Error("استجابة ملخص الإدارة العامة غير مكتملة.");
+    return data.summary;
+  } catch (error) {
+    const message = failureMessage(error);
+    if (/HTTP 400/.test(message)) {
+      throw new Error(`${message} النسخة المنشورة من خدمة إدارة الأدوار لا تدعم ملخص المؤشرات؛ يلزم نشر النسخة الحالية من الدالة.`);
+    }
+    throw new Error(message);
+  }
 }
 
 export async function changeUserRole(

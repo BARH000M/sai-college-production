@@ -72,6 +72,22 @@ jobs:
             -H "Content-Type: application/octet-stream" \
             --data-binary "@${DUMP_FILE}.enc"
 
+      # A backup is only a backup once it can be read back. Download the stored
+      # object and prove byte-for-byte equality with the checksum and size we
+      # computed locally; otherwise the run is recorded as failed.
+      - name: Verify the uploaded backup (read-back checksum)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          curl -sSf -o "verify-${DUMP_FILE}.enc" \
+            "${SUPABASE_URL}/storage/v1/object/backups/${OBJECT}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
+          echo "${CHECKSUM}  verify-${DUMP_FILE}.enc" | sha256sum -c -
+          test "$(stat -c%s "verify-${DUMP_FILE}.enc")" = "${SIZE}"
+          echo "VERIFIED=1" >> "$GITHUB_ENV"
+
       - name: Record run in sai_backup_runs
         if: always()
         env:
@@ -80,9 +96,10 @@ jobs:
           RETENTION: ${{ github.event.inputs.retention || secrets.BACKUP_RETENTION_CLASS || 'daily' }}
         run: |
           set -euo pipefail
+          # Truthful status only: completed requires the read-back verification to have
+          # passed. Never report success for a dump that was never confirmed in storage.
           STATUS="completed"
-          [ -f "${DUMP_FILE}.enc" ] || STATUS="completed"
-          if [ "${{ job.status }}" != "success" ]; then STATUS="failed"; fi
+          if [ "${VERIFIED:-0}" != "1" ] || [ ! -f "${DUMP_FILE}.enc" ]; then STATUS="failed"; fi
           LOCATION="${OBJECT:-}"
           BODY=$(cat <<JSON
           [{
