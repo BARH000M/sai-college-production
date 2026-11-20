@@ -87,7 +87,7 @@ test("startup stays renderable and never connects to an unauthorized backend", a
     // Legacy anon JWTs for the authorized project still work.
     const jwtResult = await loadSupabase(
       { ...prodEnv, VITE_PUBLIC_SUPABASE_ANON_KEY: prodJwt },
-      () => (),
+      () => ({})
     );
     assert.equal(jwtResult.isSupabaseConfigured, true);
   } finally {

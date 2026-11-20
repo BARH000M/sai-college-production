@@ -111,9 +111,9 @@ export function BackupManager({ roles }: { roles: readonly string[] }) {
     }
   }
 
-  async function requestRestore(run: BackupRun) {
+  async function requestRestore(backup: BackupRun) {
     if (!window.confirm("سيتم تسجيل طلب استعادة بمراجعة بشرية. لن تُطبَّق أي استعادة تلقائياً على الإنتاج. متابعة؟")) return;
-    await run("request-restore", { backupId: run.id, note: `طلب استعادة للنسخة ${run.id}` }, "تم تسجيل طلب الاستعادة للمراجعة.");
+    await run("request-restore", { backupId: backup.id, note: `طلب استعادة للنسخة ${backup.id}` }, "تم تسجيل طلب الاستعادة للمراجعة.");
   }
 
   if (!isSuper) {

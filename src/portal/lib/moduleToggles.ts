@@ -16,7 +16,6 @@ export function useModuleToggles(): LoadState & { reload: () => void } {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
-  const [version, setVersion] = useState(0);
   const reload = useCallback(() => setNonce((value) => value + 1), []);
 
   useEffect(() => {
@@ -43,13 +42,11 @@ export function useModuleToggles(): LoadState & { reload: () => void } {
         if (active) {
           applyModuleToggles(disabled, overrides);
           setError(null);
-          setVersion((value) => value + 1);
         }
       } catch (e) {
         if (active) {
           applyModuleToggles([], {});
           setError(e instanceof Error ? e.message : String(e));
-          setVersion((value) => value + 1);
         }
       } finally {
         if (active) setReady(true);
@@ -69,5 +66,5 @@ export function useModuleToggles(): LoadState & { reload: () => void } {
     return () => { void supabase.removeChannel(channel); window.removeEventListener("sai:module-toggles-changed", onLocal); };
   }, [reload]);
 
-  return { ready, error, reload, version };
+  return { ready, error, reload };
 }
