@@ -1,6 +1,35 @@
 # Production deployment status and candidate manifest — Phase 7-R
 
-**Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
+**Current execution policy — 20 November 2026:** Complete the local SEC-02 + Phase 5A integration before resuming the remaining Phase 5A work, then continue through Phases 5A–6B. Defer the remaining Phase 4B work and Phase 4C under the current owner-directed priority. Production migration reconciliation and deployment remain approval-gated, `release_ready=false`, and **NO-GO**. All 16 phases and 24 settings requirements remain required.
+
+## SEC-02 pre-merge integration verification — 20 November 2026
+
+- At this earlier checkpoint, PR #8's source branch was reconciled against `38b03e096c9d61a68cac8438a7100a2a473c18f`; a local backup branch preserves its pre-merge head. The archived 017 migration remains out of `supabase/migrations/`, and the accidental empty file `0` was removed.
+- The pre-merge migration validator and manifest checks passed with 8/8 tamper tests; root tests passed 31/31 and web tests 112/112. Flutter, native PostgreSQL, Phase 3B reconciliation and the synthetic production SPA build also passed at that checkpoint.
+- Read-only Supabase metadata confirms the authorized project ref/name and `BARH000M` organization. No key was retrieved. The validator enforces URL/project identity; opaque publishable-key ownership remains unprovable from the key prefix alone.
+- GitHub Actions in the three root workflows are pinned to immutable commit hashes. The remote SPA check on the prior PR head failed due to missing CI configuration and is fixed locally. Supabase Preview still references a different project; no remote Supabase project was touched.
+
+**Disposition: NO-GO.** Do not push until the owner confirms the Supabase Preview integration is rebound to the authoritative project or disabled. Recovery, external write-hold, hash-bound owner approval, hosted security fixes, authenticated acceptance, release signing and hosting approvals remain outstanding. No production SQL, migration, website deployment, or remote project mutation was performed.
+
+## SEC-02 + Phase 5A combined local verification — 20 November 2026
+
+PR #8 is merged on `origin/main` at `f094b52`; local `main` combines it with HR
+commit `14bfc10`. Root tests passed 31/31, web tests 115/115, TypeScript and
+ESLint passed, Flutter strict analysis reported no issues and Flutter tests
+passed 68/68. Migration inventory/checksum/manifest validation passed against
+`origin/main`, with 8/8 migration tamper tests passing. The isolated native
+PostgreSQL profile/contact, examinations and HR suites passed; Phase 3B
+security reconciliation passed. The root production SPA built successfully
+with synthetic CI configuration; Vite reported the existing large-chunk
+warning.
+
+The HR migration is recorded in the reviewed migration lock with
+`history=false` and `classification=NOT APPLIED`. Historical migration lock
+entries and archived demo 017 are unchanged; HR is not in the production
+manifest. This is local implementation and validation only. Production remains
+**NO-GO**; no production migration/write, deployment or push occurred. Do not
+push until the owner resolves the Supabase Preview project mismatch and
+deployment safety is confirmed.
 
 ## Final backend/synchronization follow-up — 19 November 2026
 

@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'data/demo_school.dart';
 import 'data/demo_workspace.dart';
 import 'data/repository.dart';
+import 'data/secure_auth_storage.dart';
 import 'ui/components.dart';
 import 'ui/login_screen.dart';
 import 'ui/screens.dart';
@@ -32,13 +33,13 @@ Future<void> main() async {
     } else {
       try {
         // Preserve Main sessions; no other backend target is supported.
+        final authStorage = SecureAuthStorage();
         await Supabase.initialize(
           url: backendUrl,
           publishableKey: publicKey,
           authOptions: FlutterAuthClientOptions(
-            localStorage: SharedPreferencesLocalStorage(
-              persistSessionKey: 'sai-$saiTarget-auth',
-            ),
+            localStorage: authStorage,
+            pkceAsyncStorage: authStorage,
           ),
         );
       } catch (_) {

@@ -13,7 +13,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = ROOT / 'supabase' / 'tests'
 EVIDENCE = ROOT / '.tmp-phase7m-contracts'
-SUITES = ('profile_contact_behavior.sql', 'examinations_behavior.sql')
+SUITES = (
+    'profile_contact_behavior.sql',
+    'examinations_behavior.sql',
+    'hr_employee_directory_behavior.sql',
+)
 HOST = '127.0.0.1'
 SUFFIX = '.exe' if os.name == 'nt' else ''
 REQUIRED = ('initdb', 'pg_ctl', 'postgres', 'psql')

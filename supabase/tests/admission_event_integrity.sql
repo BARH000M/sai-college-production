@@ -45,12 +45,22 @@ begin
 
   perform set_config('request.jwt.claim.sub',attacker::text,true);
   execute 'set local role authenticated';
-  insert into public.audit_logs(actor_user_id,action,entity_type,entity_id,metadata)
-    values(attacker,'status_change','admissions_enquiries',eid,
-      '{"source":"sai_admissions_trigger","new_status":"enrolled"}');
-  insert into public.audit_logs(actor_user_id,action,entity_type,entity_id,metadata)
-    values(attacker,'insert','admissions_enquiries',eid,
-      '{"source":"sai_admissions_trigger","new_status":"accepted"}');
+  denied := false;
+  begin
+    insert into public.audit_logs(actor_user_id,action,entity_type,entity_id,metadata)
+      values(attacker,'status_change','admissions_enquiries',eid,
+        '{"source":"sai_admissions_trigger","new_status":"enrolled"}');
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Authenticated audit forgery was permitted'; end if;
+  denied := false;
+  begin
+    insert into public.audit_logs(actor_user_id,action,entity_type,entity_id,metadata)
+      values(attacker,'insert','admissions_enquiries',eid,
+        '{"source":"sai_admissions_trigger","new_status":"accepted"}');
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'Authenticated audit insert was permitted'; end if;
   denied := false;
   begin
     perform public.sai_admissions_set_status(eid,'accepted');
@@ -64,8 +74,8 @@ begin
   end;
   if not denied then raise exception 'Direct status update permitted'; end if;
   execute 'reset role';
-  if not exists(select 1 from public.audit_logs where entity_id=eid and actor_user_id=attacker)
-    then raise exception 'Forgery fixture did not persist'; end if;
+  if exists(select 1 from public.audit_logs where entity_id=eid and actor_user_id=attacker)
+    then raise exception 'Denied audit forgery persisted'; end if;
   if public.admissions_public_history(ref,token) is distinct from before_history
     then raise exception 'Forged audit affected trusted history'; end if;
   if public.admissions_public_history(ref,null) is not null

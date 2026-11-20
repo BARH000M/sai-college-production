@@ -4,6 +4,22 @@
 No production SQL, maintenance activation, Edge deployment, website/mobile
 publication or authenticated live acceptance occurred.
 
+## SEC-02 integration verification — 20 November 2026
+
+| Area | Result |
+|---|---|
+| PR/main reconciliation | Local SEC-02 branch reconciled with `origin/main` at `38b03e0`; pre-merge head backed up. One integrity conflict resolved. No force-push. |
+| Migration disposition | Archived 017 migration preserved outside production migrations; accidental zero-byte `0` removed. Validator and 8 tamper tests PASS. |
+| Root/web | Root 31/31, type-check and lint PASS; web 112/112 PASS. |
+| Flutter | Strict analysis PASS; full tests PASS (67 tests). |
+| Native PostgreSQL | Profile/contact, examinations, learning assessment, native contracts and Phase 3B reconciliation PASS on isolated loopback clusters; no Docker. |
+| Production SPA | Build PASS with authorized URL and synthetic non-secret publishable-key-shaped CI fixture; existing large-chunk warning remains. No deployment. |
+| GitHub Actions | All workflow action references are immutable commit hashes. Existing remote PR checks refer to the prior commit; rerun is pending push. |
+| Supabase project identity | Read-only project metadata verifies the authorized ref/name and `BARH000M` organization. No key value accessed. |
+| Remote preview integration | Supabase Preview check links to a different project. Push is blocked pending owner confirmation/rebinding so a retired/non-authoritative project cannot be modified. |
+
+Production remains **NO-GO**. No production migration, hosted database write, deployment, release, or GitHub settings change occurred.
+
 ## Latest local evidence — 18 November 2026
 
 The latest local integration refresh supersedes earlier local suite counts

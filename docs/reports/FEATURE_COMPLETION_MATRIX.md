@@ -1,5 +1,36 @@
 # Feature completion matrix
 
+## SEC-02 + Phase 5A combined local integration — 20 November 2026
+
+PR #8 is merged on `origin/main` at `f094b52`; local `main` combines that
+integration with HR commit `14bfc10`. Root tests passed 31/31, web tests
+115/115, TypeScript and ESLint passed, Flutter strict analysis reported no
+issues and Flutter tests passed 68/68. Migration inventory, checksums and
+manifest validation passed against `origin/main`, including all 8 migration
+tamper tests. Isolated native PostgreSQL profile/contact, examinations and HR
+contracts passed, as did Phase 3B security reconciliation. The root production
+SPA built with the synthetic CI configuration; Vite reported the existing
+large-chunk warning.
+
+The Phase 5A employee-directory slice is implemented and tested locally in
+the React and Flutter shared-module flows. Its branch-scoped migration is
+registered in the migration lock as `NOT APPLIED`; historical entries and the
+archived demo 017 checksum are preserved, and HR is excluded from the
+production manifest. HR documents, leave, attendance, contracts and payroll
+remain unfinished. This is local implementation evidence only. Production
+remains **NO-GO**; no production migration/write, deployment or push occurred.
+
+## SEC-02 pre-merge integration verification — 20 November 2026
+
+Before the HR merge, SEC-02 source integration and release checks passed as
+recorded here; these results are historical and are not the combined-tree
+verification above. Root tests passed 31/31, web tests 112/112, Flutter strict
+analysis and 67 tests passed, migration validation and 8 tamper tests passed,
+native PostgreSQL suites and Phase 3B reconciliation passed, and the root
+production SPA built with a non-secret CI fixture. Phase 4B remains
+**PARTIAL**, the deployment manifest remains `release_ready=false`, and
+production remains **NO-GO**. No production migration or deployment occurred.
+
 **Owner-authorized execution policy — 18 November 2026:** Phase 7-M local reconciliation is **COMPLETE**. Phase 4B is **ACTIVE FOR LOCAL DEVELOPMENT**. Production migration reconciliation and deployment remain pending explicit approval, with `release_ready=false`; unfinished Phase 4B contracts remain excluded from the production manifest. Production NO-GO does not block local development. All 16 phases and 24 settings requirements remain required. Earlier paused-status statements below describe the prior checkpoint.
 
 ## Latest local feature and release-preparation update — 18 November 2026

@@ -42,6 +42,20 @@ test('both push workflows remain checks-only, without deployment credentials or 
   }
 });
 
+test('all GitHub Actions are pinned to immutable commit hashes', () => {
+  for (const file of [
+    '.github/workflows/database-ci.yml',
+    '.github/workflows/mobile-ci.yml',
+    '.github/workflows/web-ci.yml',
+  ]) {
+    const actions = read(file).match(/^\s*(?:-\s*)?uses:\s+\S+/gm) ?? [];
+    assert.ok(actions.length > 0, `${file} has no actions to verify`);
+    for (const action of actions) {
+      assert.match(action, /@[0-9a-f]{40}$/i, `${file} contains a mutable action reference`);
+    }
+  }
+});
+
 test('root React app owns the production build and secondary web commands delegate to it', () => {
   const rootPackage = JSON.parse(read('package.json'));
   const webPackage = JSON.parse(read('web/package.json'));
@@ -54,5 +68,11 @@ test('root React app owns the production build and secondary web commands delega
   const workflow = read('.github/workflows/web-ci.yml');
   const productionJob = workflow.split('  secondary-web:')[0];
   assert.match(productionJob, /- run: npm run build/);
+  assert.ok(productionJob.includes([
+    '        env:',
+    '          VITE_SAI_TARGET: production',
+    '          VITE_PUBLIC_SUPABASE_URL: https://aeryusbrulqdxjdynwfh.supabase.co',
+    '          VITE_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ci',
+  ].join('\n')));
   assert.match(workflow, /root app is built in main-web/);
 });

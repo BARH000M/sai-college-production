@@ -16,6 +16,10 @@ def keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withReader("UTF-8") { reader -> keystoreProperties.load(reader) }
 }
+def requiredSigningProperties = ["keyAlias", "keyPassword", "storeFile", "storePassword"]
+def releaseSigningReady = keystorePropertiesFile.exists() &&
+        requiredSigningProperties.every { keystoreProperties.getProperty(it)?.trim() } &&
+        file(keystoreProperties.getProperty("storeFile", "")).isFile()
 
 android {
     namespace = "com.saicollege.mobile"
@@ -35,7 +39,7 @@ android {
     }
     signingConfigs {
         release {
-            if (keystorePropertiesFile.exists()) {
+            if (releaseSigningReady) {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
                 storeFile = file(keystoreProperties.getProperty("storeFile"))
@@ -46,8 +50,17 @@ android {
     buildTypes {
         release {
             // Never silently sign production output with the debug key.
-            signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : null
+            signingConfig = releaseSigningReady ? signingConfigs.release : null
         }
     }
 }
 flutter { source = "../.." }
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def buildsReleaseArtifact = taskGraph.allTasks.any {
+        it.name == "assembleRelease" || it.name == "bundleRelease"
+    }
+    if (buildsReleaseArtifact && !releaseSigningReady) {
+        throw new GradleException("Release APK/AAB builds require a complete key.properties and existing keystore.")
+    }
+}

@@ -1,10 +1,16 @@
 # Yemen SAI V2 — Building and production roadmap
 
-**Current owner-directed priority — 20 November 2026:** Task 2 (Phases 5A–6B) is the exclusive active development scope. Phase 4B remains **PARTIAL**; defer its nonessential remainder. Defer Phase 4C until after core college launch. Stop Phase 7 preflight/audit work; do one final integration and release checkpoint after Task 2. Preserve all completed functionality. Do not modify production, push, or deploy during Task 2.
+**Current main synchronization checkpoint — 20 November 2026:** PR #8 (SEC-02) is merged on `origin/main` at `f094b52`; local `main` combines it with the Phase 5A HR commit `14bfc10`. The combined implementation passed local validation; complete the local merge commit before resuming the remaining Phase 5A work. Do not push until the combined implementation passes validation and deployment safety is confirmed. Do not modify production or deploy.
+
+**SEC-01 / SEC-02 history:** SEC-01 assessment findings and evidence are retained in `docs/security/SEC-01-AUDIT-REPORT.md` and the associated reports; its completed assessment does not mean hosted controls passed. SEC-02 local remediation and its successful PR #8 integration are recorded in `docs/security/SEC-02-REMEDIATION-CLOSEOUT.md`. The SEC-02 checks were run before this HR combination, so the results below must not be presented as validation of the combined tree. SEC-01 findings F01–F12 remain open for production until their required deployment and live evidence exist. The earlier PR check failure caused by missing SPA build configuration was corrected locally; the Supabase Preview integration still points at a different project. Do not push until the owner confirms it is rebound to the authoritative project or disabled.
+
+**Outstanding security gates:** SEC-03 requires exact deployed web/mobile/database/RPC/Edge source parity, known Auth/Storage contracts and a signed distribution artifact. SEC-04 requires authenticated positive/negative privacy tests across student, parent, teacher, branch-admin, finance and super-admin boundaries. SEC-05 requires an authorized recovery drill, agreed RPO/RTO, key-custody recovery, runbooks and owner risk sign-off. Production remains **NO-GO**; no hosted security fix or release is claimed complete.
+
+**Current owner-directed development priority — 20 November 2026:** Task 2 (Phases 5A–6B) is the exclusive active development scope. Phase 4B remains **PARTIAL**; defer its nonessential remainder. Defer Phase 4C until after core college launch. Stop Phase 7 preflight/audit work; perform the final integration and release checkpoint after Task 2. Preserve all completed functionality. Do not modify production, push, or deploy during Task 2.
 
 | Module | Database implementation | React implementation | Flutter implementation | Authorization | Functional tests | Local commit | Remaining requirements |
 |---|---|---|---|---|---|---|---|
-| 5A HR | Employee directory implemented and isolated-SQL tested | Employee directory wired | Employee directory wired | Super Admin/Admin; branch RLS tested | Focused web, mobile and SQL tests pass | This local commit | Next: managed departments/designations; then contracts, documents, attendance, leave, payroll, salaries, payslips and reports |
+| 5A HR | Branch-scoped migration registered as `NOT APPLIED`; isolated SQL behavior test passes | Shared staff module wired; focused tests pass | Shared staff module wired; 68 Flutter tests pass | Super Admin/Admin; branch RLS, cross-branch denial and no-delete checks pass | Root 31/31; web 115/115; native HR PostgreSQL test passes; Flutter analysis clean | `14bfc10` plus local integration | After this integration gate: managed departments/designations, contracts, documents, attendance, leave, payroll, salaries, payslips and reports |
 | 5B Student services | Pending | Pending | Pending | Pending | Pending | Pending | Requests, certificates, ID cards, letters, transcripts, CV, documents, downloads, PDF and print |
 | 5C Settings | Existing partial contract; requirements pending | Existing partial UI; pending | Existing partial UI; pending | Existing contract; verify behavior by setting | Pending | Pending | Implement and synchronize all 24 approved settings |
 | 5D Communications | Existing partial contract; pending | Existing partial UI; pending | Existing partial UI; pending | Pending | Pending | Pending | Announcements, messaging, templates, recipients, read states and workflow integration |
@@ -13,6 +19,10 @@
 | 6B Advanced administration | Existing partial contracts; pending | Existing partial UI; pending | Existing partial UI; pending | Pending | Pending | Pending | Scholarships, aid, alumni, recruitment, applications, dashboards and printable reports |
 
 Tracker statuses describe newly verified implementation in this task, not historic claims. Update it after each coherent module; do not mark a module complete from navigation, placeholder UI, or an unverified schema alone.
+
+**SEC-02 + Phase 5A combined local verification — 20 November 2026:** Root tests passed 31/31; web tests 115/115; TypeScript, ESLint, Flutter strict analysis and Flutter tests 68/68 passed. Migration inventory/checksum/manifest validation passed against `origin/main`, with all eight migration tamper tests passing. The isolated native PostgreSQL profile/contact, examinations and HR suites passed; Phase 3B security reconciliation passed. The root production SPA built successfully with the synthetic CI configuration (existing large-chunk warning). The HR migration is recorded in the lock as `history=false`, `NOT APPLIED`; historical migration entries and the archived demo 017 checksum are preserved, and HR is not added to the production deployment manifest. Production remains **NO-GO**; no production migration/write, deployment, or push occurred.
+
+**SEC-02 pre-merge verification record — 20 November 2026:** Before the HR integration, PR #8's local source checks reported root tests 31/31, web tests 112/112, Flutter strict analysis and 67 tests, migration validation and eight tamper tests, native PostgreSQL contracts and Phase 3B reconciliation, and a production-mode SPA build with a synthetic publishable-key-shaped value. These are historical SEC-02 results, not results for the combined tree. Actions were pinned to immutable commits. Read-only project metadata confirmed the configured Main project and organization; no key was retrieved. No production migration, database write, website deployment or Supabase project mutation occurred. `supabase/migrations/017_demo_attendance_week.sql` remains archived at `supabase/archive/demo/017_demo_attendance_week.sql`; its historical checksum is preserved. The PR's earlier base was `38b03e096c9d61a68cac8438a7100a2a473c18f`; the merged target is now `f094b52`.
 
 **Final backend/synchronization follow-up — 19 November 2026:** The four ignored local configuration files now share the Main URL and supported publishable key; the web variables match `src/portal/lib/supabase.ts` and set `VITE_SAI_TARGET=production`. The root React app remains authoritative, builds to `out/`, and `web/` dev/build/preview commands delegate to it. Focused integration tests, the secondary build, and the migration/manifest validator pass. The live Main project is `ACTIVE_HEALTHY` on PostgreSQL 17.11; read-only inventory confirms 16 recorded migrations and seven active Edge Functions at the expected versions. Auth health returned HTTP 200 with the local publishable key; no user sign-in was attempted.
 
@@ -26,9 +36,9 @@ Production remains **NO-GO**. Live catalog checks still find the proposed examin
 
 
 <!-- PHASE7M-CURRENT -->
-**Historical Phase 7-M checkpoint — 18 November 2026:** The refreshed Main inventory was **57 local files / 57 GitHub Main files / 16 production history records**. Migration files matched `origin/main` at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. At that checkpoint Phase 4B was still paused. The later Phase 4B local-development refresh above supersedes that status; no production write, history repair or deployment occurred.
+**Historical Phase 7-M checkpoint — 18 November 2026:** The refreshed Main inventory was **57 local files / 57 GitHub Main files / 16 production history records**. Migration files matched `origin/main` at `d9e15f3b5680b32323bde29d3f41bd3bf22b4716`. At that checkpoint Phase 4B was still paused. The later Phase 4B local-development refresh above superseded that status; no production write, history repair or deployment occurred.
 
-**Current checkpoint within Phase 7: Phase 7-M.** Local reconciliation preparation and native SQL/security testing passed; the production baseline is unchanged and remains NO-GO. Retain all **16 development phases** and **24 system-settings requirements** below. Phase 7-M is a checkpoint, not an additional development phase or a waiver of provider/release requirements.
+**Historical Phase 7-M evidence and restrictions:** Local reconciliation preparation and native SQL/security testing passed at that checkpoint; the production baseline was unchanged and remained NO-GO. Retain all **16 development phases** and **24 system-settings requirements** below. Phase 7-M is a checkpoint, not an additional development phase or a waiver of provider/release requirements.
 
 - Use the [complete matrix](reports/PHASE_7M_MIGRATION_MATRIX.md), [current reconciliation report](reports/PHASE_7M_RECONCILIATION.md) and [updated Phase 7-R manifest](../supabase/deployment/phase7r/main-deployment-manifest.json).
 - Never replay 007 or the historical backlog. Quarantine the fourteen overlapping production candidates, including six empty placeholders. Apply only reviewed Main-compatible package routes after approval.
@@ -57,9 +67,9 @@ Production remains **NO-GO**. Live catalog checks still find the proposed examin
 - Nine roles: `super_admin`, `admin`, `teacher`, `accountant`, `receptionist`, `librarian`, `student`, `parent`, `content_editor`. Preserve authorized multi-role accounts and branch/session scope.
 - No new GitHub or Supabase branches, projects, development workspaces, Docker, force pushes, data resets or blind historical migration replay. Protected external backups and disposable native PostgreSQL test clusters are permitted solely for recovery/security testing.
 
-## 2. Latest reported evidence and boundaries
+## 2. Historical Phase 7 preflight evidence and boundaries
 
-This is a roadmap, not a fresh live database audit. Preserve newer verified repository evidence if it exists.
+The following table records the earlier preflight checkpoint; it is not current live status or a fresh database audit. Preserve newer verified repository evidence and do not infer current counts from these snapshots.
 
 | Checkpoint | Latest reported evidence | Remaining gate |
 |---|---|---|
@@ -197,7 +207,7 @@ The reference report's row-level classifications total 4 complete, 7 partial, 4 
 
 ## 5. Immediate execution sequence — Task 2
 
-1. Implement and verify Phase 5A HR modules, starting with employee management. Reuse shared Supabase contracts and connect both the React and Flutter clients; keep employee financial and contract data separately permissioned.
+1. Complete the local SEC-02 + Phase 5A synchronization checkpoint before continuing HR development. The employee-directory first slice is implemented in the shared React and Flutter module flows; register its local migration through the reviewed migration lock/integrity process and verify isolated RLS behavior. Then continue with managed departments/designations, contracts, documents, attendance, leave and payroll, keeping financial and contract data separately permissioned.
 2. Continue automatically through 5B, 5C, 5D, 5E, 6A and 6B. Integrate financial transactions with the existing accounting contract. Keep settings synchronized across clients and retain the nine-role model, Arabic RTL, Cairo font and institutional branding.
 3. Keep all schema changes in reviewed local migration files and tests. Do not apply database changes to production, push, deploy, run readiness audits, or resume 4B/4C work during Task 2.
 4. Commit each verified coherent module locally, updating the single tracker above. If work pauses before Task 2 is complete, report the exact next unfinished administrative feature.
@@ -220,6 +230,6 @@ Cross-cutting standards: Arabic-first RTL with English/Chinese support; responsi
 
 **Task 2 development cycle:** Implement → Focused test → Local commit → Update tracker → Continue. Push, production approval/deployment and release verification are outside Task 2.
 
-**Immediate action:** Begin Phase 5A HR employee management and continue through Phase 6B. The historical production NO-GO evidence above is retained for the later Phase 7 checkpoint; it is not an instruction to perform audits or preflight work during Task 2.
+**Immediate action:** Finish this local integration and validation, then resume the remaining Phase 5A HR requirements and continue through Phase 6B. The production NO-GO evidence is retained for the later Phase 7 checkpoint; it is not an instruction to perform audits or preflight work during Task 2.
 
-**Source of this revision:** 17 November 2026 deployment preflight report (`Pasted text(20261117-185858).txt`, final findings lines 345–410) and the previous `SAI_BUILDING_ROADMAP_2026-11-17.md`. This updated copy has not itself been written into the Windows workspace or GitHub.
+**Roadmap provenance:** This canonical roadmap consolidates the 17 November deployment preflight evidence, the SEC-01/SEC-02 reports and the 20 November owner-directed Phase 5A–6B execution scope. Older checkpoint-specific evidence remains historical and is superseded wherever the current status above differs.

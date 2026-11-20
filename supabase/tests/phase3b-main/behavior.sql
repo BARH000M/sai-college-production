@@ -41,9 +41,30 @@ do $$declare r text;c record;begin
      or has_any_column_privilege(r,'public.branch_memberships','INSERT,UPDATE') then
      raise exception 'Direct role/scope write survived for %',r;
    end if;
+   if r in ('anon','authenticated')
+     and (has_table_privilege(r,'public.audit_logs','INSERT')
+       or has_any_column_privilege(r,'public.audit_logs','INSERT')) then
+     raise exception 'Untrusted audit-log insert survived for %',r;
+   end if;
    if has_function_privilege(r,'public.sai_set_role(uuid,public.app_role,boolean)','EXECUTE') then
      raise exception 'Legacy role writer callable';end if;
  end loop;
+ if not has_table_privilege('service_role','public.audit_logs','INSERT')
+   or exists(select 1 from pg_policies where schemaname='public' and tablename='audit_logs'
+     and policyname='audit_logs_insert_self') then
+   raise exception 'Trusted audit writer or client policy contract is invalid';
+ end if;
+ if exists(
+   select 1 from pg_proc p
+   join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public' and p.proname in ('sai_library_issue','sai_library_return')
+     and (p.prosecdef or not coalesce(p.proconfig,ARRAY[]::text[])
+       @> ARRAY['search_path=pg_catalog, public, auth']::text[])
+ ) or (select count(*) from pg_proc p
+       join pg_namespace n on n.oid=p.pronamespace
+       where n.nspname='public' and p.proname in ('sai_library_issue','sai_library_return'))<>2 then
+   raise exception 'Library RPC invoker/search_path contract is invalid';
+ end if;
  for c in select p.oid,p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
    where n.nspname='public' and p.proname ~ '^sai_(security_|learning_(can_|own_student)|finance_(has_role|staff|can_read_student))' loop
    if has_function_privilege('authenticated',c.oid,'EXECUTE') or has_function_privilege('anon',c.oid,'EXECUTE') then
@@ -56,6 +77,8 @@ select pg_temp.expect_error('42501',$q$select public.sai_manage_role_assignment(
 reset role;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',true);
 set local role authenticated;
+select pg_temp.expect_error('42501',$q$insert into public.audit_logs(actor_user_id,action,entity_type,metadata)
+ values('00000000-0000-4000-8000-000000000002','forged','students','{"forged":true}')$q$);
 select pg_temp.expect_error('42501',$q$insert into public.user_roles(user_id,role) values('00000000-0000-4000-8000-000000000002','super_admin')$q$);
 select pg_temp.expect_error('42501',$q$update public.branch_memberships set branch_id='20000000-0000-4000-8000-000000000002'$q$);
 select pg_temp.expect_error('42501',$q$select public.sai_set_role('00000000-0000-4000-8000-000000000002','super_admin',true)$q$);

@@ -30,8 +30,8 @@ jobs:
     name: Portal / production SPA
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
           cache: npm
@@ -39,6 +39,11 @@ jobs:
       - run: node --test tests/main-integration.test.mjs
       - run: npm run type-check
       - run: npm run build
+        env:
+          VITE_SAI_TARGET: production
+          VITE_PUBLIC_SUPABASE_URL: https://aeryusbrulqdxjdynwfh.supabase.co
+          VITE_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ci
+          IS_PREVIEW: ''
   secondary-web:
     name: web/ compatibility and unit tests
     runs-on: ubuntu-latest
@@ -46,8 +51,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
           cache: npm

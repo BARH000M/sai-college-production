@@ -1,8 +1,7 @@
 import { supabase } from "./supabase";
 
-// EXACT table names and record columns used by the Yemen SAI Flutter v1.2 package.
-// These eight tables are defined by the proposed 029 migration and must be installed
-// before enabling the pages in production. Existing homework/library/finance stay unchanged.
+// The eight administrative tables follow the proposed 029 migration; the HR
+// employee directory has its own Phase 5A migration. Keep existing modules unchanged.
 export type UnifiedId = "staff" | "downloads" | "inventory" | "transport" | "portfolio" | "housing" | "certificates" | "frontCms" | "alumni";
 export type Field = { key: string; label: string; kind?: "number" | "date" | "boolean" | "text"; required?: boolean; defaultValue?: string };
 export type UnifiedSpec = {

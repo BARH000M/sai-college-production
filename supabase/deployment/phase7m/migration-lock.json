@@ -459,6 +459,14 @@
       "history": false,
       "empty": true,
       "classification": "CONFLICTING"
+    },
+    {
+      "version": "20261119230404",
+      "filename": "20261119230404_phase5a_hr_employee_directory.sql",
+      "sha256_lf": "2de5be2d4ef5404fd79f041c403d9f542a98212ac35b251789e8fa6d3367aeb6",
+      "history": false,
+      "empty": false,
+      "classification": "NOT APPLIED"
     }
   ]
 }

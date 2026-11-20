@@ -8,6 +8,7 @@ class Gates(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)
         paths={p.relative_to(ROOT).as_posix() for p in (ROOT/'supabase/migrations').glob('*.sql')}
+        paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'supabase/archive/demo').glob('*.sql'))
         paths.update(json.loads((ROOT/'supabase/deployment/phase7m/integrity.json').read_text()))
         paths.update(s['path'] for s in json.loads((ROOT/'supabase/deployment/phase7r/main-deployment-manifest.json').read_text())['required_source_files'])
         paths.add('supabase/deployment/phase7m/integrity.json')
@@ -21,6 +22,15 @@ class Gates(unittest.TestCase):
     def test_missing(self):
         (self.root/'supabase/migrations/007_finance.sql').unlink()
         self.assertTrue(any('missing migration' in e for e in v.validate(self.root)))
+    def test_archived_demo_checksum(self):
+        path=self.root/'supabase/archive/demo/017_demo_attendance_week.sql'
+        with path.open('a') as f: f.write('\nselect 1;')
+        self.assertTrue(any('archived checksum/version mismatch' in e for e in v.validate(self.root)))
+    def test_missing_archived_demo(self):
+        (self.root/'supabase/archive/demo/017_demo_attendance_week.sql').unlink()
+        errors=v.validate(self.root)
+        self.assertTrue(any('missing migration file: 017_demo_attendance_week.sql' in e for e in errors))
+        self.assertTrue(any('missing legacy version 017' in e for e in errors))
     def test_applied_checksum(self):
         with (self.root/'supabase/migrations/001_initial_schema.sql').open('a') as f: f.write('\nselect 1;')
         self.assertTrue(any('checksum/version mismatch' in e for e in v.validate(self.root)))
