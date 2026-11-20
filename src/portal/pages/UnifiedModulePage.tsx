@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { loadUnifiedBranches, loadUnifiedRows, removeUnifiedRow, saveUnifiedRow, type Field, type UnifiedRow, type UnifiedSpec } from "../lib/unifiedModules";
 
-export function UnifiedModulePage({spec,roles}:{spec:UnifiedSpec;roles:readonly string[]}) {
+export function UnifiedModulePage({spec,roles,headerExtra}:{spec:UnifiedSpec;roles:readonly string[];headerExtra?:ReactNode}) {
   const permitted = roles.some(role=>spec.roles.includes(role));
   const writable = roles.some(role=>spec.writeRoles.includes(role));
   const [branches,setBranches] = useState<{id:string;name:string}[]>([]);
@@ -68,6 +68,7 @@ export function UnifiedModulePage({spec,roles}:{spec:UnifiedSpec;roles:readonly 
   }
   return <main className="workspace" dir="rtl"><section className="panel">
     <p className="eyebrow">قاعدة البيانات الموحدة · Supabase</p><h1>{spec.title}</h1>
+    {headerExtra}
     <p className="muted">جدول {spec.table} مشترك مع تطبيق Yemen SAI. البيانات الظاهرة فقط هي البيانات التي تسمح سياسة RLS بقراءتها.</p>
     <div className="actions" style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <label htmlFor={`branch-${spec.id}`}>الفرع</label><select id={`branch-${spec.id}`} value={branch} onChange={e=>setBranch(e.target.value)}>

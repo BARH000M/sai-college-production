@@ -37,7 +37,7 @@ const sections: readonly SectionSpec[] = [
   { id: "content", label: "إدارة المحتوى والموقع", icon: "ri-layout-4-line", moduleIds: ["authoring", "media", "approvals", "cms", "frontCms"] },
   { id: "organization", label: "الفروع والجلسات", icon: "ri-map-pin-2-line", moduleIds: ["branches", "sessions"] },
   { id: "reports", label: "التقارير", icon: "ri-bar-chart-2-line", moduleIds: ["reports"] },
-  { id: "administration", label: "النظام والصلاحيات", icon: "ri-shield-user-line", moduleIds: ["roles", "settings", "systemCatalog"] },
+  { id: "administration", label: "النظام والصلاحيات", icon: "ri-shield-user-line", moduleIds: ["roles", "settings", "systemCatalog", "backups"] },
 ];
 
 export function visibleSidebarSections(roles: readonly string[]): SidebarSection[] {

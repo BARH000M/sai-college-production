@@ -48,6 +48,6 @@ export const expectedSystemEntryCount = systemCategories.reduce((total, category
 export function inventoryRelatedModulePath(entry: InventoryReferenceEntry): string | null {
   if (entry.status === "pending" || !entry.moduleId) return null;
   const item = navigation.find((module) => module.id === entry.moduleId);
-  if (!item || !isModuleAvailable(item.id) || !canAccessModule(item.id, ["super_admin"])) return null;
+  if (!item || !isModuleAvailable(item.id, ["super_admin"]) || !canAccessModule(item.id, ["super_admin"])) return null;
   return modulePath(item);
 }

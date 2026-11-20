@@ -9,6 +9,7 @@ import { PortalHome } from "./pages/PortalHome";
 import { Profile } from "./pages/Profile";
 import { ModuleEntry } from "./pages/ModuleEntry";
 import { isAppRole } from "./lib/navigation";
+import { useModuleToggles } from "./lib/moduleToggles";
 import { onboardingNotices } from "./lib/onboarding";
 import { canAccessOperations } from "./lib/studentLearning";
 import { accountErrorMessage } from "./lib/accountError";
@@ -26,6 +27,7 @@ export default function PortalApp() {
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const version = useRef(0);
   const location = useLocation();
+  const moduleToggles = useModuleToggles();
 
   async function refresh() {
     const request = ++version.current;
@@ -118,6 +120,7 @@ export default function PortalApp() {
 
   return (
     <ErrorBoundary>
+      {moduleToggles.ready ? (
       <div className="portal-root">
         <Routes>
           {/* The old portal login keeps working, but the real screen lives at /auth. */}
@@ -134,6 +137,9 @@ export default function PortalApp() {
           <Route path="*" element={<StatusCard title="الصفحة غير موجودة" message="العنوان المطلوب غير متاح." link={HOME} />} />
         </Routes>
       </div>
+      ) : (
+        <StatusCard title="جارٍ تحميل إعدادات اللوحة" message="يتم تجهيز حالة تفعيل الوحدات قبل عرض اللوحة." />
+      )}
     </ErrorBoundary>
   );
 }

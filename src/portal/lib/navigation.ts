@@ -68,6 +68,7 @@ export const navigation: readonly NavigationItem[] = [
   { id: "alumni", label: "الخريجون", icon: "ri-graduation-cap-line", roles: ["super_admin","admin","receptionist"] },
   { id: "settings", label: "إعدادات النظام", icon: "ri-settings-3-line", roles: ["super_admin","admin"] },
   { id: "systemCatalog", label: "جرد النظام والوحدات", icon: "ri-list-check-2", roles: ["super_admin"] },
+  { id: "backups", label: "النسخ الاحتياطي والاستعادة", icon: "ri-database-2-line", roles: ["super_admin"] },
 ];
 
 /**
@@ -80,14 +81,85 @@ const availableModuleIds: readonly string[] = [
   "courses", "homework", "progress", "attendance", "exams", "roles", "reports", "cms",
   "academics", "timetable", "qr", "vocabulary", "library", "communications", "finance",
   "settings", "systemCatalog", "staff",
+  "downloads", "inventory", "transport", "portfolio", "housing", "certificates", "frontCms", "alumni",
+  "backups",
 ];
 
 export function isAppRole(value: string): value is AppRole {
   return Object.prototype.hasOwnProperty.call(roleLabels, value);
 }
 
-export function isModuleAvailable(id: string): boolean {
-  return availableModuleIds.includes(id);
+/**
+ * Modules that must never be switched off, so a super administrator can always
+ * reach Settings to re-enable anything else.
+ */
+export const alwaysOnModuleIds: readonly string[] = [
+  "home", "profile", "notifications", "settings", "systemCatalog", "roles", "backups",
+];
+
+// Live toggle state, loaded once per session from sai_module_toggles.
+let disabledModuleIds: ReadonlySet<string> = new Set();
+// Per-role overrides, loaded from sai_module_role_overrides (moduleId -> role -> enabled).
+let moduleRoleOverrides: ReadonlyMap<string, ReadonlyMap<string, boolean>> = new Map();
+
+export function applyModuleToggles(
+  disabledIds: readonly string[],
+  overrides: Record<string, Record<string, boolean>> = {},
+): void {
+  const next = new Set<string>();
+  for (const id of disabledIds) if (!alwaysOnModuleIds.includes(id)) next.add(id);
+  disabledModuleIds = next;
+
+  const map = new Map<string, ReadonlyMap<string, boolean>>();
+  for (const [moduleId, roleMap] of Object.entries(overrides)) {
+    if (alwaysOnModuleIds.includes(moduleId)) continue;
+    const inner = new Map<string, boolean>();
+    for (const [role, enabled] of Object.entries(roleMap ?? {})) inner.set(role, enabled === true);
+    if (inner.size > 0) map.set(moduleId, inner);
+  }
+  moduleRoleOverrides = map;
+}
+
+/** Explicit per-role override, or null when the role inherits the global state. */
+export function moduleRoleOverride(moduleId: string, role: string): boolean | null {
+  const inner = moduleRoleOverrides.get(moduleId);
+  if (!inner) return null;
+  const value = inner.get(role);
+  return value === undefined ? null : value;
+}
+
+export function isModuleDisabled(id: string): boolean {
+  return disabledModuleIds.has(id);
+}
+
+/**
+ * Effective state for a set of roles. A module is available when the global
+ * toggle is on AND at least one of the user's roles resolves to enabled.
+ * Role overrides only ever narrow or restore access, never bypass the global off.
+ */
+export function isModuleEnabledFor(moduleId: string, roles: readonly string[]): boolean {
+  if (alwaysOnModuleIds.includes(moduleId)) return true;
+  const base = !disabledModuleIds.has(moduleId);
+  if (roles.length === 0) return base;
+  const inner = moduleRoleOverrides.get(moduleId);
+  if (!inner || inner.size === 0) return base;
+  for (const role of roles) {
+    const override = inner.get(role);
+    if (override === true) return true;
+    if (override === undefined && base) return true;
+  }
+  return false;
+}
+
+/** Modules a super administrator may toggle in Settings (available and not always-on). */
+export function toggleableModules(): NavigationItem[] {
+  return navigation.filter((item) => availableModuleIds.includes(item.id) && !alwaysOnModuleIds.includes(item.id));
+}
+
+export function isModuleAvailable(id: string, roles?: readonly string[]): boolean {
+  if (!availableModuleIds.includes(id)) return false;
+  if (roles) return isModuleEnabledFor(id, roles);
+  return !disabledModuleIds.has(id);
 }
 
 export function canAccessModule(id: string, roles: readonly string[]): boolean {
@@ -102,7 +174,7 @@ export function modulePath(item: NavigationItem): string {
 }
 
 export function visibleNavigation(roles: readonly string[]): NavigationItem[] {
-  return navigation.filter((item) => isModuleAvailable(item.id) && canAccessModule(item.id, roles));
+  return navigation.filter((item) => isModuleAvailable(item.id, roles) && canAccessModule(item.id, roles));
 }
 
 /**
@@ -116,14 +188,6 @@ export const pendingModules: readonly { id: string; label: string; reason: strin
   { id: "media", label: "مكتبة الوسائط", reason: "تحتاج تخزين ملفات وربطه بمساحة Supabase Storage." },
   { id: "approvals", label: "المراجعة والنشر", reason: "تحتاج حالات مراجعة واعتماد للمحتوى." },
   { id: "reception", label: "الاستقبال", reason: "تحتاج مسار زوار ومواعيد مستقل عن القبول." },
-  { id: "downloads", label: "مركز التحميل", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
-  { id: "inventory", label: "المخزون", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
-  { id: "transport", label: "النقل", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
-  { id: "portfolio", label: "ملف الإنجاز", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
-  { id: "housing", label: "السكن", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
-  { id: "certificates", label: "الشهادات", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
-  { id: "frontCms", label: "صفحات Front CMS", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
-  { id: "alumni", label: "الخريجون", reason: "يحتاج التحقق من عقد الخدمة والصلاحيات قبل التفعيل." },
   { id: "listening", label: "الاستماع", reason: "لا توجد شاشة تدريب مكتملة؛ المحتوى الصوتي يُعرض فقط إذا أُضيف إلى درس منشور." },
   { id: "speaking", label: "التحدث والنطق", reason: "لا يوجد تسجيل أو تقييم نطق موثوق في الخلفية الحالية." },
   { id: "tones", label: "النغمات الصينية", reason: "لا يوجد مسار تدريب وتقييم للنغمات مرتبط بنتائج الطالب." },

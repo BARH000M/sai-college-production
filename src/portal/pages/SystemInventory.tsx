@@ -7,7 +7,7 @@ import { inventoryReference, type InventoryEntryStatus } from "../lib/systemInve
 
 const moduleById = new Map(navigation.map((item) => [item.id, item]));
 const superAdminModules = navigation.filter((item) =>
-  item.id !== "systemCatalog" && isModuleAvailable(item.id) && item.roles.includes("super_admin"),
+  item.id !== "systemCatalog" && isModuleAvailable(item.id, ["super_admin"]) && item.roles.includes("super_admin"),
 );
 const entryStatusLabels: Record<InventoryEntryStatus, string> = {
   implemented: "منفذ في التطبيق",
@@ -64,7 +64,7 @@ export function SystemInventory() {
             const linked = [...new Set(category.moduleIds)]
               .flatMap((id) => {
                 const item = moduleById.get(id);
-                return item && isModuleAvailable(id) ? [item] : [];
+                return item && isModuleAvailable(id, ["super_admin"]) ? [item] : [];
               });
             return <tr key={category.id}>
               <td>{index + 1}</td>

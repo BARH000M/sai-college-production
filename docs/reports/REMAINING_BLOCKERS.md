@@ -1,5 +1,27 @@
 # Remaining blockers — Phase 7-R
 
+<!-- LIVE-VERIFICATION-2026-11-20 -->
+## Live re-verification — 20 November 2026
+
+Read-only inspection of the connected Supabase project corrects several items
+below. Full evidence: `docs/security/LIVE-SECURITY-VERIFICATION-2026-11-20.md`.
+
+- RLS is enabled on **all 51 public tables**; the only zero-policy table is
+  deny-all and unused. The earlier "RLS/policy pending" concern is resolved.
+- **49 audit triggers** exist and `audit_logs` is healthy.
+- Every `SECURITY DEFINER` RPC callable by `authenticated` enforces a role/scope
+  gate through a private/public helper. The "14 unlocked wrappers" note no
+  longer matches the live function set; the gates resolve correctly.
+- `exams`, `exam_results`, HR, certificates, alumni, housing, inventory,
+  transport, downloads, portfolios, CMS pages, `sai_backup_runs` and the
+  `backups` bucket **now exist** — the "absent schema" blockers are stale.
+- `sai_mutation_hold` remains absent **by design** (cutover-only tool).
+
+Still genuinely open (non-code): managed-backup/PITR evidence, Supabase-compatible
+restore proof, signed AAB (`key.properties` missing), GitHub authorization, and
+the authenticated nine-role acceptance pass.
+<!-- END-LIVE-VERIFICATION -->
+
 Status refreshed 18 November 2026. **Production remains NO-GO.** No production
 SQL, hold activation, Edge deployment, website deployment, mobile publication or
 live acceptance was performed.

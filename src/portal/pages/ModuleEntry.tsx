@@ -19,6 +19,8 @@ import { Communications } from "./Communications";
 import { Finance } from "./Finance";
 import { SystemSettings } from "./SystemSettings";
 import { SystemInventory } from "./SystemInventory";
+import { BackupManager } from "./BackupManager";
+import { HrPage } from "./hr/HrPage";
 import { UnifiedModulePage } from "./UnifiedModulePage";
 import { unifiedModules, type UnifiedId } from "../lib/unifiedModules";
 
@@ -29,7 +31,7 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   if (!canAccessModule(item.id, roles)) {
     return <main className="workspace"><section className="panel" role="alert"><h1>الوصول غير متاح</h1><p>هذا القسم غير متاح للأدوار المسندة إلى حسابك.</p><Link to="/portal/dashboard">العودة للرئيسية</Link></section></main>;
   }
-  if (!isModuleAvailable(item.id)) {
+  if (!isModuleAvailable(item.id, roles)) {
     const pending = pendingModules.find((entry) => entry.id === item.id);
     return <main className="workspace"><section className="panel">
       <p className="eyebrow">كلية ساي</p><h1>{item.label}</h1>
@@ -61,8 +63,10 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   if (item.id === "library") return <Library roles={roles} userId={userId} />;
   if (item.id === "communications") return <Communications roles={roles} userId={userId} />;
   if (item.id === "finance") return <Finance roles={roles} userId={userId} />;
-  if (item.id === "settings") return <SystemSettings roles={roles} />;
+  if (item.id === "settings") return <SystemSettings roles={roles} userId={userId} />;
   if (item.id === "systemCatalog") return <SystemInventory />;
+  if (item.id === "backups") return <BackupManager roles={roles} />;
+  if (item.id === "staff") return <HrPage roles={roles} userId={userId} />;
   if (Object.prototype.hasOwnProperty.call(unifiedModules, item.id)) {
     return <UnifiedModulePage key={item.id} roles={roles} spec={unifiedModules[item.id as UnifiedId]} />;
   }

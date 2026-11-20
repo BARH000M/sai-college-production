@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadSettings, saveSetting, settingsSections, type SettingField, type SettingSection } from "../lib/systemSettings";
+import { ModuleTogglesPanel } from "./settings/ModuleTogglesPanel";
+import { AuditLogPanel } from "./settings/AuditLogPanel";
 
 const actions = [
   {label:"إدارة المستخدمين والأدوار",to:"/portal/modules/roles",note:"الحسابات والصلاحيات تُدار عبر خدمة إدارة الأدوار المصرح لها فقط."},
   {label:"إدارة الجلسات الأكاديمية",to:"/portal/modules/sessions",note:"تسجيل الجلسات وتواريخها في قاعدة البيانات الحقيقية."},
   {label:"صفحات الموقع Front CMS",to:"/portal/modules/frontCms",note:"الصفحات المنشورة والمسودات المشتركة مع التطبيق."},
+  {label:"النسخ الاحتياطي والاستعادة",to:"/portal/modules/backups",note:"تنسيق النسخ الآمنة وسجل العمليات للمسؤول العام فقط."},
 ];
 
-export function SystemSettings({ roles }: { roles: readonly string[] }) {
+export function SystemSettings({ roles, userId }: { roles: readonly string[]; userId: string | null }) {
   const privileged = roles.includes("super_admin");
   const allowed = privileged || roles.includes("admin");
   const [section, setSection] = useState<SettingSection>(settingsSections[0]);
@@ -67,6 +70,8 @@ export function SystemSettings({ roles }: { roles: readonly string[] }) {
           {saving===field.key?"جارٍ الحفظ...":"حفظ في Supabase"}</button></div>
       </div>)}
     </div>}
+    <ModuleTogglesPanel roles={roles} userId={userId} />
+    <AuditLogPanel roles={roles} />
     <h2 style={{marginTop:28}}>إدارة منفصلة وآمنة</h2>
     {actions.filter(action=>privileged || action.to!=="/portal/modules/roles").map(action=><p key={action.to}><Link to={action.to}>{action.label}</Link> — {action.note}</p>)}
     <p className="data-note">حظر عناوين IP يتم من بوابة الشبكة/WAF وليس من حقل نص في قاعدة البيانات. استعادة البيانات من النسخ الاحتياطية تحتاج إجراءً إدارياً منفصلاً بمراجعة وتأكيد.</p>

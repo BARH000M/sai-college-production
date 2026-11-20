@@ -1,0 +1,106 @@
+# Secure server-side PostgreSQL backup worker.
+# Runs pg_dump from a GitHub Actions runner (native binaries, no Docker),
+# compresses + encrypts, uploads to a restricted private Supabase Storage bucket,
+# and records the run + checksum in public.sai_backup_runs via the service role.
+#
+# Required repository secrets:
+#   SUPABASE_DB_URL              - Postgres connection string (session pooler) for pg_dump
+#   SUPABASE_URL                 - https://<project-ref>.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY    - service role key (Storage upload + REST insert)
+#   BACKUP_ENCRYPTION_KEY        - symmetric encryption passphrase (openssl aes-256-cbc)
+# Optional:
+#   BACKUP_RETENTION_CLASS       - daily | weekly | monthly (default daily)
+
+name: Database Backup
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # daily at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      retention:
+        description: "Retention class (daily|weekly|monthly)"
+        required: false
+        default: "daily"
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client openssl
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --format=plain | gzip -9 > "db-${STAMP}.sql.gz"
+          echo "DUMP_FILE=db-${STAMP}.sql.gz" >> "$GITHUB_ENV"
+
+      - name: Encrypt + checksum
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          openssl enc -aes-256-cbc -salt -pbkdf2 -pass env:BACKUP_ENCRYPTION_KEY \
+            -in "$DUMP_FILE" -out "${DUMP_FILE}.enc"
+          CHECKSUM="$(sha256sum "${DUMP_FILE}.enc" | cut -d' ' -f1)"
+          SIZE="$(stat -c%s "${DUMP_FILE}.enc")"
+          echo "CHECKSUM=$CHECKSUM" >> "$GITHUB_ENV"
+          echo "SIZE=$SIZE" >> "$GITHUB_ENV"
+          rm -f "$DUMP_FILE"
+
+      - name: Upload to private backups bucket
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          OBJECT="database/${STAMP}/${DUMP_FILE}.enc"
+          echo "OBJECT=$OBJECT" >> "$GITHUB_ENV"
+          curl -sSf -X POST \
+            "${SUPABASE_URL}/storage/v1/object/backups/${OBJECT}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "x-upsert: true" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@${DUMP_FILE}.enc"
+
+      - name: Record run in sai_backup_runs
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RETENTION: ${{ github.event.inputs.retention || secrets.BACKUP_RETENTION_CLASS || 'daily' }}
+        run: |
+          set -euo pipefail
+          STATUS="completed"
+          [ -f "${DUMP_FILE}.enc" ] || STATUS="completed"
+          if [ "${{ job.status }}" != "success" ]; then STATUS="failed"; fi
+          LOCATION="${OBJECT:-}"
+          BODY=$(cat <<JSON
+          [{
+            "provider": "github-actions",
+            "kind": "database",
+            "status": "${STATUS}",
+            "retention_class": "${RETENTION}",
+            "size_bytes": ${SIZE:-0},
+            "checksum": "${CHECKSUM:-}",
+            "location": "${LOCATION}",
+            "finished_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "note": "نسخة pg_dump مشفّرة من عامل GitHub Actions"
+          }]
+          JSON
+          )
+          curl -sSf -X POST "${SUPABASE_URL}/rest/v1/sai_backup_runs" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            --data "$BODY"

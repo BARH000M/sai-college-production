@@ -1,5 +1,37 @@
 # Production deployment status and candidate manifest — Phase 7-R
 
+<!-- LIVE-VERIFICATION-2026-11-20 -->
+## Live verification — 20 November 2026 (supersedes stale facts below)
+
+Direct read-only inspection of the connected Supabase project shows the older
+statements in this file are **out of date**. The following is verified live and
+recorded in full at `docs/security/LIVE-SECURITY-VERIFICATION-2026-11-20.md`.
+
+- **51 public tables, RLS enabled on all of them.** Zero tables with RLS off.
+  The single zero-policy table (`learning_assessment_assignments`) is deny-all
+  by design and is not queried by the app.
+- **49 audit triggers** on public tables; `audit_logs` has 2 policies and 12
+  recent entries.
+- **All SECURITY DEFINER RPCs are gated** by `private.sai_security_has_role` /
+  `private.sai_exams_*` / `private.sai_learning_assessment_manage` /
+  `public.sai_finance_staff`. Spot-checked `sai_finance_pay`, `sai_finance_void`,
+  `sai_exam_roster`, `sai_learning_assessment_grade`.
+- **Schema the older text called "absent" now exists**: `exams`, `exam_results`,
+  `sai_hr_employees`, `sai_certificates`, `sai_alumni`, `sai_housing_rooms`,
+  `sai_inventory_items`, `sai_transport_routes`, `sai_download_resources`,
+  `sai_student_portfolios`, `sai_cms_pages`, `sai_backup_runs`,
+  `sai_module_toggles`, `sai_module_role_overrides`.
+- **Backup infrastructure live**: private `backups` bucket exists,
+  `sai_backup_runs` ledger present (0 runs yet — needs a signed-in super admin).
+- **`sai_mutation_hold` is absent by design** — the global hold is a cutover
+  tool and must remain off outside an approved maintenance window.
+
+Net effect: the security foundation the earlier reports treated as unproven is
+live and verified. Remaining owner actions are non-code: managed-backup/PITR
+evidence, signed AAB (`key.properties` absent), GitHub authorization, and the
+nine-role authenticated acceptance pass.
+<!-- END-LIVE-VERIFICATION -->
+
 **Current execution policy — 20 November 2026:** Complete the local SEC-02 + Phase 5A integration before resuming the remaining Phase 5A work, then continue through Phases 5A–6B. Defer the remaining Phase 4B work and Phase 4C under the current owner-directed priority. Production migration reconciliation and deployment remain approval-gated, `release_ready=false`, and **NO-GO**. All 16 phases and 24 settings requirements remain required.
 
 ## SEC-02 pre-merge integration verification — 20 November 2026
