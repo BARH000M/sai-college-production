@@ -6,7 +6,8 @@ type ToggleRow = { module_id: string; enabled: boolean };
 type OverrideRow = { module_id: string; role: string; enabled: boolean };
 
 const alwaysEnabledNote = "الوحدات الأساسية (الرئيسية، الملف الشخصي، الإشعارات، الإعدادات، إدارة الأدوار، النسخ الاحتياطي) لا يمكن تعطيلها حتى تبقى الإدارة قابلة للوصول.";
-const overrideNote = "يمكن تخصيص كل وحدة لكل دور: «افتراضي» يتبع الحالة العامة، و«مفعّل» أو «معطّل» يتجاوزها لهذا الدور فقط. إذا كان للمستخدم أكثر من دور، تُتاح الوحدة إذا كان أي دور منها يسمح بها.";
+const overrideNote = "يمكن تخصيص كل وحدة لكل دور: «افتراضي» يتبع الحالة العامة، و«مفعّل» أو «معطّل» يخص هذا الدور فقط. التعطيل العام يسبق كل التخصيصات، فلا يمكن لأي دور إعادة تفعيل وحدة معطّلة عامةً. وإذا كان للمستخدم أكثر من دور، تُتاح الوحدة إذا كان أي دور منها يسمح بها.";
+const globalOffNote = "هذه الوحدة معطّلة عامةً، لذلك لن تظهر لأي دور مهما كان التخصيص.";
 
 /** inherit (null) → enabled (true) → disabled (false) → inherit */
 function nextOverride(current: boolean | null): boolean | null {
@@ -161,7 +162,7 @@ export function ModuleTogglesPanel({ roles, userId }: { roles: readonly string[]
         const moduleOverrides = overrides[item.id] ?? {};
         const isOpen = expanded.has(item.id);
         const overrideCount = Object.keys(moduleOverrides).length;
-        const effectiveRoleCount = item.roles.filter((role) => {
+        const effectiveRoleCount = !enabled ? 0 : item.roles.filter((role) => {
           const value = moduleOverrides[role];
           return value === undefined ? enabled : value;
         }).length;
@@ -191,6 +192,7 @@ export function ModuleTogglesPanel({ roles, userId }: { roles: readonly string[]
             </button>
           </div>
 
+          {isOpen && !enabled && <p className="data-note" role="status">{globalOffNote}</p>}
           {isOpen && <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {item.roles.map((role) => {
               const value = moduleOverrides[role] ?? null;
@@ -201,7 +203,7 @@ export function ModuleTogglesPanel({ roles, userId }: { roles: readonly string[]
                 type="button"
                 className={`button ${value === true ? "" : "secondary"}`}
                 style={{ fontSize: 12 }}
-                disabled={!canWrite || busy !== null}
+                disabled={!canWrite || busy !== null || !enabled}
                 title={`${roleLabels[role]} — ${label}`}
                 aria-label={`${item.label}: ${roleLabels[role]} — ${label}`}
                 onClick={() => void setOverride(item.id, role, nextOverride(value))}

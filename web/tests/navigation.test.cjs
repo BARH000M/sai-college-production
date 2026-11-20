@@ -73,14 +73,29 @@ test("navigation matches the approved prototype role mapping", async () => {
   }
 });
 
-test("modules without the proposed schema stay hidden until it is installed", async () => {
+// Verified against the live database: every module below has a table with RLS
+// enabled and real read/write policies, and a screen in ModuleEntry. Anything that
+// still lacks a verified contract must stay out of the catalogue and stay pending.
+const verifiedModules = ["staff", "downloads", "inventory", "transport", "portfolio", "housing", "certificates", "frontCms", "alumni"];
+
+for (const id of verifiedModules) {
+  test(`module ${id} is available because its table, RLS and screen are verified`, async () => {
+    const { isModuleAvailable, isModulePending, navigation } = await navigationModule;
+    assert.equal(isModuleAvailable(id), true, `${id} has a verified table with RLS and a wired screen`);
+    assert.equal(isModulePending(id), false, `${id} must not be reported as pending`);
+    const item = navigation.find((entry) => entry.id === id);
+    assert.ok(item, `${id} must exist in the navigation catalogue`);
+    assert.ok(item.roles.length > 0, `${id} must keep its approved role mapping`);
+  });
+}
+
+test("modules without a verified contract stay hidden and pending", async () => {
   const { isModuleAvailable, isModulePending } = await navigationModule;
-  for (const id of ["downloads", "inventory", "transport", "portfolio", "housing", "certificates", "frontCms", "alumni"]) {
-    assert.equal(isModuleAvailable(id), false, `${id} must not expose a missing database table`);
+  for (const id of ["quizzes", "authoring", "media", "approvals", "reception"]) {
+    assert.equal(isModuleAvailable(id), false, `${id} must not expose an unverified screen`);
     assert.equal(isModulePending(id), true, `${id} must explain why it is unavailable`);
   }
-  assert.equal(isModuleAvailable("staff"), true);
-  assert.equal(isModulePending("staff"), false);
+  assert.equal(isModuleAvailable("not-a-module"), false);
 });
 
 test("staff records are available only to HR administrators", async () => {

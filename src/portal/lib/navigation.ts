@@ -133,22 +133,61 @@ export function isModuleDisabled(id: string): boolean {
 }
 
 /**
- * Effective state for a set of roles. A module is available when the global
- * toggle is on AND at least one of the user's roles resolves to enabled.
- * Role overrides only ever narrow or restore access, never bypass the global off.
+ * Effective state for a set of roles.
+ *
+ * Precedence is strict: an always-on module is always visible, a global OFF hides
+ * the module for every role, and only then do per-role overrides apply. A per-role
+ * "enabled" row can therefore never bypass a global disable — it only restores the
+ * global state for one role, or switches it off for one role. Multi-role accounts
+ * get the union: the module is visible when at least one of their roles is enabled.
  */
 export function isModuleEnabledFor(moduleId: string, roles: readonly string[]): boolean {
   if (alwaysOnModuleIds.includes(moduleId)) return true;
-  const base = !disabledModuleIds.has(moduleId);
-  if (roles.length === 0) return base;
+  // Global OFF wins over every per-role override.
+  if (disabledModuleIds.has(moduleId)) return false;
   const inner = moduleRoleOverrides.get(moduleId);
-  if (!inner || inner.size === 0) return base;
+  if (!inner || inner.size === 0) return true;
+  if (roles.length === 0) return true;
   for (const role of roles) {
     const override = inner.get(role);
-    if (override === true) return true;
-    if (override === undefined && base) return true;
+    // An explicit "off" hides the module for that role only; unknown/inherit keeps it.
+    if (override === undefined || override === true) return true;
   }
   return false;
+}
+
+/**
+ * Snapshot shape loaded from sai_module_toggles and sai_module_role_overrides.
+ * `null` means that particular read failed, which is different from an empty list.
+ */
+export type ModuleToggleSnapshot = {
+  toggles: readonly { module_id: string; enabled: boolean }[] | null;
+  overrides: readonly { module_id: string; role: string; enabled: boolean }[] | null;
+};
+
+/**
+ * Applies a loaded snapshot.
+ *
+ * Failure behaviour is deliberate: when the global toggle list could not be read,
+ * the last successfully applied state is kept untouched instead of being cleared.
+ * A transient error therefore never resurrects a module an administrator disabled,
+ * and a first-load failure still fails open (no module is hidden) so the portal
+ * remains reachable — navigation is a UI hint, row level security still enforces data
+ * access. If only the override read failed, the global state still applies and every
+ * role inherits it.
+ */
+export function applyModuleToggleSnapshot(snapshot: ModuleToggleSnapshot): void {
+  if (snapshot.toggles === null) return;
+  const disabled = snapshot.toggles
+    .filter((row) => row.enabled === false)
+    .map((row) => row.module_id);
+  const overrides: Record<string, Record<string, boolean>> = {};
+  for (const row of snapshot.overrides ?? []) {
+    // Reject a role value that is not one of the nine approved roles.
+    if (!isAppRole(row.role)) continue;
+    overrides[row.module_id] = { ...(overrides[row.module_id] ?? {}), [row.role]: row.enabled === true };
+  }
+  applyModuleToggles(disabled, overrides);
 }
 
 /** Modules a super administrator may toggle in Settings (available and not always-on). */

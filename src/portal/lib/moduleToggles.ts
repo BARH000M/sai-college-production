@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./supabase";
-import { applyModuleToggles } from "./navigation";
+import { applyModuleToggleSnapshot } from "./navigation";
 
 export type ModuleToggleRow = { module_id: string; enabled: boolean; updated_at: string; updated_by: string | null };
 export type ModuleRoleOverrideRow = { module_id: string; role: string; enabled: boolean };
@@ -9,8 +9,12 @@ type LoadState = { ready: boolean; error: string | null };
 
 /**
  * Loads the global module toggles plus the per-role overrides once and keeps the
- * navigation store in sync. Fails open: if the tables are unreachable, no module
- * is hidden and every role inherits the global state.
+ * navigation store in sync.
+ *
+ * On the first failure of a session the navigation stays open (nothing is hidden)
+ * so the portal remains reachable. After a successful load, a later failure keeps
+ * the last known state, so a transient error cannot re-expose a module an
+ * administrator disabled. The error is surfaced to the caller either way.
  */
 export function useModuleToggles(): LoadState & { reload: () => void } {
   const [ready, setReady] = useState(false);
@@ -28,24 +32,18 @@ export function useModuleToggles(): LoadState & { reload: () => void } {
         ]);
         if (globalResult.error) throw new Error(globalResult.error.message);
 
-        const disabled = ((globalResult.data ?? []) as ModuleToggleRow[])
-          .filter((row) => row.enabled === false)
-          .map((row) => row.module_id);
-
-        const overrides: Record<string, Record<string, boolean>> = {};
-        if (!overrideResult.error) {
-          for (const row of (overrideResult.data ?? []) as ModuleRoleOverrideRow[]) {
-            overrides[row.module_id] = { ...(overrides[row.module_id] ?? {}), [row.role]: row.enabled === true };
-          }
-        }
-
         if (active) {
-          applyModuleToggles(disabled, overrides);
+          applyModuleToggleSnapshot({
+            toggles: (globalResult.data ?? []) as ModuleToggleRow[],
+            // A failed override read is not fatal: every role inherits the global state.
+            overrides: overrideResult.error ? null : ((overrideResult.data ?? []) as ModuleRoleOverrideRow[]),
+          });
           setError(null);
         }
       } catch (e) {
         if (active) {
-          applyModuleToggles([], {});
+          // Keep the last applied state; only a first-load failure leaves it empty.
+          applyModuleToggleSnapshot({ toggles: null, overrides: null });
           setError(e instanceof Error ? e.message : String(e));
         }
       } finally {
