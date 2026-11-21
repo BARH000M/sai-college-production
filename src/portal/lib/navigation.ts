@@ -69,6 +69,9 @@ export const navigation: readonly NavigationItem[] = [
   { id: "settings", label: "إعدادات النظام", icon: "ri-settings-3-line", roles: ["super_admin","admin"] },
   { id: "systemCatalog", label: "جرد النظام والوحدات", icon: "ri-list-check-2", roles: ["super_admin"] },
   { id: "backups", label: "النسخ الاحتياطي والاستعادة", icon: "ri-database-2-line", roles: ["super_admin"] },
+  { id: "permissionsCenter", label: "مصفوفة الصلاحيات المتقدمة", icon: "ri-shield-keyhole-line", roles: ["super_admin"] },
+  { id: "sidebarManager", label: "إدارة القائمة الجانبية", icon: "ri-layout-left-2-line", roles: ["super_admin"] },
+  { id: "coverageAudit", label: "تدقيق التغطية", icon: "ri-file-list-3-line", roles: ["super_admin","admin"] },
 ];
 
 /**
@@ -83,6 +86,9 @@ const availableModuleIds: readonly string[] = [
   "settings", "systemCatalog", "staff",
   "downloads", "inventory", "transport", "portfolio", "housing", "certificates", "frontCms", "alumni",
   "backups",
+  "listening", "speaking", "tones", "handwriting", "reading", "review", "authoring",
+  "permissionsCenter", "sidebarManager", "coverageAudit",
+  "media", "approvals", "quizzes", "reception",
 ];
 
 export function isAppRole(value: string): value is AppRole {
@@ -95,6 +101,7 @@ export function isAppRole(value: string): value is AppRole {
  */
 export const alwaysOnModuleIds: readonly string[] = [
   "home", "profile", "notifications", "settings", "systemCatalog", "roles", "backups",
+  "permissionsCenter", "sidebarManager",
 ];
 
 // Live toggle state, loaded once per session from sai_module_toggles.
@@ -114,7 +121,12 @@ export function applyModuleToggles(
   for (const [moduleId, roleMap] of Object.entries(overrides)) {
     if (alwaysOnModuleIds.includes(moduleId)) continue;
     const inner = new Map<string, boolean>();
-    for (const [role, enabled] of Object.entries(roleMap ?? {})) inner.set(role, enabled === true);
+    for (const [role, enabled] of Object.entries(roleMap ?? {})) {
+      // A per-role override may only ever target one of the nine approved roles;
+      // anything else is dropped so it can never widen access.
+      if (!isAppRole(role)) continue;
+      inner.set(role, enabled === true);
+    }
     if (inner.size > 0) map.set(moduleId, inner);
   }
   moduleRoleOverrides = map;
@@ -220,20 +232,12 @@ export function visibleNavigation(roles: readonly string[]): NavigationItem[] {
  * Modules whose screens exist in the catalogue but whose data foundation or
  * sign-off is not ready. They never appear as links; the dashboard lists them so
  * staff can see what is still being prepared instead of clicking a dead button.
+ *
+ * V4.0 completed the four remaining modules (media, approvals, quizzes,
+ * reception). They are now wired and reachable, so the pending list is empty;
+ * the export is kept so the dashboard and tests keep a stable contract.
  */
-export const pendingModules: readonly { id: string; label: string; reason: string }[] = [
-  { id: "quizzes", label: "الاختبارات القصيرة", reason: "تحتاج جداول أسئلة ومحاولات وحساب درجات." },
-  { id: "authoring", label: "تأليف الدروس", reason: "المحرر الكامل للمحتوى غير مبني بعد؛ تُدار الدروس حالياً من المقررات." },
-  { id: "media", label: "مكتبة الوسائط", reason: "تحتاج تخزين ملفات وربطه بمساحة Supabase Storage." },
-  { id: "approvals", label: "المراجعة والنشر", reason: "تحتاج حالات مراجعة واعتماد للمحتوى." },
-  { id: "reception", label: "الاستقبال", reason: "تحتاج مسار زوار ومواعيد مستقل عن القبول." },
-  { id: "listening", label: "الاستماع", reason: "لا توجد شاشة تدريب مكتملة؛ المحتوى الصوتي يُعرض فقط إذا أُضيف إلى درس منشور." },
-  { id: "speaking", label: "التحدث والنطق", reason: "لا يوجد تسجيل أو تقييم نطق موثوق في الخلفية الحالية." },
-  { id: "tones", label: "النغمات الصينية", reason: "لا يوجد مسار تدريب وتقييم للنغمات مرتبط بنتائج الطالب." },
-  { id: "handwriting", label: "الكتابة اليدوية", reason: "لا توجد أداة كتابة أو حفظ وتقييم لمحاولات الطالب." },
-  { id: "reading", label: "القراءة", reason: "لا توجد شاشة قراءة مستقلة أو تتبع جلسة قراءة." },
-  { id: "review", label: "المراجعة المتباعدة", reason: "لا توجد جدولة مراجعة شخصية أو سجل استدعاء موثوق." },
-] as const;
+export const pendingModules: readonly { id: string; label: string; reason: string }[] = [] as const;
 
 export function isModulePending(id: string): boolean {
   return pendingModules.some((item) => item.id === id);

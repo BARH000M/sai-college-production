@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import saiLogo from "@/portal/assets/saiLogo";
 import { signIn, signUpAccount } from "@/portal/lib/auth";
+import { isSupabaseConfigured } from "@/portal/lib/supabase";
 
 type Lang = "ar" | "en";
 type Mode = "signin" | "signup";
@@ -50,6 +51,7 @@ type Copy = {
   secure: string;
   arabic: string;
   english: string;
+  backendUnavailable: string;
 };
 
 const copy: Record<Lang, Copy> = {
@@ -102,6 +104,7 @@ const copy: Record<Lang, Copy> = {
     secure: "اتصال آمن عبر بوابة الكلية",
     arabic: "العربية",
     english: "English",
+    backendUnavailable: "تعذر الوصول إلى الخادم. يرجى التواصل مع إدارة النظام لتحديث إعدادات الاتصال.",
   },
   en: {
     dir: "ltr",
@@ -152,6 +155,7 @@ const copy: Record<Lang, Copy> = {
     secure: "Secure connection to the college portal",
     arabic: "العربية",
     english: "English",
+    backendUnavailable: "We could not reach the backend. Please contact the system administrator to refresh the connection settings.",
   },
 };
 
@@ -160,6 +164,11 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function friendlyAuthError(message: string, lang: Lang): string {
   const text = message.toLowerCase();
   const ar = lang === "ar";
+  if (text.includes("invalid api key") || text.includes("no api key") || text.includes("invalid apikey")) {
+    return ar
+      ? "تعذّر الاتصال بالخادم: مفتاح الوصول غير صالح أو منتهي. يرجى التواصل مع إدارة النظام لتحديث إعدادات الاتصال."
+      : "We could not reach the backend: the access key is invalid or expired. Please contact the system administrator to refresh the connection settings.";
+  }
   if (text.includes("invalid login credentials")) {
     return ar ? "البريد الإلكتروني أو كلمة المرور غير صحيحة." : "The email address or password is incorrect.";
   }
@@ -496,6 +505,12 @@ export default function AuthPage() {
                       {formError && (
                         <p className="rounded-md border border-primary-200 bg-primary-50 px-3 py-2.5 text-xs leading-relaxed text-primary-800" role="alert">
                           {formError}
+                        </p>
+                      )}
+
+                      {!isSupabaseConfigured && (
+                        <p className="rounded-md border border-secondary-200 bg-secondary-50 px-3 py-2.5 text-xs leading-relaxed text-secondary-900" role="status">
+                          {t.backendUnavailable}
                         </p>
                       )}
 

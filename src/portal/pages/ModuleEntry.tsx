@@ -23,6 +23,19 @@ import { BackupManager } from "./BackupManager";
 import { HrPage } from "./hr/HrPage";
 import { UnifiedModulePage } from "./UnifiedModulePage";
 import { unifiedModules, type UnifiedId } from "../lib/unifiedModules";
+import { ListeningLab } from "./labs/ListeningLab";
+import { SpeakingLab } from "./labs/SpeakingLab";
+import { TonesLab } from "./labs/TonesLab";
+import { HandwritingLab } from "./labs/HandwritingLab";
+import { ReadingLab } from "./labs/ReadingLab";
+import { ReviewLab } from "./labs/ReviewLab";
+import { PermissionsCenter } from "./PermissionsCenter";
+import { SidebarManager } from "./SidebarManager";
+import { CoverageAudit } from "./CoverageAudit";
+import { MediaLibrary } from "./MediaLibrary";
+import { ContentApprovals } from "./ContentApprovals";
+import { Quizzes } from "./Quizzes";
+import { Reception } from "./Reception";
 
 export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userId: string | null }) {
   const { moduleId } = useParams();
@@ -67,6 +80,20 @@ export function ModuleEntry({ roles, userId }: { roles: readonly string[]; userI
   if (item.id === "systemCatalog") return <SystemInventory />;
   if (item.id === "backups") return <BackupManager roles={roles} />;
   if (item.id === "staff") return <HrPage roles={roles} userId={userId} />;
+  if (item.id === "listening") return <ListeningLab />;
+  if (item.id === "speaking") return <SpeakingLab />;
+  if (item.id === "tones") return <TonesLab />;
+  if (item.id === "handwriting") return <HandwritingLab />;
+  if (item.id === "reading") return <ReadingLab />;
+  if (item.id === "review") return <ReviewLab />;
+  if (item.id === "authoring") return <Learning key={`authoring:${userId}`} view="courses" roles={roles} userId={userId} />;
+  if (item.id === "permissionsCenter") return <PermissionsCenter roles={roles} userId={userId} />;
+  if (item.id === "sidebarManager") return <SidebarManager roles={roles} userId={userId} />;
+  if (item.id === "coverageAudit") return <CoverageAudit />;
+  if (item.id === "media") return <MediaLibrary />;
+  if (item.id === "approvals") return <ContentApprovals userId={userId} />;
+  if (item.id === "quizzes") return <Quizzes />;
+  if (item.id === "reception") return <Reception userId={userId} />;
   if (Object.prototype.hasOwnProperty.call(unifiedModules, item.id)) {
     return <UnifiedModulePage key={item.id} roles={roles} spec={unifiedModules[item.id as UnifiedId]} />;
   }

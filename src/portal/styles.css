@@ -2,14 +2,23 @@
 @font-face { font-family: Cairo; src: url("./assets/Cairo-600.ttf"); font-weight: 600; font-display: swap; }
 @font-face { font-family: Cairo; src: url("./assets/Cairo-700.ttf"); font-weight: 700; font-display: swap; }
 
+/*
+ * Direction is driven by the selected portal language, not by the stylesheet.
+ * `AppRoot` writes dir="rtl" for Arabic and dir="ltr" for English/Chinese, so
+ * the sidebar, tables and page content all mirror together. Layout rules below
+ * use logical properties (inline-start / inline-end) so they never need
+ * duplicated RTL/LTR blocks.
+ */
 .portal-root {
   font-family: Cairo, "IBM Plex Sans Arabic", Arial, sans-serif;
   color: oklch(var(--foreground-950));
   background: oklch(var(--background-100));
   min-height: 100vh;
-  direction: rtl;
-  text-align: right;
+  direction: inherit;
+  text-align: start;
 }
+.portal-root[dir="rtl"] { direction: rtl; }
+.portal-root[dir="ltr"] { direction: ltr; }
 .portal-root * { box-sizing: border-box; }
 .portal-root button,
 .portal-root input,
@@ -68,14 +77,14 @@
 .portal-root .layout.collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .portal-root .sidebar {
   position: sticky; top: 0; height: 100vh; background: oklch(var(--background-50));
-  border-left: 1px solid oklch(var(--background-200)); padding: 18px 12px;
+  border-inline-start: 1px solid oklch(var(--background-200)); padding: 18px 12px;
   overflow-y: auto; z-index: 20;
 }
 .portal-root .sidebar-brand { display: flex; gap: 10px; align-items: center; }
 .portal-root .sidebar-brand strong,
 .portal-root .sidebar-brand small { display: block; white-space: nowrap; }
 .portal-root .sidebar-brand small { color: oklch(var(--foreground-600)); font-size: 11px; }
-.portal-root .collapse-button { margin-right: auto; }
+.portal-root .collapse-button { margin-inline-start: auto; }
 .portal-root .collapsed .sidebar-label { display: none; }
 .portal-root .collapsed .sidebar-brand { flex-wrap: wrap; justify-content: center; }
 .portal-root .collapsed .collapse-button { margin: 0; }
@@ -108,10 +117,10 @@
   min-width: 42px; min-height: 42px; border: 0; background: oklch(var(--background-100));
   color: oklch(var(--primary-700)); border-radius: 8px; font-size: 19px;
 }
-.portal-root .search-wrap { position: relative; width: min(420px, 100%); margin-left: auto; }
+.portal-root .search-wrap { position: relative; width: min(420px, 100%); margin-inline-start: auto; }
 .portal-root .search-wrap input { background: oklch(var(--background-100)); }
 .portal-root .search-results {
-  position: absolute; top: calc(100% + 4px); right: 0; left: 0; z-index: 10;
+  position: absolute; top: calc(100% + 4px); inset-inline: 0; z-index: 10;
   background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-200));
   border-radius: 8px; overflow: hidden;
 }
@@ -121,7 +130,7 @@
 .portal-root .profile-menu { position: relative; max-width: 180px; }
 .portal-root .profile-menu summary { cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
 .portal-root .profile-menu > div {
-  position: absolute; z-index: 10; left: 0; top: 32px; width: 220px;
+  position: absolute; z-index: 10; inset-inline-start: 0; top: 32px; width: 220px;
   background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-200));
   border-radius: 8px; padding: 12px; overflow-wrap: anywhere; font-size: 11px;
 }
@@ -169,7 +178,7 @@
 .portal-root .module-card small { color: oklch(var(--primary-700)); }
 
 .portal-root .table-scroll { overflow-x: auto; }
-.portal-root .management-table { width: 100%; border-collapse: collapse; text-align: right; font-size: 12px; }
+.portal-root .management-table { width: 100%; border-collapse: collapse; text-align: start; font-size: 12px; }
 .portal-root .management-table th,
 .portal-root .management-table td { border-bottom: 1px solid oklch(var(--background-200)); padding: 10px; overflow-wrap: anywhere; vertical-align: middle; }
 .portal-root .management-table th { color: oklch(var(--foreground-600)); font-weight: 600; background: oklch(var(--background-100)); }
@@ -410,7 +419,7 @@
 .portal-root .learn-stat strong { display: block; margin-top: 4px; font-size: 18px; overflow-wrap: anywhere; }
 .portal-root .learn-course-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-top: 12px; }
 .portal-root .learn-course {
-  display: grid; gap: 6px; min-width: 0; text-align: right; padding: 14px;
+  display: grid; gap: 6px; min-width: 0; text-align: start; padding: 14px;
   background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200));
   border-radius: 10px; color: inherit; transition: border-color .16s ease, background .16s ease;
 }
@@ -639,7 +648,7 @@
 .portal-root .sheet-table th,
 .portal-root .sheet-table td {
   border: 1px solid oklch(var(--background-300)); padding: 7px 8px;
-  text-align: right; vertical-align: top; overflow-wrap: anywhere;
+  text-align: start; vertical-align: top; overflow-wrap: anywhere;
 }
 .portal-root .sheet-table th { background: oklch(var(--background-100)); font-size: 10.5px; color: oklch(var(--foreground-700)); font-weight: 700; }
 .portal-root .sheet-table tr { break-inside: avoid; }
@@ -786,7 +795,7 @@
   body { background: #ffffff; }
   body * { visibility: hidden; }
   .portal-root .print-overlay {
-    position: absolute; top: 0; left: 0; width: 100%; padding: 0;
+    position: absolute; top: 0; inset-inline-start: 0; width: 100%; padding: 0;
     background: none; display: block; overflow: visible;
   }
   .portal-root .print-overlay,
@@ -853,9 +862,10 @@
   .portal-root .layout,
   .portal-root .layout.collapsed { display: block; }
   .portal-root .sidebar {
-    position: fixed; right: 0; top: 0; width: min(280px, 85vw); height: 100vh;
+    position: fixed; inset-inline-end: 0; top: 0; width: min(280px, 85vw); height: 100vh;
     transform: translateX(100%); visibility: hidden; transition: transform .18s ease, visibility .18s;
   }
+  .portal-root[dir="ltr"] .sidebar { transform: translateX(-100%); }
   .portal-root .sidebar.open { transform: translateX(0); visibility: visible; }
   .portal-root .collapsed .sidebar-label { display: block; }
   .portal-root .collapsed .sidebar-brand { flex-wrap: nowrap; }
@@ -872,7 +882,7 @@
   .portal-root .learner-grid { grid-template-columns: minmax(0, 1fr); }
   .portal-root .learn-lesson-side { margin-inline-start: 0; align-items: flex-start; }
   .portal-root .bottom-nav {
-    display: grid; position: fixed; z-index: 15; bottom: 0; right: 0; left: 0;
+    display: grid; position: fixed; z-index: 15; bottom: 0; inset-inline: 0;
     grid-template-columns: repeat(5, minmax(0, 1fr)); background: oklch(var(--background-50));
     border-top: 1px solid oklch(var(--background-200)); padding: 4px 0 env(safe-area-inset-bottom);
   }
@@ -1029,7 +1039,7 @@
   background: oklch(var(--background-100)); border: 1px solid oklch(var(--background-200));
 }
 .portal-root .lab-item-button {
-  width: 100%; text-align: right; color: inherit; font: inherit; cursor: pointer;
+  width: 100%; text-align: start; color: inherit; font: inherit; cursor: pointer;
   transition: border-color .16s ease, background .16s ease;
 }
 .portal-root .lab-item-button:hover { border-color: oklch(var(--primary-300)); }
@@ -1115,7 +1125,7 @@
 .portal-root .lab-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 8px; }
 .portal-root .lab-option {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 10px 12px; border-radius: 8px; font-size: 12px; text-align: right;
+  padding: 10px 12px; border-radius: 8px; font-size: 12px; text-align: start;
   background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-300) / .8);
   color: oklch(var(--foreground-900)); transition: border-color .16s ease, background .16s ease;
 }
@@ -1261,7 +1271,7 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 8px;
 }
 .portal-root .lab-char-chip {
-  display: flex; align-items: center; gap: 8px; width: 100%; text-align: right;
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: start;
   padding: 8px 10px; border-radius: 8px; font: inherit; color: inherit; cursor: pointer;
   background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-200));
 }
@@ -1285,7 +1295,7 @@
   transition: background .18s ease, border-color .18s ease;
 }
 .portal-root .review-card.revealed { background: oklch(var(--secondary-50)); border-color: oklch(var(--secondary-300)); }
-.portal-root .review-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: right; }
+.portal-root .review-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: start; }
 .portal-root .review-hanzi { margin: 6px 0 0; font-size: 46px; line-height: 1.5; font-weight: 700; }
 .portal-root .review-answer { margin: 0; font-size: 17px; font-weight: 700; color: oklch(var(--secondary-900)); }
 .portal-root .review-example {
@@ -1350,7 +1360,7 @@
 .portal-root .timetable { width: 100%; min-width: 940px; border-collapse: collapse; font-size: 11px; }
 .portal-root .timetable th,
 .portal-root .timetable td {
-  border: 1px solid oklch(var(--background-200)); padding: 6px; text-align: right;
+  border: 1px solid oklch(var(--background-200)); padding: 6px; text-align: start;
   vertical-align: top; overflow-wrap: anywhere;
 }
 .portal-root .timetable thead th { background: oklch(var(--background-100)); font-size: 11px; color: oklch(var(--foreground-700)); text-align: center; }
@@ -1383,7 +1393,7 @@
 .portal-root .calendar-head span { padding: 4px 0; text-align: center; font-size: 10.5px; font-weight: 700; color: oklch(var(--foreground-600)); }
 .portal-root .calendar-day {
   position: relative; min-height: 66px; display: grid; align-content: start; gap: 4px;
-  padding: 6px; border-radius: 8px; font: inherit; color: inherit; text-align: right;
+  padding: 6px; border-radius: 8px; font: inherit; color: inherit; text-align: start;
   background: oklch(var(--background-50)); border: 1px solid oklch(var(--background-200));
   cursor: pointer; transition: border-color .16s ease, background .16s ease;
 }
@@ -1531,8 +1541,8 @@
 .portal-root .flash-card:hover { border-color: oklch(var(--primary-300)); }
 .portal-root .flash-card.revealed { background: oklch(var(--secondary-50)); border-color: oklch(var(--secondary-300)); }
 .portal-root .flash-card-top {
-  position: absolute; top: 16px; right: 18px; left: 18px;
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: right;
+  position: absolute; top: 16px; inset-inline: 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: start;
 }
 .portal-root .flash-hanzi { font-size: 58px; line-height: 1.35; font-weight: 700; }
 .portal-root .flash-pinyin { font-size: 17px; color: oklch(var(--primary-700)); }
@@ -1576,7 +1586,7 @@
 .portal-root .notify-body { min-width: 0; display: grid; gap: 3px; }
 .portal-root .notify-body strong { font-size: 12.5px; overflow-wrap: anywhere; }
 .portal-root .notify-body small { font-size: 11px; line-height: 1.7; color: oklch(var(--foreground-600)); overflow-wrap: anywhere; }
-.portal-root .notify-meta { display: grid; gap: 4px; justify-items: end; text-align: left; }
+.portal-root .notify-meta { display: grid; gap: 4px; justify-items: end; text-align: end; }
 .portal-root .notify-meta time { font-size: 10.5px; color: oklch(var(--foreground-600)); white-space: nowrap; }
 .portal-root .notify-arrow { color: oklch(var(--foreground-500)); font-size: 18px; }
 .portal-root .notify-empty {

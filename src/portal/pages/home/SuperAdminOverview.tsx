@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadSuperAdminSummary, type SuperAdminSummary } from "../../lib/roles";
 import { useNotificationFeed } from "../../hooks/useNotificationFeed";
+import { usePortalLang } from "../../lib/portalLangContext";
 
 type SummaryState =
   | { status: "loading"; data: null; error: null }
@@ -10,18 +11,46 @@ type SummaryState =
 
 type SummaryKey = keyof SuperAdminSummary;
 
-const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-function Metric({ label, value, note, to }: {
-  label: string;
-  value: number;
-  note?: string;
-  to?: string;
-}) {
+/** Translation keys for every metric, so no label is hardcoded Arabic. */
+const metricKeys: Record<SummaryKey, string> = {
+  totalUsers: "metricTotalUsers",
+  emailConfirmedUsers: "metricEmailConfirmed",
+  pendingEmailConfirmation: "metricPendingEmail",
+  bannedUsers: "metricBanned",
+  usersWithoutRoles: "metricNoRoles",
+  totalProfiles: "metricProfiles",
+  totalRoleAssignments: "metricRoleAssignments",
+  teachers: "metricTeachers",
+  students: "metricStudents",
+  activeStudents: "metricActiveStudents",
+  studentsWithoutAccounts: "metricStudentsWithoutAccounts",
+  activeClasses: "metricActiveClasses",
+  activeClassesWithoutTeachers: "metricClassesWithoutTeachers",
+  branches: "kpiBranches",
+  academicSessions: "academicSessionsLabel",
+  courses: "metricCourses",
+  activeCourses: "metricActiveCourses",
+  lessons: "metricLessons",
+  publishedLessons: "metricPublishedLessons",
+  lessonsWithAssetPaths: "metricLessonAssets",
+  lessonsMissingContent: "metricLessonsMissingContent",
+  activeEnrollments: "metricActiveEnrollments",
+  lessonProgressInProgress: "metricLessonProgress",
+  legacyCompletedProgress: "metricLegacyProgress",
+  homeworkSubmissionsPendingReview: "metricHomeworkPending",
+  homeworkSubmissionsGraded: "metricHomeworkGraded",
+  pendingAdmissions: "metricPendingAdmissions",
+};
+
+const numberLocales = { ar: "ar", en: "en-GB", zh: "zh-CN" } as const;
+
+function Metric({ label, value, to }: { label: string; value: number; to?: string }) {
+  const { lang } = usePortalLang();
   const content = <>
     <span>{label}</span>
-    <strong>{value.toLocaleString("ar")}</strong>
-    {note && <small>{note}</small>}
+    <strong>{value.toLocaleString(numberLocales[lang])}</strong>
   </>;
   return to
     ? <Link className="kpi-card" to={to}>{content}</Link>
@@ -29,39 +58,11 @@ function Metric({ label, value, note, to }: {
 }
 
 function MetricGrid({ data, keys }: { data: SuperAdminSummary; keys: readonly SummaryKey[] }) {
-  const labels: Record<SummaryKey, string> = {
-    totalUsers: "إجمالي حسابات الدخول",
-    emailConfirmedUsers: "حسابات مؤكدة البريد",
-    pendingEmailConfirmation: "بانتظار تأكيد البريد",
-    bannedUsers: "حسابات موقوفة مؤقتاً",
-    usersWithoutRoles: "حسابات بلا أدوار",
-    totalProfiles: "ملفات المستخدمين",
-    totalRoleAssignments: "إسنادات الأدوار",
-    teachers: "حسابات بدور معلم",
-    students: "إجمالي الطلاب",
-    activeStudents: "الطلاب النشطون",
-    studentsWithoutAccounts: "طلاب بلا حساب مرتبط",
-    activeClasses: "الصفوف النشطة",
-    activeClassesWithoutTeachers: "صفوف بلا معلم مسند",
-    branches: "الفروع",
-    academicSessions: "الجلسات الأكاديمية",
-    courses: "إجمالي المقررات",
-    activeCourses: "المقررات النشطة",
-    lessons: "إجمالي الدروس",
-    publishedLessons: "الدروس المنشورة",
-    lessonsWithAssetPaths: "دروس لها مسارات وسائط مسجلة",
-    lessonsMissingContent: "دروس بلا محتوى مسجل",
-    activeEnrollments: "طلاب نشطون مسندون إلى صف",
-    lessonProgressInProgress: "حالات تعلم قيد الدراسة",
-    legacyCompletedProgress: "حالات إكمال تاريخية غير متحققة",
-    homeworkSubmissionsPendingReview: "تسليمات بانتظار التصحيح",
-    homeworkSubmissionsGraded: "تسليمات صُححت",
-    pendingAdmissions: "طلبات قبول جديدة",
-  };
+  const { t } = usePortalLang();
   return <div className="kpi-grid home-kpi-grid">
     {keys.map((key) => <Metric
       key={key}
-      label={labels[key]}
+      label={t(metricKeys[key])}
       value={data[key]}
       to={key === "pendingAdmissions" ? "/portal/modules/admissions" : undefined}
     />)}
@@ -69,6 +70,7 @@ function MetricGrid({ data, keys }: { data: SuperAdminSummary; keys: readonly Su
 }
 
 export function SuperAdminOverview() {
+  const { t, lang } = usePortalLang();
   const [state, setState] = useState<SummaryState>({ status: "loading", data: null, error: null });
   const [retry, setRetry] = useState(0);
   const feed = useNotificationFeed(["super_admin"]);
@@ -85,101 +87,98 @@ export function SuperAdminOverview() {
   }, [retry]);
 
   const data = state.status === "ready" ? state.data : null;
+  const format = (value: number) => value.toLocaleString(numberLocales[lang]);
+
+  const allAlerts: { key: SummaryKey; to: string; labelKey: string }[] = [
+    { key: "pendingAdmissions", to: "/portal/modules/admissions", labelKey: "alertPendingAdmissions" },
+    { key: "homeworkSubmissionsPendingReview", to: "/portal/modules/homework", labelKey: "alertHomeworkPending" },
+    { key: "activeClassesWithoutTeachers", to: "/portal/modules/classes", labelKey: "alertClassesWithoutTeachers" },
+    { key: "studentsWithoutAccounts", to: "/portal/modules/students", labelKey: "alertStudentsWithoutAccounts" },
+    { key: "usersWithoutRoles", to: "/portal/modules/roles", labelKey: "alertUsersWithoutRoles" },
+    { key: "pendingEmailConfirmation", to: "/portal/modules/roles", labelKey: "alertPendingEmail" },
+    { key: "lessonsMissingContent", to: "/portal/modules/courses", labelKey: "alertLessonsMissingContent" },
+  ];
+  const alerts = data ? allAlerts.filter((alert) => data[alert.key] > 0) : [];
 
   return <section className="panel super-admin-overview" aria-labelledby="super-admin-overview-title">
     <div className="home-panel-head">
       <div>
-        <p className="eyebrow">إشراف الإدارة العامة</p>
-        <h2 id="super-admin-overview-title">مؤشرات النظام من الخدمات المعتمدة</h2>
+        <p className="eyebrow">{t("superAdminEyebrow")}</p>
+        <h2 id="super-admin-overview-title">{t("superAdminTitle")}</h2>
       </div>
       <div className="actions">
-        <Link className="button secondary" to="/portal/modules/systemCatalog">جرد الوحدات</Link>
+        <Link className="button secondary" to="/portal/modules/systemCatalog">{t("systemInventoryLink")}</Link>
         <button className="button secondary" type="button" onClick={() => setRetry((value) => value + 1)}
-          disabled={state.status === "loading"}>تحديث المؤشرات</button>
+          disabled={state.status === "loading"}>{t("refreshIndicators")}</button>
       </div>
     </div>
-    <p className="data-note">
-      الأعداد تُقرأ من ملخص Edge Function المخصص للمسؤول العام. لا تمثل حالات الإكمال التاريخية إتقاناً موثقاً،
-      ومسارات الوسائط المسجلة لا تثبت وجود الملف في التخزين.
-    </p>
+    <p className="data-note">{t("superAdminNote")}</p>
 
-    {state.status === "loading" && <p role="status">جارٍ تحميل مؤشرات النظام...</p>}
+    {state.status === "loading" && <p role="status">{t("loadingIndicators")}</p>}
     {state.status === "error" && <div className="error-box" role="alert">
-      تعذر تحميل مؤشرات النظام: {state.error}
-      <button className="text-button" type="button" onClick={() => setRetry((value) => value + 1)}>إعادة المحاولة</button>
+      {t("indicatorsLoadFailed")}: {state.error}
+      <button className="text-button" type="button" onClick={() => setRetry((value) => value + 1)}>{t("retry")}</button>
     </div>}
 
     {data && <>
-      <h3 className="home-subheading">الحسابات والهوية</h3>
+      <h3 className="home-subheading">{t("groupAccountsIdentity")}</h3>
       <MetricGrid data={data} keys={[
         "totalUsers", "totalProfiles", "totalRoleAssignments", "teachers",
         "emailConfirmedUsers", "pendingEmailConfirmation", "bannedUsers",
         "usersWithoutRoles",
       ]} />
-      <h3 className="home-subheading">الطلاب والأكاديميا</h3>
+      <h3 className="home-subheading">{t("groupStudentsAcademics")}</h3>
       <MetricGrid data={data} keys={[
         "students", "activeStudents", "activeEnrollments", "studentsWithoutAccounts",
         "activeClasses", "activeClassesWithoutTeachers", "branches", "academicSessions",
       ]} />
-      <h3 className="home-subheading">التعلّم والتقييم</h3>
+      <h3 className="home-subheading">{t("groupLearningAssessment")}</h3>
       <MetricGrid data={data} keys={[
         "courses", "activeCourses", "lessons", "publishedLessons",
         "lessonProgressInProgress", "legacyCompletedProgress",
         "homeworkSubmissionsPendingReview", "homeworkSubmissionsGraded",
       ]} />
-      <h3 className="home-subheading">جاهزية المحتوى والتنبيهات التشغيلية</h3>
+      <h3 className="home-subheading">{t("groupContentReadiness")}</h3>
       <MetricGrid data={data} keys={[
         "lessonsWithAssetPaths", "lessonsMissingContent", "pendingAdmissions",
       ]} />
       <section className="panel" aria-labelledby="operational-alerts-title">
-        <h3 id="operational-alerts-title">تنبيهات تحتاج متابعة</h3>
-        {(() => {
-          const allAlerts: { key: SummaryKey; to: string; text: string }[] = [
-            { key: "pendingAdmissions", to: "/portal/modules/admissions", text: "طلبات قبول جديدة تنتظر التواصل" },
-            { key: "homeworkSubmissionsPendingReview", to: "/portal/modules/homework", text: "تسليمات واجبات تنتظر التصحيح" },
-            { key: "activeClassesWithoutTeachers", to: "/portal/modules/classes", text: "صفوف نشطة بلا معلم مسند" },
-            { key: "studentsWithoutAccounts", to: "/portal/modules/students", text: "سجلات طلاب نشطة بلا حساب مرتبط" },
-            { key: "usersWithoutRoles", to: "/portal/modules/roles", text: "حسابات دخول بلا دور" },
-            { key: "pendingEmailConfirmation", to: "/portal/modules/roles", text: "حسابات بانتظار تأكيد البريد" },
-            { key: "lessonsMissingContent", to: "/portal/modules/courses", text: "دروس بلا محتوى مسجل" },
-          ];
-          const alerts = allAlerts.filter((alert) => data[alert.key] > 0);
-          return alerts.length
-            ? <ul className="home-enquiry-list">{alerts.map((alert) => <li className="home-enquiry" key={alert.key}>
-              <span>{data[alert.key].toLocaleString("ar")} · {alert.text}</span>
-              <Link className="text-button" to={alert.to}>مراجعة</Link>
-            </li>)}</ul>
-            : <p className="muted">لا توجد تنبيهات في المؤشرات المعروضة.</p>;
-        })()}
+        <h3 id="operational-alerts-title">{t("operationalAlerts")}</h3>
+        {alerts.length
+          ? <ul className="home-enquiry-list">{alerts.map((alert) => <li className="home-enquiry" key={alert.key}>
+            <span>{format(data[alert.key])} · {t(alert.labelKey)}</span>
+            <Link className="text-button" to={alert.to}>{t("reviewAction")}</Link>
+          </li>)}</ul>
+          : <p className="muted">{t("noAlerts")}</p>}
         {data.lessonsWithAssetPaths > 0 && <p className="data-note">
-          توجد {data.lessonsWithAssetPaths.toLocaleString("ar")} إحالات لمسارات ملفات؛ لم يتحقق هذا الملخص من وجود الملفات فعلياً في Storage.
+          {t("assetPathNote").replace("{count}", format(data.lessonsWithAssetPaths))}
         </p>}
       </section>
       <div className="home-section-grid">
         <section className="panel">
           <div className="home-panel-head">
-            <h3>الإشعارات غير المقروءة لهذا الحساب</h3>
-            <Link className="text-button" to="/portal/modules/notifications">فتح الإشعارات</Link>
+            <h3>{t("unreadForAccount")}</h3>
+            <Link className="text-button" to="/portal/modules/notifications">{t("openNotifications")}</Link>
           </div>
-          {feed.loading && <p role="status">جارٍ تحميل الإشعارات...</p>}
-          {feed.error && <p className="error-box" role="alert">تعذر تحميل الإشعارات: {feed.error}</p>}
+          {feed.loading && <p role="status">{t("loadingNotifications")}</p>}
+          {feed.error && <p className="error-box" role="alert">{t("notificationsLoadFailed")}: {feed.error}</p>}
           {!feed.loading && !feed.error && <p className="learn-score">
-            <strong>{feed.unread.toLocaleString("ar")}</strong> غير مقروءة
+            <strong>{format(feed.unread)}</strong> {t("unreadSuffix")}
           </p>}
-          <p className="data-note">هذا العدد خاص بحساب المسؤول العام الحالي، وليس إجمالي إشعارات جميع المستخدمين.</p>
+          <p className="data-note">{t("notificationsScopeNote")}</p>
         </section>
         <section className="panel">
           <div className="home-panel-head">
-            <h3>حدود مؤشرات الوسائط والتقييم</h3>
-            <Link className="text-button" to="/portal/modules/courses">مراجعة المقررات</Link>
+            <h3>{t("mediaLimitsTitle")}</h3>
+            <Link className="text-button" to="/portal/modules/courses">{t("reviewCourses")}</Link>
           </div>
-          <p>المهام المصححة هي تسليمات واجبات موجودة؛ لا يوجد بنك امتحانات أو إحصاء موثوق لمحاولات اختبارات في العقد الحالي.</p>
-          <p>مسارات الملفات مؤشرات مرجعية فقط. يلزم فحص وجود كائنات التخزين المصرح بها قبل وصف الوسائط بأنها جاهزة.</p>
+          <p>{t("mediaLimitBody1")}</p>
+          <p>{t("mediaLimitBody2")}</p>
         </section>
       </div>
       <div className="actions" style={{ marginTop: 16 }}>
-        <Link className="button secondary" to="/portal/modules/roles">إدارة الحسابات والأدوار</Link>
-        <Link className="button secondary" to="/portal/modules/reports">التقارير</Link>
+        <Link className="button secondary" to="/portal/modules/roles">{t("manageAccountsRoles")}</Link>
+        <Link className="button secondary" to="/portal/modules/reports">{t("reports")}</Link>
       </div>
     </>}
   </section>;

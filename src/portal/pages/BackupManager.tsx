@@ -129,7 +129,7 @@ export function BackupManager({ roles }: { roles: readonly string[] }) {
   const lastCompleted = completed[0] ?? null;
   const totalBytes = runs.reduce((sum, r) => sum + (r.size_bytes ?? 0), 0);
 
-  return <main className="workspace" dir="rtl">
+  return <main className="workspace">
     <div className="page-heading">
       <div>
         <p className="eyebrow">الإدارة العامة · الحماية والاستعادة</p>

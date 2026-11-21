@@ -1,4 +1,5 @@
 import { admissionStatuses } from "../../lib/admissions";
+import { usePortalLang } from "../../lib/portalLangContext";
 
 export function OccupancyBar({ enrolled, capacity }: { enrolled: number; capacity: number }) {
   const percent = capacity > 0 ? Math.round((enrolled / capacity) * 100) : 0;
@@ -24,6 +25,11 @@ const statusTones: Record<string, string> = {
 };
 
 export function AdmissionChip({ status }: { status: string }) {
-  const label = admissionStatuses[status as keyof typeof admissionStatuses] ?? status;
-  return <span className={`lab-status ${statusTones[status] ?? "status-neutral"}`}>{label}</span>;
+  const { tStatus } = usePortalLang();
+  const fallback = admissionStatuses[status as keyof typeof admissionStatuses] ?? status;
+  return (
+    <span className={`lab-status ${statusTones[status] ?? "status-neutral"}`}>
+      {tStatus(status, fallback)}
+    </span>
+  );
 }

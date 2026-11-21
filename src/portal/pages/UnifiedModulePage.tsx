@@ -66,7 +66,7 @@ export function UnifiedModulePage({spec,roles,headerExtra}:{spec:UnifiedSpec;rol
       required={field.required}
       onChange={e=>setForm(v=>({...v,[field.key]:field.kind==="number"?(e.target.value===""?null:Number(e.target.value)):e.target.value}))} />;
   }
-  return <main className="workspace" dir="rtl"><section className="panel">
+  return <main className="workspace"><section className="panel">
     <p className="eyebrow">قاعدة البيانات الموحدة · Supabase</p><h1>{spec.title}</h1>
     {headerExtra}
     <p className="muted">جدول {spec.table} مشترك مع تطبيق Yemen SAI. البيانات الظاهرة فقط هي البيانات التي تسمح سياسة RLS بقراءتها.</p>

@@ -129,7 +129,7 @@ export function CmsPreview({ open, onClose }: { open: boolean; onClose: () => vo
         image: item.img,
       }));
 
-  return <div className="fixed inset-0 z-[120] bg-background-100 flex flex-col" dir="rtl" role="dialog" aria-modal="true" aria-label="معاينة مباشرة للصفحة العامة">
+  return <div className="fixed inset-0 z-[120] bg-background-100 flex flex-col" role="dialog" aria-modal="true" aria-label="معاينة مباشرة للصفحة العامة">
     <header className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3 bg-background-50 border-b border-background-200">
       <div className="flex items-center gap-3">
         <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground-900">

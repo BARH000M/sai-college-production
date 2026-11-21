@@ -8,8 +8,12 @@ import { Dashboard } from "./pages/Dashboard";
 import { PortalHome } from "./pages/PortalHome";
 import { Profile } from "./pages/Profile";
 import { ModuleEntry } from "./pages/ModuleEntry";
+import { ModuleDirectory } from "./pages/ModuleDirectory";
+import { ControlCenter } from "./pages/ControlCenter";
+import { PortalLanguageProvider, usePortalLang } from "./lib/portalLangContext";
 import { isAppRole } from "./lib/navigation";
 import { useModuleToggles } from "./lib/moduleToggles";
+import { useSidebarLayout } from "./hooks/useSidebarLayout";
 import { onboardingNotices } from "./lib/onboarding";
 import { canAccessOperations } from "./lib/studentLearning";
 import { accountErrorMessage } from "./lib/accountError";
@@ -18,16 +22,31 @@ import {
   subscribeToAuthChanges, type AuthState,
 } from "./lib/auth";
 import "./styles.css";
+import "./components/workspace-modules.css";
 
 const HOME = "/portal/dashboard";
 
-export default function PortalApp() {
+/**
+ * The single element that owns the portal writing direction.
+ *
+ * Arabic renders right-to-left; English and Chinese render left-to-right with the
+ * sidebar on the left. Every layout rule underneath uses logical properties, so
+ * switching language mirrors the whole shell without a duplicated stylesheet.
+ */
+function PortalSurface({ children }: { children: ReactNode }) {
+  const { dir, lang } = usePortalLang();
+  return <div className="portal-root" dir={dir} lang={lang}>{children}</div>;
+}
+
+function PortalAppInner() {
   const [auth, setAuth] = useState<AuthState>(getInitialAuthState);
   const [busy, setBusy] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const version = useRef(0);
   const location = useLocation();
+  const { t } = usePortalLang();
   const moduleToggles = useModuleToggles();
+  const sidebarLayout = useSidebarLayout();
 
   async function refresh() {
     const request = ++version.current;
@@ -84,19 +103,23 @@ export default function PortalApp() {
   const signOutButton = (
     <>
       <button className="button secondary" onClick={handleSignOut} disabled={busy}>
-        {busy ? "جارٍ تسجيل الخروج..." : "تسجيل الخروج"}
+        {busy ? t("signingOut") : t("signOut")}
       </button>
-      {signOutError && <p className="error-box" role="alert">تعذر تسجيل الخروج: {signOutError}</p>}
+      {signOutError && <p className="error-box" role="alert">{t("signOutFailed")}: {signOutError}</p>}
     </>
   );
 
   function protectedPage(content: ReactNode) {
     return auth.status === "loading" ? (
-      <StatusCard title="جارٍ التحقق من الحساب" message="يرجى الانتظار أثناء تحميل الجلسة والبيانات." />
+      <StatusCard title={t("checkingAccount")} message={t("checkingAccountBody")} />
     ) : auth.status === "signed-out" ? (
       <Navigate to={signInPath} replace />
     ) : auth.profileError || auth.rolesError ? (
-      <StatusCard title="تعذر تحميل بيانات الحساب" message={accountErrorMessage([auth.profileError, auth.rolesError])} onRetry={refresh}>
+      <StatusCard
+        title={t("accountLoadFailed")}
+        message={accountErrorMessage([auth.profileError, auth.rolesError])}
+        onRetry={refresh}
+      >
         {signOutButton}
       </StatusCard>
     ) : !auth.roles.some(isAppRole) ? (
@@ -108,38 +131,60 @@ export default function PortalApp() {
         onSignOut={handleSignOut}
       />
     ) : !auth.profile ? (
-      <StatusCard title="الملف الشخصي غير متاح" message="لم يتم العثور على ملفك الشخصي أو لا تسمح سياسات الوصول بعرضه. تواصل مع مسؤول النظام." onRetry={refresh}>
+      <StatusCard title={t("profileUnavailable")} message={t("profileUnavailableBody")} onRetry={refresh}>
         {signOutButton}
       </StatusCard>
     ) : (
-      <AppShell profileName={auth.profile.fullName} email={auth.email} roles={auth.roles} onSignOut={handleSignOut} busy={busy} signOutError={signOutError} onboardingNotices={accountNotices}>
+      <AppShell
+        profileName={auth.profile.fullName}
+        email={auth.email}
+        roles={auth.roles}
+        onSignOut={handleSignOut}
+        busy={busy}
+        signOutError={signOutError}
+        onboardingNotices={accountNotices}
+      >
         {content}
       </AppShell>
     );
   }
 
+  if (!moduleToggles.ready || !sidebarLayout.ready) {
+    return (
+      <PortalSurface>
+        <StatusCard title={t("loadingPortalSettings")} message={t("loadingPortalSettingsBody")} />
+      </PortalSurface>
+    );
+  }
+
+  return (
+    <PortalSurface>
+      <Routes>
+        {/* The old portal login keeps working, but the real screen lives at /auth. */}
+        <Route path="login" element={<Navigate to={HOME} replace />} />
+        <Route path="dashboard" element={protectedPage(<PortalHome roles={auth.roles} userId={auth.userId} />)} />
+        <Route path="directory" element={protectedPage(<ModuleDirectory roles={auth.roles} />)} />
+        <Route path="control-center" element={protectedPage(<ControlCenter roles={auth.roles} />)} />
+        <Route path="profile" element={protectedPage(<Profile userId={auth.userId ?? ""} email={auth.email} roles={auth.roles} />)} />
+        <Route path="operations" element={protectedPage(
+          canAccessOperations(auth.roles)
+            ? <Dashboard />
+            : <StatusCard title={t("accessUnavailableTitle")} message={t("accessUnavailableBody")} link={HOME} />
+        )} />
+        <Route path="modules/:moduleId" element={protectedPage(<ModuleEntry roles={auth.roles} userId={auth.userId} />)} />
+        <Route path="" element={<Navigate to={HOME} replace />} />
+        <Route path="*" element={<StatusCard title={t("pageNotFoundTitle")} message={t("pageNotFoundBody")} link={HOME} />} />
+      </Routes>
+    </PortalSurface>
+  );
+}
+
+export default function PortalApp() {
   return (
     <ErrorBoundary>
-      {moduleToggles.ready ? (
-      <div className="portal-root">
-        <Routes>
-          {/* The old portal login keeps working, but the real screen lives at /auth. */}
-          <Route path="login" element={<Navigate to={HOME} replace />} />
-          <Route path="dashboard" element={protectedPage(<PortalHome roles={auth.roles} userId={auth.userId} />)} />
-          <Route path="profile" element={protectedPage(<Profile userId={auth.userId ?? ""} email={auth.email} roles={auth.roles} />)} />
-          <Route path="operations" element={protectedPage(
-            canAccessOperations(auth.roles)
-              ? <Dashboard />
-              : <StatusCard title="الوصول غير متاح" message="لوحة الإدارة غير متاحة لأدوار حسابك." link={HOME} />
-          )} />
-          <Route path="modules/:moduleId" element={protectedPage(<ModuleEntry roles={auth.roles} userId={auth.userId} />)} />
-          <Route path="" element={<Navigate to={HOME} replace />} />
-          <Route path="*" element={<StatusCard title="الصفحة غير موجودة" message="العنوان المطلوب غير متاح." link={HOME} />} />
-        </Routes>
-      </div>
-      ) : (
-        <StatusCard title="جارٍ تحميل إعدادات اللوحة" message="يتم تجهيز حالة تفعيل الوحدات قبل عرض اللوحة." />
-      )}
+      <PortalLanguageProvider>
+        <PortalAppInner />
+      </PortalLanguageProvider>
     </ErrorBoundary>
   );
 }

@@ -106,12 +106,14 @@ export function SystemInventory() {
 
     <section className="panel">
       <h2>وحدات معلّقة — لا تفتح صفحات وهمية</h2>
-      <div className="home-section-grid">
-        {pendingModules.map((item) => <article className="panel" key={item.id}>
-          <h3>{item.label}</h3>
-          <p className="data-note">{item.reason}</p>
-        </article>)}
-      </div>
+      {pendingModules.length === 0
+        ? <p className="success-box" role="status">لا توجد وحدات معلّقة بعد إنجاز النسخة V4.0؛ كل الشاشات المخططة مفعّلة وقابلة للفتح.</p>
+        : <div className="home-section-grid">
+          {pendingModules.map((item) => <article className="panel" key={item.id}>
+            <h3>{item.label}</h3>
+            <p className="data-note">{item.reason}</p>
+          </article>)}
+        </div>}
     </section>
   </main>;
 }

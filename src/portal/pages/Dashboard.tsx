@@ -7,12 +7,15 @@ import {
 } from "../lib/dashboard";
 import { runAdmissionRemindersNow, type ReminderRunResult } from "../lib/reminders";
 import { pendingModules } from "../lib/navigation";
+import { usePortalLang } from "../lib/portalLangContext";
 import { DashboardReportPrint } from "./DashboardReportPrint";
 
 type DashboardData = { students: Result<number>; classes: Result<number>; audit: Result<AuditEntry[]> };
 const unavailable: Result<number> = { data: null, error: null };
+const numberLocales = { ar: "ar", en: "en-GB", zh: "zh-CN" } as const;
 
 export function Dashboard() {
+  const { t, lang } = usePortalLang();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [sessions, setSessions] = useState<AcademicSession[]>([]);
   const [branchId, setBranchId] = useState("");
@@ -92,71 +95,148 @@ export function Dashboard() {
 
   return <main className="workspace">
     <section id="overview">
-      <div className="page-heading"><div><p className="eyebrow">الإدارة العامة</p><h1>لوحة التحكم</h1><p className="muted">نظرة على بيانات الأكاديمية في النطاق المحدد.</p></div><button className="button secondary" onClick={refresh} disabled={contextLoading || dataLoading}>تحديث البيانات</button></div>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">{t("opsEyebrow")}</p>
+          <h1>{t("dashboardTitle")}</h1>
+          <p className="muted">{t("opsIntro")}</p>
+        </div>
+        <button className="button secondary" onClick={refresh} disabled={contextLoading || dataLoading}>{t("refreshData")}</button>
+      </div>
       <div className="context-card">
-        <label>الفرع<select value={branchId} onChange={(e) => setBranchId(e.target.value)} disabled={contextLoading || !branches.length}><option value="">لا توجد فروع متاحة</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
-        <label>الجلسة الأكاديمية<select value={sessionId} onChange={(e) => setSessionId(e.target.value)} disabled={contextLoading || !sessions.length}><option value="">لا توجد جلسات متاحة</option>{sessions.map((session) => <option key={session.id} value={session.id}>{session.name}{session.is_active ? " — نشطة" : ""}</option>)}</select></label>
+        <label>
+          {t("branchLabel")}
+          <select value={branchId} onChange={(e) => setBranchId(e.target.value)} disabled={contextLoading || !branches.length}>
+            <option value="">{t("noBranchesOption")}</option>
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+          </select>
+        </label>
+        <label>
+          {t("sessionLabel")}
+          <select value={sessionId} onChange={(e) => setSessionId(e.target.value)} disabled={contextLoading || !sessions.length}>
+            <option value="">{t("noSessionsOption")}</option>
+            {sessions.map((session) => (
+              <option key={session.id} value={session.id}>
+                {session.name}{session.is_active ? ` — ${t("activeSuffix")}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
-      {contextLoading && <p className="muted" role="status">جارٍ تحميل الفروع والجلسات...</p>}
-      {contextError && <div className="error-box" role="alert">تعذر تحميل الفروع أو الجلسات: {contextError} <button className="text-button" onClick={refresh}>إعادة المحاولة</button></div>}
-      {!contextLoading && !contextError && (!branches.length || !sessions.length) && <div className="notice">لا توجد فروع أو جلسات متاحة لحسابك. قد تمنع سياسات الوصول عرض السجلات؛ تحقق مع مسؤول النظام.</div>}
+      {contextLoading && <p className="muted" role="status">{t("loadingBranches")}</p>}
+      {contextError && <div className="error-box" role="alert">
+        {t("branchesLoadFailed")}: {contextError}{" "}
+        <button className="text-button" onClick={refresh}>{t("retry")}</button>
+      </div>}
+      {!contextLoading && !contextError && (!branches.length || !sessions.length) && <div className="notice">{t("noScopeNotice")}</div>}
       <div className="kpi-grid">
-        <KpiCard label="الفروع النشطة" value={contextLoading || contextError ? "—" : branches.filter((branch) => branch.is_active).length} detail="الفروع المتاحة لحسابك" error={contextError} />
-        <KpiCard label="الطلاب النشطون" value={dataLoading || students.data === null ? "—" : students.data} detail="المسجلون في صفوف الفرع والجلسة" error={students.error} />
-        <KpiCard label="الصفوف" value={dataLoading || classes.data === null ? "—" : classes.data} detail="جميع صفوف الفرع والجلسة المحددين" error={classes.error} />
         <KpiCard
-          label="بانتظار أول تواصل"
-          value={staleCount}
-          detail="طلبات «جديد» أقدم من ثلاثة أيام في الفرع المحدد"
-          error={stale.error}
-          action={stale.error ? null : <Link className="kpi-link" to={admissionHref}>عرض الطلبات المتأخرة</Link>}
+          label={t("kpiActiveBranches")}
+          value={contextLoading || contextError ? "—" : branches.filter((branch) => branch.is_active).length}
+          detail={t("kpiActiveBranchesNote")}
+          error={contextError}
         />
-        <KpiCard label="الجلسة النشطة" value={contextLoading ? "—" : activeSession?.name ?? "لا توجد جلسة نشطة محددة"} detail="الجلسة المختارة" error={contextError} />
+        <KpiCard
+          label={t("kpiActiveStudentsShort")}
+          value={dataLoading || students.data === null ? "—" : students.data}
+          detail={t("kpiActiveStudentsShortNote")}
+          error={students.error}
+        />
+        <KpiCard
+          label={t("kpiClasses")}
+          value={dataLoading || classes.data === null ? "—" : classes.data}
+          detail={t("kpiClassesNote")}
+          error={classes.error}
+        />
+        <KpiCard
+          label={t("kpiAwaitingContact")}
+          value={staleCount}
+          detail={t("kpiAwaitingContactNote")}
+          error={stale.error}
+          action={stale.error ? null : <Link className="kpi-link" to={admissionHref}>{t("viewOverdue")}</Link>}
+        />
+        <KpiCard
+          label={t("kpiActiveSession")}
+          value={contextLoading ? "—" : activeSession?.name ?? t("noActiveSession")}
+          detail={t("kpiActiveSessionNote")}
+          error={contextError}
+        />
       </div>
-      {dataLoading && <p className="muted" role="status">جارٍ تحميل بيانات اللوحة...</p>}
-      {(students.error || classes.error || audit?.error) && <button className="button secondary" onClick={refresh}>إعادة محاولة تحميل اللوحة</button>}
-      <p className="data-note">تعرض الأرقام السجلات التي تسمح بها سياسات الوصول فقط. لا تعني النتيجة الفارغة بالضرورة عدم وجود بيانات.</p>
+      {dataLoading && <p className="muted" role="status">{t("loadingDashboard")}</p>}
+      {(students.error || classes.error || audit?.error) && (
+        <button className="button secondary" onClick={refresh}>{t("retryDashboard")}</button>
+      )}
+      <p className="data-note">{t("figuresNote")}</p>
     </section>
     <DashboardReportPrint branchId={branchId} sessionId={sessionId} />
     <div className="dashboard-grid">
       <section id="pending" className="panel">
-        <h2>أقسام قيد التجهيز</h2>
-        <p className="muted">هذه الأقسام لا تظهر في القائمة حتى يكتمل أساسها في قاعدة البيانات، حتى لا يظهر أي زر لا يعمل.</p>
-        <ul className="pending-list">
-          {pendingModules.map((item) => <li key={item.id}>
-            <strong>{item.label}</strong>
-            <span>{item.reason}</span>
-          </li>)}
-        </ul>
+        <h2>{t("pendingSections")}</h2>
+        <p className="muted">{t("pendingSectionsNote")}</p>
+        {pendingModules.length === 0
+          ? <p className="success-box" role="status">{t("allModulesComplete")}</p>
+          : <ul className="pending-list">
+            {pendingModules.map((item) => <li key={item.id}>
+              <strong>{item.label}</strong>
+              <span>{item.reason}</span>
+            </li>)}
+          </ul>}
       </section>
       <section id="admissions" className="panel admissions-glance">
-        <div className="page-heading"><div><h2>نظرة على القبول</h2></div></div>
+        <div className="page-heading"><div><h2>{t("admissionsGlance")}</h2></div></div>
         <div className="stale-counter">
           <strong>{staleCount}</strong>
           <div>
-            <p>طلب بانتظار أول تواصل</p>
-            <small>ما زالت في حالة «جديد» منذ أكثر من ثلاثة أيام دون تسجيل أي تواصل.</small>
+            <p>{t("awaitingFirstContact")}</p>
+            <small>{t("awaitingFirstContactNote")}</small>
           </div>
         </div>
-        {staleLoading && <p className="muted" role="status">جارٍ حساب الطلبات المتأخرة...</p>}
-        {stale.error && <p className="error-box" role="alert">تعذر حساب الطلبات المتأخرة: {stale.error}</p>}
+        {staleLoading && <p className="muted" role="status">{t("calculatingOverdue")}</p>}
+        {stale.error && <p className="error-box" role="alert">{t("overdueCalcFailed")}: {stale.error}</p>}
         <div className="actions">
-          <Link className="button primary" to={admissionHref}>فتح القائمة المصفّاة</Link>
-          <Link className="button secondary" to="/portal/modules/admissions">مساحة القبول</Link>
+          <Link className="button primary" to={admissionHref}>{t("openFilteredList")}</Link>
+          <Link className="button secondary" to="/portal/modules/admissions">{t("admissionsWorkspace")}</Link>
         </div>
         <div className="reminder-block">
-          <h3>تذكيرات الطلبات المتأخرة</h3>
-          <p className="data-note">تشغّل نفس المهمة التي تعمل تلقائيًا كل صباح: رسالة للمتقدم وملخص لفريق القبول. لا يتلقى أي طلب تذكيرًا أكثر من مرة.</p>
-          <button className="button secondary" onClick={() => void runReminders()} disabled={reminderBusy}>{reminderBusy ? "جارٍ تشغيل التذكيرات..." : "تشغيل التذكيرات الآن"}</button>
+          <h3>{t("reminderTitle")}</h3>
+          <p className="data-note">{t("reminderNote")}</p>
+          <button className="button secondary" onClick={() => void runReminders()} disabled={reminderBusy}>
+            {reminderBusy ? t("runningReminders") : t("runReminders")}
+          </button>
           {reminderResult && <p
             className={reminderResult.status === "error" ? "error-box" : reminderResult.status === "sent" ? "success-box" : "notice"}
             role={reminderResult.status === "error" ? "alert" : "status"}
           >{reminderResult.message}</p>}
         </div>
       </section>
-      <section id="upcoming" className="panel"><h2>الحصص القادمة</h2><p className="muted">يتوفر الآن جدول الحصص الأسبوعي وتقويم الاختبارات والفعاليات لكل شعبة.</p><div className="actions"><Link className="button secondary" to="/portal/modules/timetable">عرض الجدول والتقويم</Link><Link className="button secondary" to="/portal/modules/qr">الحضور بالرمز QR</Link></div></section>
-      <section id="audit" className="panel audit-panel"><h2>آخر أحداث التدقيق غير المتحقق منها</h2><p className="data-note">سجل عام غير مصنف حسب الفرع أو الجلسة؛ قد يتضمن معلومات مزورة ولا يثبت وقوع الأحداث المعروضة.</p>
-        {dataLoading ? <p className="muted">جارٍ تحميل سجل التدقيق...</p> : audit?.error ? <p className="error-box" role="alert">تعذر تحميل سجل التدقيق: {audit.error}</p> : !branchId || !sessionId ? <p className="muted">اختر فرعاً وجلسة لعرض اللوحة.</p> : audit?.data?.length ? <ul className="audit-list">{audit.data.map((entry) => <li key={entry.id}><strong>{entry.action}</strong><span>{entry.entity_type} · <time>{new Date(entry.created_at).toLocaleString("ar")}</time></span></li>)}</ul> : <p className="muted">لا توجد أحداث متاحة لهذا الحساب.</p>}
+      <section id="upcoming" className="panel">
+        <h2>{t("upcomingLessons")}</h2>
+        <p className="muted">{t("upcomingLessonsBody")}</p>
+        <div className="actions">
+          <Link className="button secondary" to="/portal/modules/timetable">{t("viewTimetable")}</Link>
+          <Link className="button secondary" to="/portal/modules/qr">{t("qrAttendance")}</Link>
+        </div>
+      </section>
+      <section id="audit" className="panel audit-panel">
+        <h2>{t("recentAudit")}</h2>
+        <p className="data-note">{t("auditNote")}</p>
+        {dataLoading
+          ? <p className="muted">{t("loadingAudit")}</p>
+          : audit?.error
+            ? <p className="error-box" role="alert">{t("auditLoadFailed")}: {audit.error}</p>
+            : !branchId || !sessionId
+              ? <p className="muted">{t("selectScope")}</p>
+              : audit?.data?.length
+                ? <ul className="audit-list">{audit.data.map((entry) => (
+                  <li key={entry.id}>
+                    <strong>{entry.action}</strong>
+                    <span>
+                      {entry.entity_type} ·{" "}
+                      <time>{new Date(entry.created_at).toLocaleString(numberLocales[lang])}</time>
+                    </span>
+                  </li>
+                ))}</ul>
+                : <p className="muted">{t("noAuditEvents")}</p>}
       </section>
     </div>
   </main>;

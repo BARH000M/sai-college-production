@@ -43,7 +43,7 @@ export function SystemSettings({ roles, userId }: { roles: readonly string[]; us
     catch(e){setError(e instanceof Error?e.message:String(e));}
     finally {setSaving(null);}
   }
-  return <main className="workspace" dir="rtl"><section className="panel">
+  return <main className="workspace"><section className="panel">
     <p className="eyebrow">Yemen SAI · Supabase</p><h1>إعدادات النظام</h1>
     <p className="data-note">الحفظ متاح للمدير العام فقط بعد تحميل الإعدادات بنجاح من الخادم. عند عدم توفر الخدمة تبقى عمليات الحفظ معطلة.</p>
     <p className="muted">تعرض هذه الشاشة الإعدادات التي يتيحها الخادم عند توفرها. المدير العام فقط يستطيع تغيير الإعدادات العامة؛ يستطيع المدير الاطلاع على الفئات المسموح بها. لا تحفظ كلمات مرور هنا.</p>

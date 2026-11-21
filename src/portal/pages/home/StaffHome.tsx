@@ -4,6 +4,7 @@ import { loadStaffHome, type StaffHome as StaffHomeData } from "../../lib/home";
 import { formatDateTime } from "./dateFormat";
 import { AdmissionChip, OccupancyBar } from "./SectionBits";
 import { SuperAdminOverview } from "./SuperAdminOverview";
+import { usePortalLang } from "../../lib/portalLangContext";
 
 type State =
   | { status: "loading"; data: null; error: null }
@@ -11,6 +12,7 @@ type State =
   | { status: "error"; data: null; error: string };
 
 export function StaffHome({ superAdmin = false }: { superAdmin?: boolean }) {
+  const { t, lang } = usePortalLang();
   const [state, setState] = useState<State>({ status: "loading", data: null, error: null });
   const [retry, setRetry] = useState(0);
 
@@ -32,63 +34,63 @@ export function StaffHome({ superAdmin = false }: { superAdmin?: boolean }) {
     {superAdmin && <SuperAdminOverview />}
     <div className="page-heading">
       <div>
-        <p className="eyebrow">الإدارة والأكاديمية</p>
-        <h1>لوحة التحكم</h1>
-        <p className="muted">نظرة سريعة على الطلاب والصفوف وطلبات القبول الجديدة.</p>
+        <p className="eyebrow">{t("adminEyebrow")}</p>
+        <h1>{t("dashboardTitle")}</h1>
+        <p className="muted">{t("dashboardIntro")}</p>
       </div>
       <div className="actions">
-        <Link className="button secondary" to="/portal/operations">التقارير والتذكيرات</Link>
-        <button className="button secondary" onClick={refresh} disabled={state.status === "loading"}>تحديث</button>
+        <Link className="button secondary" to="/portal/operations">{t("reportsAndReminders")}</Link>
+        <button className="button secondary" onClick={refresh} disabled={state.status === "loading"}>{t("refresh")}</button>
       </div>
     </div>
 
-    {state.status === "loading" && <p role="status">جارٍ تحميل بيانات الأكاديمية...</p>}
+    {state.status === "loading" && <p role="status">{t("loadingAcademics")}</p>}
 
     {state.status === "error" && <section className="panel">
-      <p className="error-box" role="alert">تعذر تحميل بيانات اللوحة: {state.error}</p>
+      <p className="error-box" role="alert">{t("dashboardLoadFailed")}: {state.error}</p>
       <div className="actions" style={{ marginTop: 12 }}>
-        <button className="button secondary" onClick={refresh}>إعادة المحاولة</button>
+        <button className="button secondary" onClick={refresh}>{t("retry")}</button>
       </div>
     </section>}
 
     {data && <>
       <div className="kpi-grid home-kpi-grid">
         <div className="kpi-card">
-          <span>الطلاب النشطون</span>
+          <span>{t("kpiActiveStudents")}</span>
           <strong>{data.activeStudents}</strong>
-          <small>السجلات النشطة المتاحة لحسابك</small>
+          <small>{t("kpiActiveStudentsNote")}</small>
         </div>
         <div className="kpi-card">
-          <span>الصفوف النشطة</span>
+          <span>{t("kpiRunningClasses")}</span>
           <strong>{data.runningClasses}</strong>
-          <small>شعب مفتوحة في الجلسات المسموحة</small>
+          <small>{t("kpiRunningClassesNote")}</small>
         </div>
         <div className="kpi-card">
-          <span>طلبات قبول جديدة</span>
+          <span>{t("kpiNewEnquiries")}</span>
           <strong>{data.newEnquiries}</strong>
-          <small>بانتظار أول تواصل</small>
+          <small>{t("kpiNewEnquiriesNote")}</small>
         </div>
         <div className="kpi-card">
-          <span>الفروع</span>
+          <span>{t("kpiBranches")}</span>
           <strong>{data.branches.length}</strong>
-          <small>{data.sessions.length} جلسة أكاديمية</small>
+          <small>{t("kpiSessionsNote").replace("{count}", String(data.sessions.length))}</small>
         </div>
       </div>
 
       <div className="home-split">
         <section className="panel">
           <div className="home-panel-head">
-            <h2>أحدث طلبات القبول</h2>
-            <Link className="text-button" to="/portal/modules/admissions">فتح مساحة القبول</Link>
+            <h2>{t("latestEnquiries")}</h2>
+            <Link className="text-button" to="/portal/modules/admissions">{t("openAdmissionsWorkspace")}</Link>
           </div>
           {!data.enquiries.length
-            ? <p className="muted">لا توجد طلبات قبول متاحة لحسابك بعد.</p>
+            ? <p className="muted">{t("noEnquiries")}</p>
             : <ul className="home-enquiry-list">
               {data.enquiries.map((row) => <li key={row.id} className="home-enquiry">
                 <div className="home-enquiry-main">
                   <strong>{row.applicant_full_name}</strong>
                   <small dir="ltr">{row.application_no}</small>
-                  <small>{row.preferred_program ?? "برنامج غير محدد"} · {formatDateTime(row.created_at)}</small>
+                  <small>{row.preferred_program ?? t("programUnspecified")} · {formatDateTime(row.created_at, lang)}</small>
                 </div>
                 <AdmissionChip status={row.status} />
               </li>)}
@@ -97,16 +99,16 @@ export function StaffHome({ superAdmin = false }: { superAdmin?: boolean }) {
 
         <section className="panel">
           <div className="home-panel-head">
-            <h2>الفروع والجلسات</h2>
-            <Link className="text-button" to="/portal/modules/branches">إدارة الفروع</Link>
+            <h2>{t("branchesAndSessions")}</h2>
+            <Link className="text-button" to="/portal/modules/branches">{t("manageBranches")}</Link>
           </div>
-          <h3 className="home-subheading">الفروع</h3>
+          <h3 className="home-subheading">{t("branchesLabel")}</h3>
           {!data.branches.length
-            ? <p className="muted">لا توجد فروع متاحة.</p>
+            ? <p className="muted">{t("noBranches")}</p>
             : <div className="role-chips">{data.branches.map((branch) => <span className="role-chip" key={branch.id}>{branch.name}</span>)}</div>}
-          <h3 className="home-subheading">الجلسات الأكاديمية</h3>
+          <h3 className="home-subheading">{t("academicSessionsLabel")}</h3>
           {!data.sessions.length
-            ? <p className="muted">لا توجد جلسات متاحة.</p>
+            ? <p className="muted">{t("noSessions")}</p>
             : <ul className="home-session-list">
               {data.sessions.map((session) => <li key={session.id}><i className="ri-calendar-2-line" aria-hidden="true"></i>{session.name}</li>)}
             </ul>}
@@ -115,25 +117,37 @@ export function StaffHome({ superAdmin = false }: { superAdmin?: boolean }) {
 
       <section className="panel">
         <div className="home-panel-head">
-          <h2>شعب الصفوف والإشغال</h2>
-          <Link className="text-button" to="/portal/modules/classes">إدارة الصفوف</Link>
+          <h2>{t("sectionsOccupancy")}</h2>
+          <Link className="text-button" to="/portal/modules/classes">{t("manageClasses")}</Link>
         </div>
-        <p className="data-note">عدد المسجلين لكل شعبة من الطلاب النشطين، مقارنة بالسعة المعتمدة.</p>
+        <p className="data-note">{t("sectionsOccupancyNote")}</p>
         {!data.sections.length
-          ? <p className="muted">لا توجد شعب متاحة لحسابك بعد.</p>
+          ? <p className="muted">{t("noSections")}</p>
           : <div className="table-scroll">
             <table className="management-table">
-              <thead><tr><th>الشعبة</th><th>البرنامج</th><th>الفرع</th><th>الإشغال</th><th>الحضور</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>{t("thSection")}</th>
+                  <th>{t("thProgram")}</th>
+                  <th>{t("thBranch")}</th>
+                  <th>{t("thOccupancy")}</th>
+                  <th>{t("thAttendance")}</th>
+                </tr>
+              </thead>
               <tbody>
                 {data.sections.map((section) => <tr key={section.id}>
                   <td>
                     <strong>{section.name}</strong>
-                    <small className="learn-meta">{section.sessionName}{section.isActive ? "" : " · غير نشطة"}</small>
+                    <small className="learn-meta">{section.sessionName}{section.isActive ? "" : ` · ${t("inactive")}`}</small>
                   </td>
                   <td>{section.program}</td>
                   <td>{section.branchName}</td>
                   <td><OccupancyBar enrolled={section.enrolled} capacity={section.capacity} /></td>
-                  <td><Link className="button secondary attendance-shortcut" to={`/portal/modules/attendance?class=${section.id}`}><i className="ri-calendar-check-line" aria-hidden="true"></i> سجل الحضور</Link></td>
+                  <td>
+                    <Link className="button secondary attendance-shortcut" to={`/portal/modules/attendance?class=${section.id}`}>
+                      <i className="ri-calendar-check-line" aria-hidden="true"></i> {t("attendanceRegister")}
+                    </Link>
+                  </td>
                 </tr>)}
               </tbody>
             </table>

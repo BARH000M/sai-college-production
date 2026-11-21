@@ -48,7 +48,7 @@ export function HrPage({ roles, userId }: { roles: readonly string[]; userId: st
     return <UnifiedModulePage roles={roles} spec={unifiedModules.staff} headerExtra={<TabBar active={tab} onChange={setTab} roles={roles} />} />;
   }
 
-  return <main className="workspace" dir="rtl">
+  return <main className="workspace">
     <section className="panel">
       <p className="eyebrow">الموارد البشرية</p>
       <h1>{tab === "payroll" ? "مسير الرواتب" : "إدارة الإجازات"}</h1>

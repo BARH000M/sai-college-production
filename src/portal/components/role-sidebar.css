@@ -23,6 +23,23 @@
 }
 .portal-root .role-nav-child { min-height: 38px; padding: 7px 9px; font-size: 11px; }
 .portal-root .role-nav-child > i:first-child { font-size: 15px; min-width: 20px; }
+.portal-root .role-nav-submenu { display: grid; gap: 1px; }
+.portal-root .role-nav-submenu + .role-nav-submenu { margin-top: 4px; }
+.portal-root .role-nav-submenu-label {
+  margin: 4px 0 2px;
+  padding-inline-start: 2px;
+  font-size: 9px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: oklch(var(--foreground-500));
+}
+.portal-root .role-nav-subtag {
+  margin-inline-start: auto;
+  font-size: 8.5px; font-weight: 600;
+  color: oklch(var(--foreground-400));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 88px;
+}
+.portal-root .role-nav-child.active .role-nav-subtag { color: oklch(var(--primary-600)); }
+.portal-root .layout.collapsed .role-nav-submenu-label,
+.portal-root .layout.collapsed .role-nav-subtag { display: none; }
 .portal-root .layout.collapsed .role-nav-children { display: none; }
 .portal-root .layout.collapsed .role-nav-chevron { display: none; }
 @media (max-width: 900px) {
