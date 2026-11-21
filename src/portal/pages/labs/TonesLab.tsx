@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { tonePractice, toneReferences } from "@/mocks/learningLabs";
 import { AnswerMark, LabPage } from "@/portal/pages/labs/LabShell";
+import { useLabDatasets } from "@/portal/pages/labs/LabDataContext";
 
 export function TonesLab() {
+  const { tonePractice, toneReferences } = useLabDatasets();
   const [playingTone, setPlayingTone] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
 

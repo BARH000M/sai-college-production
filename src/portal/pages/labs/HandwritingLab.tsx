@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { handwritingChars } from "@/mocks/learningLabs";
 import { LabPage } from "@/portal/pages/labs/LabShell";
+import { useLabDatasets } from "@/portal/pages/labs/LabDataContext";
 
 type Point = { x: number; y: number };
 
 export function HandwritingLab() {
+  const { handwritingChars } = useLabDatasets();
   const [charId, setCharId] = useState(handwritingChars[0].id);
   const [showGuide, setShowGuide] = useState(true);
   const [hasInk, setHasInk] = useState(false);

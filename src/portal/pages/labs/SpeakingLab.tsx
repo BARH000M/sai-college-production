@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { speakingDrills } from "@/mocks/learningLabs";
 import { LabPage } from "@/portal/pages/labs/LabShell";
+import { useLabDatasets } from "@/portal/pages/labs/LabDataContext";
 
 const RECORD_SECONDS = 3;
 const BARS = [22, 46, 68, 38, 74, 52, 88, 44, 62, 30, 78, 56, 36, 84, 48, 66, 26, 70, 42, 58];
@@ -8,6 +8,7 @@ const BARS = [22, 46, 68, 38, 74, 52, 88, 44, 62, 30, 78, 56, 36, 84, 48, 66, 26
 type Result = { overall: number; tone: number; clarity: number; rhythm: number; note: string };
 
 export function SpeakingLab() {
+  const { speakingDrills } = useLabDatasets();
   const [drillId, setDrillId] = useState(speakingDrills[0].id);
   const [recording, setRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);

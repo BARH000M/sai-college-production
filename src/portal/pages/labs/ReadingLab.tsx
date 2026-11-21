@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { readingPassages } from "@/mocks/learningLabs";
 import { AnswerMark, LabPage } from "@/portal/pages/labs/LabShell";
+import { useLabDatasets } from "@/portal/pages/labs/LabDataContext";
 
 export function ReadingLab() {
+  const { readingPassages } = useLabDatasets();
   const [passageId, setPassageId] = useState(readingPassages[0].id);
   const [showPinyin, setShowPinyin] = useState(true);
   const [answers, setAnswers] = useState<Record<string, number>>({});

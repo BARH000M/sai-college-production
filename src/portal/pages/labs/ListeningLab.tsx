@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { labSummaryStats, listeningLessons } from "@/mocks/learningLabs";
 import { AnswerMark, LabPage, LabStats } from "@/portal/pages/labs/LabShell";
+import { useLabDatasets } from "@/portal/pages/labs/LabDataContext";
 
 const WAVE = Array.from({ length: 56 }, (_, index) => 18 + Math.round(Math.abs(Math.sin(index * 1.7)) * 58));
 
@@ -11,6 +11,7 @@ function clock(value: number): string {
 }
 
 export function ListeningLab() {
+  const { labSummaryStats, listeningLessons } = useLabDatasets();
   const [lessonId, setLessonId] = useState(listeningLessons[0].id);
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
